@@ -10,6 +10,7 @@ import sys
 import shutil
 import argparse
 import csv
+import hashlib
 import validators
 from typing import Dict, Iterator
 import datetime
@@ -26,7 +27,7 @@ default_config = {
     "questions_url_path": "",
     "save_path": "",
     "company_tag_save_path": "",
-    "save_images_locally": False,
+    "cache_downloads": False,
     "overwrite": False,
     "preferred_language_order": "csharp,cpp,python3,java,c,golang",
     "include_submissions_count": 100
@@ -98,7 +99,7 @@ def generate_config():
         "questions_url_path": "Enter Questions URL Save Path: ",
         "save_path": "Enter Save Path: ",
         "company_tag_save_path": "Enter Company Tag Save Path: ",
-        "save_images_locally": "Save images locally as base64 T/F? (T/F): ",
+        "cache_downloads": "Cache images and json locally T/F? (T/F): ",
         "overwrite": "Overwrite existing files T/F? (T/F): ",
         "preferred_language_order": "Enter order of the preferred solution language (all or a command separate list of languages c, cpp, csharp, java, python3, javascript, typescript, golang): ",
         "include_submissions_count": "How many of your own submissions should be incldued (0 for none, a large integer for all): "
@@ -201,7 +202,9 @@ def write_questions_to_file(all_questions, questions_url_path):
 def scrape_question_url():
     headers = create_headers(CONFIG.leetcode_cookie)
     all_questions = get_all_questions_url(self_function=False)
+
     create_folder(os.path.join(CONFIG.save_path, "questions"))
+
     with open(CONFIG.questions_url_path) as f:
         for row in csv.reader(f):
             question_id = int(row[0])
@@ -236,13 +239,13 @@ def create_question_html(question_id, question_slug, question_title, headers):
     question_content, question_title = get_question_data(item_content, headers)
     content += question_content
     content += """</body>"""
-    slides_json = find_slides_json(content)
+    slides_json = find_slides_json(content, question_id)
     content = markdown2.markdown(content)
     content = attach_header_in_html() + content
     content_soup = BeautifulSoup(content, 'html.parser')
-    content_soup = replace_iframes_with_codes(content_soup, headers, question_id, question_title)
+    content_soup = replace_iframes_with_codes(content_soup, headers, question_id)
     content_soup = place_solution_slides(content_soup, slides_json)
-    content_soup = fix_image_urls(content_soup, CONFIG.save_images_locally, question_id, question_title)
+    content_soup = fix_image_urls(content_soup)
     content_soup = convert_display_math_to_inline(content_soup)
     with open(f"{question_id:04}-{question_title}.html", 'w', encoding="utf-8") as f:
         f.write(content_soup.prettify())
@@ -291,7 +294,7 @@ def scrape_card_url():
                             if f"{item_title}.html" in os.path.join(CONFIG.save_path, "questions"):
                                 if os.path.getsize(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html")) > os.path.getsize(os.path.join(
                                     CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html")):
-                                    copy_file(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
+                                    shutil.copy(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
                                     CONFIG.save_path, "cards", card_slug))
                                     try:
                                         os.remove(os.path.join(
@@ -302,7 +305,7 @@ def scrape_card_url():
                                     CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"))
                                 elif os.path.getsize(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html")) < os.path.getsize(os.path.join(
                                     CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html")):
-                                    copy_file(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"), os.path.join(save_path, "questions"))
+                                    shutil.copy(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"), os.path.join(save_path, "questions"))
                                     try:
                                         os.remove(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"))
                                     except:
@@ -312,7 +315,7 @@ def scrape_card_url():
                             continue
                         if f"{item_title}.html" in os.listdir(os.path.join(CONFIG.save_path, "questions")) and CONFIG.overwrite == False:
                             print("Copying from questions folder", item_title)
-                            copy_file(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
+                            shutil.copy(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
                                 CONFIG.save_path, "cards", card_slug))
                             os.rename(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_title}.html"), os.path.join(
                                 CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"))
@@ -333,40 +336,41 @@ def create_card_html(item_content, item_title, item_id, headers):
     content = """<body>"""
     question_content, question_title = get_question_data(item_content, headers)
     content += question_content
-    content += get_article_data(item_content, item_title, headers, item_id, question_title)
+    content += get_article_data(item_content, item_title, headers, item_id)
     content += get_html_article_data(item_content, item_title, headers)
     content += """</body>"""
-    slides_json = find_slides_json(content)
+    slides_json = find_slides_json(content, item_id)
     content = markdown2.markdown(content)
     content = attach_header_in_html() + content
     content_soup = BeautifulSoup(content, 'html.parser')
-    content_soup = replace_iframes_with_codes(content_soup, headers)
+    content_soup = replace_iframes_with_codes(content_soup, headers, item_id)
     content_soup = place_solution_slides(content_soup, slides_json)
-    content_soup = fix_image_urls(content_soup, CONFIG.save_images_locally, item_id, question_title)
+    content_soup = fix_image_urls(content_soup)
     with open(f"{item_id}-{item_title}.html", "w", encoding="utf-8") as f:
         f.write(content_soup.prettify())
 
 
-def load_image_in_b64(img_url, question_id, question_title):
+def load_image_in_b64(img_url):
     if not validators.url(img_url):
         print(f"Invalid image url: {img_url}")
         return
 
-    images_dir = os.path.join(CONFIG.save_path, "questions", "images")
-
+    images_dir = os.path.join(CONFIG.save_path, "cache", "images")
     os.makedirs(images_dir, exist_ok=True)
     
     image_file_name = os.path.basename(img_url)
     img_ext = image_file_name.split('.')[-1]
+
+    url_hash = hashlib.md5(img_url.encode()).hexdigest()
+    image_local_file_name = f"{url_hash}.{img_ext}"
+    image_local_path = os.path.join(images_dir, image_local_file_name)
+
     if img_ext == "svg":
         img_ext = "svg+xml"
 
-    image_local_file_name = f"{question_id:04}-{question_title}-{image_file_name}"
-    image_local_path = os.path.join(images_dir, image_local_file_name)
-
     encoded_string = None
 
-    if os.path.exists(image_local_path) and CONFIG.overwrite == False:
+    if CONFIG.cache_downloads and os.path.exists(image_local_path):
         print(f"Loading from {image_local_path}")
 
         with open(image_local_path, "rb") as img_file:
@@ -395,7 +399,7 @@ def load_image_in_b64(img_url, question_id, question_title):
 
 
 
-def fix_image_urls(content_soup, save_images_locally, question_id, question_title):
+def fix_image_urls(content_soup):
     print("Fixing image urls")
     images = content_soup.select('img')
     for image in images:
@@ -409,8 +413,8 @@ def fix_image_urls(content_soup, save_images_locally, question_id, question_titl
                 img_url = f"https://leetcode.com/explore/{'/'.join(splitted_image_src[index:])}"
             else:
                 img_url = image['src']
-            if save_images_locally:
-                image['src'] = load_image_in_b64(img_url, question_id, question_title)
+            if CONFIG.cache_downloads:
+                image['src'] = load_image_in_b64(img_url)
             else:
                 image['src'] = img_url
     return content_soup
@@ -461,7 +465,7 @@ def place_solution_slides(content_soup, slides_json):
     return content_soup
 
 
-def replace_iframes_with_codes(content_soup, headers, question_id, question_title):
+def replace_iframes_with_codes(content_soup, headers, question_id):
     print("Replacing iframes with codes")
 
     iframes = content_soup.find_all('iframe')
@@ -470,13 +474,13 @@ def replace_iframes_with_codes(content_soup, headers, question_id, question_titl
         if "playground" in src_url:
             uuid = src_url.split('/')[-2]
 
-            question_code_root_dir = os.path.join(CONFIG.save_path, "questions", "code")
+            question_code_root_dir = os.path.join(CONFIG.save_path, "cache", "code")
             os.makedirs(question_code_root_dir, exist_ok=True)
 
-            question_code_data_json_file = f"{question_id:04}-{question_title}-{uuid}.json"
+            question_code_data_json_file = f"{question_id:04}-{uuid}.json"
             question_code_json_path = os.path.join(question_code_root_dir, question_code_data_json_file)
 
-            if os.path.exists(question_code_json_path) and CONFIG.overwrite == False:
+            if CONFIG.cache_downloads and os.path.exists(question_code_json_path):
                 print(f"Loading from {question_code_json_path}")
                 with open(question_code_json_path, "r") as file:
                     playground_content = json.load(file)
@@ -510,6 +514,7 @@ def replace_iframes_with_codes(content_soup, headers, question_id, question_titl
                     preferred_language = preferred_language.strip()
                     if preferred_language in languages:
                         lang_to_include = preferred_language
+                        break
 
             for code_idx in range(len(playground_content)):
                 lang = playground_content[code_idx]['langSlug']
@@ -667,8 +672,12 @@ def attach_header_in_html():
  """
 
 
-def find_slides_json(content):
+def find_slides_json(content, question_id):
     print("Finding slides json")
+
+    slides_root_dir = os.path.join(CONFIG.save_path, "cache", "slides")
+    os.makedirs(slides_root_dir, exist_ok=True)
+
     word = "/Documents/"
     all_slides_json_list = re.compile(fr"!?!.*{word}.*!?!", re.MULTILINE).findall(content)
     
@@ -681,30 +690,60 @@ def find_slides_json(content):
         
         json_split = json_name.split("/")
         drop_dots = json_split[1:]
-
+        
+        documents = drop_dots[0]
+        rest_after_documents = drop_dots[1:]
         file = "/".join(drop_dots)
         file = str.lower(file)
         #file = re.sub(r'<[^>]+>', '', file)
-        slide_img_url = f"https://assets.leetcode.com/static_assets/media/{file}.json"
-        try:
-            slides_json.append(json.loads(requests.get(
-                url=slide_img_url, headers=create_headers()).content)['timeline'])
-        except:
-            slides_json.append([])
+        
+        file_hash = hashlib.md5(file.encode()).hexdigest()
+        slides_data_json_file = f"{question_id:04}-{file_hash}.json"
+        slides_data_json_path = os.path.join(slides_root_dir, slides_data_json_file)
+
+        if CONFIG.cache_downloads and os.path.exists(slides_data_json_path):
+            print(f"Loading from {slides_data_json_file}")
+            with open(slides_data_json_path, "r") as file:
+                slides_json_content = json.load(file)
+        else:
+            slide_img_url = f"https://assets.leetcode.com/static_assets/media/{file}.json"
+
+            try:
+                slides_json_obj = requests.get(url=slide_img_url, headers=create_headers())
+                if slides_json_obj.status_code == 404:
+                    print(f"{slide_img_url} NOT FOUND")
+                    # if not found try another variation
+                    file = "/".join(rest_after_documents)
+                    file = f"{str.lower(documents)}/{file}"
+                    slide_img_url = f"https://assets.leetcode.com/static_assets/media/{file}.json"
+                    slides_json_obj = requests.get(url=slide_img_url, headers=create_headers())
+
+                slides_json_obj.raise_for_status()
+
+                slides_json_content = json.loads(slides_json_obj.content)
+                slides_json_content = slides_json_content['timeline']
+            except:
+                raise Exception(f"Error in getting slides data {slide_img_url}")                
+
+            with open(slides_data_json_path, "w") as outfile:
+                outfile.write(json.dumps(slides_json_content))
+
+        slides_json.append(slides_json_content)
+
     return slides_json
 
 
-def get_article_data(item_content, item_title, headers, question_id, question_title):
+def get_article_data(item_content, item_title, headers, question_id):
     print("Getting article data")
     if item_content['article']:
-        articles_root_dir = os.path.join(CONFIG.save_path, "questions", "articles")
+        articles_root_dir = os.path.join(CONFIG.save_path, "cache", "articles")
         os.makedirs(articles_root_dir, exist_ok=True)
         
         article_id = item_content['article']['id']
-        articles_data_json_file = f"{question_id:04}-{question_title}-{article_id}.json"
+        articles_data_json_file = f"{question_id:04}-{article_id}.json"
         articles_data_json_path = os.path.join(articles_root_dir, articles_data_json_file)
 
-        if os.path.exists(articles_data_json_path) and CONFIG.overwrite == False:
+        if CONFIG.cache_downloads and os.path.exists(articles_data_json_path):
             print(f"Loading from {articles_data_json_file}")
             with open(articles_data_json_path, "r") as file:
                 article_content = json.load(file)
@@ -814,15 +853,14 @@ def get_submission_data(item_content, headers, save_submission_as_file):
     if item_content['question']:
         question_frontend_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
         question_title_slug = item_content['question']['titleSlug']
-        question_title = item_content['question']['title'] if item_content['question']['title'] else question_title_slug
 
-        submissions_root_dir = os.path.join(CONFIG.save_path, "questions", "submissions")
+        submissions_root_dir = os.path.join(CONFIG.save_path, "cache", "submissions")
         os.makedirs(submissions_root_dir, exist_ok=True)
         
-        submission_data_json_file = f"{question_frontend_id:04}-{question_title}-submissions.json"
+        submission_data_json_file = f"{question_frontend_id:04}.json"
         submission_data_json_path = os.path.join(submissions_root_dir, submission_data_json_file)
 
-        if os.path.exists(submission_data_json_path) and CONFIG.overwrite == False:
+        if CONFIG.cache_downloads and os.path.exists(submission_data_json_path):
             print(f"Loading from {submission_data_json_file}")
             with open(submission_data_json_path, "r") as file:
                 submission_content = json.load(file)
@@ -875,10 +913,14 @@ def get_submission_data(item_content, headers, save_submission_as_file):
             if save_submission_as_file:
                 list_of_submissions[int(submission["timestamp"])] = submission_detail_content['code']
             else:
-                file_extension = FILE_EXTENSIONS[submission["lang"]]
-                submission_file_name = os.path.join(submissions_root_dir, f"{question_frontend_id:04}-{question_title}-{i+1:02}-{submission_id}.{file_extension}")
+                submissions_download_dir = os.path.join(CONFIG.save_path, "questions", "submissions")
+                os.makedirs(submissions_download_dir, exist_ok=True)
 
-                with open(submission_file_name, "w") as outfile:
+                file_extension = FILE_EXTENSIONS[submission["lang"]]
+                submission_file_name = f"{question_frontend_id:04}-{i+1:02}-{submission_id}.{file_extension}"
+                submission_file_path = os.path.join(submissions_download_dir, submission_file_name)
+
+                with open(submission_file_path, "w") as outfile:
                     outfile.write(submission_detail_content['code'])
     return list_of_submissions
 
@@ -890,13 +932,13 @@ def get_question_data(item_content, headers):
         question_title_slug = item_content['question']['titleSlug']
         question_title = item_content['question']['title'] if item_content['question']['title'] else question_title_slug
 
-        question_data_root_dir = os.path.join(CONFIG.save_path, "questions", "data")
+        question_data_root_dir = os.path.join(CONFIG.save_path, "cache", "qdata")
         os.makedirs(question_data_root_dir, exist_ok=True)
 
-        question_data_json_file = f"{question_id:04}-{question_title}.json"
+        question_data_json_file = f"{question_id:04}.json"
         question_data_json_path = os.path.join(question_data_root_dir, question_data_json_file)
 
-        if os.path.exists(question_data_json_path) and CONFIG.overwrite == False:
+        if CONFIG.cache_downloads and os.path.exists(question_data_json_path):
             print(f"Loading from {question_data_json_path}")
             with open(question_data_json_path, "r") as file:
                 question_content = json.load(file)
@@ -939,6 +981,7 @@ def get_question_data(item_content, headers):
         else:
             hint_content = "No Hints"
 
+        submission_content = "No accepted submissions."
 
         if CONFIG.include_submissions_count > 0:
             item_content = {"question": {'titleSlug': question_title_slug, 'frontendQuestionId': question_id, 'title': question_title}}
@@ -954,8 +997,6 @@ def get_question_data(item_content, headers):
                     submission_time = datetime.datetime.fromtimestamp(sub_timestamp).strftime("%Y-%m-%d %H.%M.%S")
                     submission_content += f"""<div><h4>Submission Time: {submission_time}</h4>
                     <pre class="question__default_code">{code}</pre></div>"""
-        else:
-            submission_content = "No accepted submissions."
 
  
         return f""" <h2 class="question__url"><a target="_blank" href="{question_url}">{question_id}. {question_title}</a></h2><p> Difficulty: {difficulty}</p>
@@ -1011,6 +1052,7 @@ def scrape_selected_company_questions(choice):
     create_folder(os.path.join(CONFIG.save_path, "all_company_questions"))
     headers = create_headers(CONFIG.leetcode_cookie)
     final_company_tags = []
+
     with open(CONFIG.company_tag_save_path, 'r') as f:
         company_tags = f.readlines()
         for company_tag in company_tags:
@@ -1018,16 +1060,13 @@ def scrape_selected_company_questions(choice):
             final_company_tags.append(
                 {"name": company_tag,
                  'slug': company_tag})
-    if choice == "9":
+
+    if choice == 9:
         create_all_company_index_html(final_company_tags, headers)
-    elif choice == "10":
+    elif choice == 10:
         for company in final_company_tags:
-            slug = company['slug']
-            create_folder(os.path.join(
-                CONFIG.save_path, "all_company_questions", slug))
-            with open(os.path.join(CONFIG.save_path, "all_company_questions", slug, "index.html"), 'r') as f:
-                html = f.read()
-                scrape_question_data(slug, headers, html)
+            company_slug = company['slug']
+            scrape_question_data(company_slug, headers)
             os.chdir("..")
     os.chdir("..")
 
@@ -1050,16 +1089,12 @@ def scrape_all_company_questions(choice):
     print(company_tags_data)
     company_tags = company_tags_data['pageProps']['dehydratedState']['queries'][0]['state']['data']['companyTags']
 
-    if choice == "7":
+    if choice == 7:
         create_all_company_index_html(company_tags, headers)
-    elif choice == "8":
+    elif choice == 8:
         for company in company_tags:
-            slug = company['slug']
-            create_folder(os.path.join(
-                CONFIG.save_path, "all_company_questions", slug))
-            with open(os.path.join(CONFIG.save_path, "all_company_questions", slug, "index.html"), 'r') as f:
-                html = f.read()
-                scrape_question_data(slug, headers, html)
+            company_slug = company['slug']
+            scrape_question_data(company_slug, headers)
             os.chdir("..")
     os.chdir('..')
 
@@ -1096,40 +1131,57 @@ def create_all_company_index_html(company_tags, headers):
         "all": "All"
     }
     for company in company_tags:
-        slug = company['slug']
+        company_slug = company['slug']
 
-        create_folder(os.path.join(
-            CONFIG.save_path, "all_company_questions", slug))
-        if slug in os.listdir(os.path.join(
-                CONFIG.save_path, "all_company_questions")) and CONFIG.overwrite == False and "index.html" in os.listdir(os.path.join(
-                CONFIG.save_path, "all_company_questions", slug)):
-            print("Already Scraped", slug)
+        company_root_dir = os.path.join(CONFIG.save_path, "all_company_questions", company_slug)
+        os.makedirs(company_root_dir, exist_ok=True)
+
+        if CONFIG.overwrite == False and "index.html" in os.listdir(company_root_dir):
+            print("Already Scraped", company_slug)
             continue
-        print("Scrapping Index for ", slug)
+        print("Scrapping Index for ", company_slug)
+
+        companies_data_root_dir = os.path.join(CONFIG.save_path, "cache", "companies")
+        os.makedirs(companies_data_root_dir, exist_ok=True)
 
         overall_html = ''
 
         for favoriteSlug in favoriteSlugs:
-            favoriteCompanySlug = f"{slug}-{favoriteSlug}"
-            company_data = {
-                "operationName": "favoriteQuestionList",
-                "variables": {
-                    "favoriteSlug": favoriteCompanySlug,
-                    "filter": {
-                        "positionRoleTagSlug": "",
-                        "skip": 0,
-                        "limit": 10000
-                    }
-                },
-                "query": "\n    query favoriteQuestionList($favoriteSlug: String!, $filter: FavoriteQuestionFilterInput) {\n  favoriteQuestionList(favoriteSlug: $favoriteSlug, filter: $filter) {\n    questions {\n      difficulty\n      id\n      paidOnly\n      questionFrontendId\n      status\n      title\n      titleSlug\n      translatedTitle\n      isInMyFavorites\n      frequency\n      topicTags {\n        name\n        nameTranslated\n        slug\n      }\n    }\n    totalLength\n    hasMore\n  }\n}\n    "}
-            company_response_content = json.loads(requests.post(
-                url=LEETCODE_GRAPHQL_URL, headers=headers, json=company_data).content)
-            with open(os.path.join(CONFIG.save_path, "all_company_questions", slug, f"{favoriteSlug}.json"), 'w') as f:
-                f.write(json.dumps(company_response_content))
 
-            company_response = company_response_content['data']['favoriteQuestionList']        
-            
-            company_questions = company_response['questions']
+            favoriteCompanySlug = f"{company_slug}-{favoriteSlug}"
+            comapny_data_json_file = f"{favoriteCompanySlug}.json"
+            company_data_json_path = os.path.join(companies_data_root_dir, comapny_data_json_file)
+
+            if CONFIG.cache_downloads and os.path.exists(company_data_json_path):
+                print(f"Loading from {company_data_json_path}")
+                with open(company_data_json_path, "r") as file:
+                    company_questions = json.load(file)
+            else:
+                try:
+                    company_data = {
+                        "operationName": "favoriteQuestionList",
+                        "variables": {
+                            "favoriteSlug": favoriteCompanySlug,
+                            "filter": {
+                                "positionRoleTagSlug": "",
+                                "skip": 0,
+                                "limit": 10000
+                            }
+                        },
+                        "query": "\n    query favoriteQuestionList($favoriteSlug: String!, $filter: FavoriteQuestionFilterInput) {\n  favoriteQuestionList(favoriteSlug: $favoriteSlug, filter: $filter) {\n    questions {\n      difficulty\n      id\n      paidOnly\n      questionFrontendId\n      status\n      title\n      titleSlug\n      translatedTitle\n      isInMyFavorites\n      frequency\n      topicTags {\n        name\n        nameTranslated\n        slug\n      }\n    }\n    totalLength\n    hasMore\n  }\n}\n    "}
+
+                    response = requests.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=company_data)
+                    response.raise_for_status()
+
+                    company_response_content = json.loads(response.content)
+                    company_questions = company_response_content['data']['favoriteQuestionList']['questions']
+                    with open(company_data_json_path, 'w') as f:
+                        f.write(json.dumps(company_questions))
+
+                except:
+                    raise Exception("Error in getting question data")
+
+
             html = ''
             for question in company_questions:
                 questionFrontEndId = int(question['questionFrontendId'])
@@ -1143,7 +1195,7 @@ def create_all_company_index_html(company_tags, headers):
                             <td><a target="_blank" href="https://leetcode.com/problems/{question['titleSlug']}">Leetcode Url</a></td>
                             </tr>'''
             # Write each favorite slug
-            with open(os.path.join(CONFIG.save_path, "all_company_questions", slug, f"{favoriteSlug}-index.html"), 'w') as f:
+            with open(os.path.join(company_root_dir, f"{favoriteSlug}.html"), 'w') as f:
                 f.write(f"""<!DOCTYPE html>
                     <html lang="en">
                     <head> </head>
@@ -1157,7 +1209,7 @@ def create_all_company_index_html(company_tags, headers):
                 <table>{html}</table>"""
 
         # Write index html
-        with open(os.path.join(CONFIG.save_path, "all_company_questions", slug, "index.html"), 'w') as f:
+        with open(os.path.join(company_root_dir, "index.html"), 'w') as f:
             f.write(f"""<!DOCTYPE html>
                 <html lang="en">
                 <head> </head>
@@ -1165,64 +1217,36 @@ def create_all_company_index_html(company_tags, headers):
                 </html>""")
         os.chdir("..")
 
-def merge(paths, output_path):
-    # Merge multiple pdf files into a single pdf
-    merger = PdfMerger()
 
-    for pdf in paths:
-        merger.append(pdf)
-    
-    merger.write(output_path)
-    merger.close()
-    print(f"Merged PDF saved as {output_path}")
-
-def merge_pdfs_in_directory(directory, filename_no_ext):
-    # Merge PDFs in a single directory
-    pdf_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.lower().endswith('.pdf')]
-    pdf_files.sort(reverse=False)  # Sort files if necessary
-
-    if pdf_files:
-        parent_directory = os.path.dirname(directory)
-        merged_pdf_path = os.path.join(parent_directory, f"{filename_no_ext}.pdf")
-        merge(pdf_files, merged_pdf_path)
-        return merged_pdf_path
-
-
-def scrape_question_data(slug, headers, html):
+def scrape_question_data(company_slug, headers):
     print("Scraping question data")
 
-    if "questions" not in os.listdir(CONFIG.save_path):
-        os.mkdir(os.path.join(CONFIG.save_path, "questions"))
+    questions_dir = os.path.join(CONFIG.save_path, "questions")
+    questions_pdf_dir = os.path.join(questions_dir, "pdf")
+    company_root_dir = os.path.join(CONFIG.save_path, "all_company_questions", company_slug)
+    companies_data_root_dir = os.path.join(CONFIG.save_path, "cache", "companies")
+    os.makedirs(questions_dir, exist_ok=True)
+    os.makedirs(questions_pdf_dir, exist_ok=True)
+    os.makedirs(company_root_dir, exist_ok=True)
 
     questions_seen = set()
     
-    difficulty_levels = ["easy", "medium", "hard"]
-
-    favoriteSlugs = {
-        "thirty-days": "30d",
-        "three-months": "3m",
-        "six-months": "6m",
-        "more-than-six-months": "6mp",
-        "all": "all"
-    }
-
-    company_root_dir  = os.path.join(CONFIG.save_path, "all_company_questions", slug)
-    questions_dir    = os.path.join(CONFIG.save_path, "questions")
-    questions_pdf_dir = os.path.join(questions_dir, "pdf")
-
-    root_pdf_id = 0
+    favoriteSlugs = ["thirty-days", "three-months", "six-months", "more-than-six-months", "all"]
 
     for favoriteSlug in favoriteSlugs:
         company_data = None
-        with open(os.path.join(CONFIG.save_path, "all_company_questions", slug, f"{favoriteSlug}.json"), 'r') as f:
-            company_data = json.loads(f.read())
 
-        questions = company_data["data"]["favoriteQuestionList"]["questions"]
+        comapny_data_json_file = f"{company_slug}-{favoriteSlug}.json"
+        company_data_json_path = os.path.join(companies_data_root_dir, comapny_data_json_file)
 
-        if favoriteSlug not in os.listdir(company_root_dir):
-            os.mkdir(os.path.join(company_root_dir, favoriteSlug))
+        if not os.path.exists(company_data_json_path):
+            raise Exception(f"Company data not found {company_data_json_path}")
 
-        company_period_dir  = os.path.join(company_root_dir, favoriteSlug)
+        with open(company_data_json_path, 'r') as f:
+            questions = json.loads(f.read())
+
+        company_fav_dir  = os.path.join(company_root_dir, favoriteSlug)
+        os.makedirs(company_fav_dir, exist_ok=True)
 
         # sort by frequency, high frequency first
         questions = sorted(questions, key=lambda x: x['frequency'], reverse=True)
@@ -1230,7 +1254,7 @@ def scrape_question_data(slug, headers, html):
         question_sort_order_idx = 0
         
         for question in questions:
-            question_id = int(question['id'])
+            question_id = int(question['questionFrontendId'])
 
             # skip already processed questions
             if question_id in questions_seen:
@@ -1239,8 +1263,7 @@ def scrape_question_data(slug, headers, html):
 
             question_sort_order_idx = question_sort_order_idx + 1
 
-            questionFrontendId = int(question['questionFrontendId'])
-            difficulty = str.lower(question['difficulty'])
+            
             question_title = question['title']
             question_slug = question['titleSlug']
             question_filename = re.sub(r'[:?|></\\]', replace_filename, question_title)
@@ -1250,45 +1273,19 @@ def scrape_question_data(slug, headers, html):
             question_pdf_filename = f"{question_filename}.pdf"
        
             questions_html_path   = os.path.join(questions_dir, question_html_filename)
-            
             questions_pdf_path   = os.path.join(questions_dir, "pdf", question_pdf_filename)
 
-            if difficulty not in os.listdir(company_period_dir):
-                os.mkdir(os.path.join(company_period_dir, difficulty))
-
-            company_dir  = os.path.join(company_period_dir, difficulty)
-
-            # company_filename = f"{round(frequency, 1):03}-{question_title}"
-            company_filename = f"{question_sort_order_idx:04}-{question_title}"
-            company_html_filename = f"{company_filename}.html"
-            company_pdf_filename = f"{company_filename}.pdf"
-            company_html_path = os.path.join(company_dir, company_html_filename)
-            company_pdf_path = os.path.join(company_dir, company_pdf_filename)
+            company_html_path = os.path.join(company_fav_dir, question_html_filename)
+            company_pdf_path = os.path.join(company_fav_dir, question_pdf_filename)
 
             if CONFIG.overwrite:
-                create_question_html(questionFrontendId, question_slug, company_filename, headers)
-                copy_file(company_html_path, questions_html_path)
+                create_question_html(questionFrontendId, question_slug, question_filename, headers)
+                shutil.copy(company_html_path, questions_html_path)
             else:
-                if company_html_filename in os.listdir(company_dir) and question_html_filename in os.listdir(questions_dir):
-                    if os.path.getsize(questions_html_path) > os.path.getsize(company_html_path):
-                        copy_file(questions_html_path, company_html_path)
-                    else:
-                        copy_file(company_html_path, questions_html_path)
-                elif question_html_filename in os.listdir(questions_dir):
-                    copy_file(questions_html_path, company_html_path)
-                
-                if "pdf" in os.listdir(questions_dir) and question_pdf_filename in os.listdir(questions_pdf_dir):
-                    copy_file(questions_pdf_path, company_pdf_path)
-
-        for difficulty in difficulty_levels:
-            root_pdf_id = root_pdf_id + 1
-            company_dir  = os.path.join(company_period_dir, difficulty)
-            merge_pdfs_in_directory(company_dir, f"{root_pdf_id:02}-{slug}-{favoriteSlugs[favoriteSlug]}-{difficulty}")
-
-
-def copy_file(src, dst):
-    shutil.copy(src, dst)
-
+                if os.path.exists(questions_html_path):
+                    shutil.copy(questions_html_path, company_html_path)
+                if os.path.exists(questions_pdf_path):
+                    shutil.copy(questions_pdf_path, company_pdf_path)
 
 def replace_filename(str):
     numDict = {':': ' ', '?': ' ', '|': ' ', '>': ' ', '<': ' ', '/': ' ', '\\': ' '}
@@ -1305,7 +1302,7 @@ def manual_convert_images_to_base64():
                 question_title = str.join('-', parts[1:])
                 with open(os.path.join(root, file), "r") as f:
                     soup = BeautifulSoup(f.read(), 'html.parser')
-                    res_soup = fix_image_urls(soup, True, question_id, question_title)
+                    res_soup = fix_image_urls(soup, True)
                 with open(os.path.join(root, file), "w") as f:
                     f.write(res_soup.prettify())
     
@@ -1324,7 +1321,7 @@ if __name__ == '__main__':
                         required=False)
     clear()
     args = parser.parse_args()
-    previous_choice = "0"
+    previous_choice = 0
     if args.proxy:
         os.environ['http_proxy'] = "http://"+args.proxy
         os.environ['https_proxy'] = "http://"+args.proxy
@@ -1335,54 +1332,59 @@ if __name__ == '__main__':
         # print("Proxy set", requests.get(
         #     "https://httpbin.org/ip").content)
         try:
-            print("""Starting Leetcode-Scraper v1.5-stable, Built by Anilabha Datta
-                Github-Repo: https://github.com/anilabhadatta/leetcode-scraper
-                Press 1: To setup config
-                Press 2: To select config[Default: 0]
-                Press 3: To get all cards url
-                Press 4: To get all question url
-                Press 5: To scrape card url
-                Press 6: To scrape question url
-                Press 7: To scrape all company questions indexes
-                Press 8: To scrape all company questions
-                Press 9: To scrape selected company questions indexes
-                Press 10: To scrape selected company questions
-                Press 11: To convert images to base64 using os.walk
-                Press 12: To save submissions in files
-                Press any to quit
+            print("""Leetcode-Scraper v1.5-stable
+1: To setup config
+2: To select config[Default: 0]
+3: To get all cards url
+4: To get all question url
+5: To scrape card url
+6: To scrape question url
+7: To scrape all company questions indexes
+8: To scrape all company questions
+9: To scrape selected company questions indexes
+10: To scrape selected company questions
+11: To convert images to base64 using os.walk
+12: To save submissions in files
+                  
+Press any to quit
                 """)
-            if previous_choice != "0":
+            if previous_choice != 0:
                 print("Previous Choice: ", previous_choice)
             else:
                 choice = input("Enter your choice: ")
 
+            try:
+                choice = int(choice)
+            except Exception:
+                break
+
             if choice > 2:
                 CONFIG = load_config()
 
-            if choice == "1":
+            if choice == 1:
                 generate_config()
-            elif choice == "2":
+            elif choice == 2:
                 select_config()
-            elif choice == "3":
+            elif choice == 3:
                 get_all_cards_url()
-            elif choice == "4":
+            elif choice == 4:
                 get_all_questions_url()
-            elif choice == "5":
+            elif choice == 5:
                 scrape_card_url()
-            elif choice == "6":
+            elif choice == 6:
                 scrape_question_url()
-            elif choice == "7" or choice == "8":
+            elif choice == 7 or choice == 8:
                 scrape_all_company_questions(choice)
-            elif choice == "9" or choice == "10":
+            elif choice == 9 or choice == 10:
                 scrape_selected_company_questions(choice)
-            elif choice =="11":
+            elif choice == 11:
                 manual_convert_images_to_base64()
-            elif choice =="12":
+            elif choice == 12:
                 get_all_submissions()
             else:
                 break
 
-            if previous_choice != "0":
+            if previous_choice != 0:
                 break
         except KeyboardInterrupt:
             if args.non_stop:
