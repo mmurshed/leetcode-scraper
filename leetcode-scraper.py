@@ -20,6 +20,20 @@ from dataclasses_json import dataclass_json
 from PyPDF2 import PdfMerger
 from urllib.parse import urlparse
 import time
+import random
+from PIL import Image
+
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Set up logging
+log_file = 'conversion_errors.log'
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger('ConversionLogger')
+handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=5)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 # Define default config with all necessary keys
@@ -161,7 +175,7 @@ def create_headers(leetcode_cookie=""):
 
 
 def get_all_cards_url():
-    print("Getting all cards url")
+    logger.info("Getting all cards url")
     headers = create_headers()
     cards_data = {"operationName": "GetCategories", "variables": {
         "num": 1000}, "query": "query GetCategories($categorySlug: String, $num: Int) {\n  categories(slug: $categorySlug) {\n  slug\n    cards(num: $num) {\n ...CardDetailFragment\n }\n  }\n  }\n\nfragment CardDetailFragment on CardNode {\n   slug\n  categorySlug\n  }\n"}
@@ -177,13 +191,13 @@ def get_all_cards_url():
 
 
 def get_all_questions_url(self_function=True):
-    print("Getting all questions url")
+    logger.info("Getting all questions url")
     headers = create_headers()
     question_count_data = {
         "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "}
     all_questions_count = json.loads(SESSION.post(
         url=LEETCODE_GRAPHQL_URL, headers=headers, json=question_count_data).content)['data']['allQuestionsCount'][0]['count']
-    print("Total no of questions: ", all_questions_count)
+    logger.info("Total no of questions: ", all_questions_count)
 
     question_data = {"query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ", "variables": {
         "categorySlug": "", "skip": 0, "limit": int(all_questions_count), "filters": {}}}
@@ -224,11 +238,14 @@ def scrape_question_url():
             question_file = f"{question_id:04}-{question_title}.html"
             question_path = os.path.join(CONFIG.save_path, "questions", question_file)
             if os.path.exists(question_path) and CONFIG.overwrite == False:
-                # print(f"Already scraped {question_file}")
+                logger.info(f"Already scraped {question_file}")
                 continue
-            print(f"Scraping question {question_id} url: {question_url}")
+            logger.info(f"Scraping question {question_id} url: {question_url}")
             create_question_html(question_id, question_slug, question_title, headers)
-            time.sleep(10)
+
+            sleepfor = random.randint(5, 15)
+            logger.info(f"Waiting for {sleepfor} seconds")
+            time.sleep(sleepfor)
             
     with open(os.path.join(CONFIG.save_path, "questions", "index.html"), 'w') as main_index:
         main_index_html = ""
@@ -279,7 +296,7 @@ def scrape_card_url():
         card_urls = f.readlines()
         for card_url in card_urls:
             card_url = card_url.strip()
-            print("Scraping card url: ", card_url)
+            logger.info("Scraping card url: ", card_url)
             card_slug = card_url.split("/")[-2]
             card_data = {"operationName": "GetChaptersWithItems", "variables": {"cardSlug": card_slug},
                         "query": "query GetChaptersWithItems($cardSlug: String!) {\n  chapters(cardSlug: $cardSlug) {\n    ...ExtendedChapterDetail\n   }\n}\n\nfragment ExtendedChapterDetail on ChapterNode {\n  id\n  title\n  slug\n description\n items {\n    id\n    title\n  }\n }\n"}
@@ -289,14 +306,14 @@ def scrape_card_url():
                 create_folder(os.path.join(CONFIG.save_path, "cards", card_slug))
                 create_card_index_html(chapters, card_slug, headers)
                 for subcategory in chapters:
-                    print("Scraping subcategory: ", subcategory['title'])
+                    logger.info("Scraping subcategory: ", subcategory['title'])
                     for item in subcategory['items']:
-                        print("Scraping Item: ", item['title'])
+                        logger.info("Scraping Item: ", item['title'])
                         item_id = item['id']
                         item_title = re.sub(r'[:?|></\\]', replace_filename, item['title'])
 
                         if f"{item_id}-{item_title}.html" in os.listdir(os.path.join(CONFIG.save_path, "cards", card_slug)) and overwrite == False:
-                            print(f"Already scraped {item_id}-{item_title}.html")
+                            logger.info(f"Already scraped {item_id}-{item_title}.html")
                             if f"{item_title}.html" in os.path.join(CONFIG.save_path, "questions"):
                                 if os.path.getsize(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html")) > os.path.getsize(os.path.join(
                                     CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html")):
@@ -320,7 +337,7 @@ def scrape_card_url():
                                     CONFIG.save_path, "questions", f"{item_title}.html"))
                             continue
                         if f"{item_title}.html" in os.listdir(os.path.join(CONFIG.save_path, "questions")) and CONFIG.overwrite == False:
-                            print("Copying from questions folder", item_title)
+                            logger.info("Copying from questions folder", item_title)
                             shutil.copy(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
                                 CONFIG.save_path, "cards", card_slug))
                             os.rename(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_title}.html"), os.path.join(
@@ -356,14 +373,32 @@ def create_card_html(item_content, item_title, item_id, headers):
         f.write(content_soup.prettify())
 
 
+def get_image_data(img_path):
+    # Open the PNG file
+    try:
+        with Image.open(img_path) as img:
+            # Check if the image is in PNG format
+            if img.format == 'PNG':
+                # Save the image without compression
+                img.save(img_path, 'PNG', compress_level=0)
+                logger.info(f"Decompressed PNG saved at {img_path}")
+    except Exception as e:
+        logger.error(f"Error reading file {img_path}\n{e}")
+        return None
+
+    with open(img_path, "rb") as img_file:
+        img_data = img_file.read()
+    return img_data
+
+
 def load_image_in_b64(img_url):
     if not validators.url(img_url):
-        print(f"Invalid image url: {img_url}")
+        logger.error(f"Invalid image url: {img_url}")
         return
     
     hostname = urlparse(img_url).hostname
     if hostname == "127.0.0.1" or hostname == "localhost":
-        print(f"localhost detected: {img_url}")
+        logger.info(f"localhost detected: {img_url}")
         return
 
     images_dir = os.path.join(CONFIG.save_path, "cache", "images")
@@ -381,23 +416,22 @@ def load_image_in_b64(img_url):
 
     encoded_string = None
 
-    if CONFIG.cache_downloads and os.path.exists(image_local_path):
-        with open(image_local_path, "rb") as img_file:
-            encoded_string = base64.b64encode(img_file.read())  
-    else:
+    if not CONFIG.cache_downloads or not os.path.exists(image_local_path):
         try:
             img_data = SESSION.get(url=img_url, headers=create_headers()).content
-            encoded_string = base64.b64encode(img_data)
-
             with open(image_local_path, 'wb') as img_file:
                 img_file.write(img_data)
-
         except Exception as e:
             raise Exception(f"Error loading image url: {img_url}")
-        
+
+    img_data = get_image_data(image_local_path)
+
+    if img_data:
+        encoded_string = base64.b64encode(img_data)
+
     if not encoded_string:
-        print(f"Error loading image url: {img_url}")
-        return
+        logger.error(f"Error loading image url: {img_url}")
+        return None
 
     decoded_string = encoded_string.decode('utf-8')
     return f"data:image/{img_ext};base64,{decoded_string}"
@@ -405,7 +439,7 @@ def load_image_in_b64(img_url):
 
 
 def fix_image_urls(content_soup):
-    print("Fixing image urls")
+    logger.info("Fixing image urls")
     images = content_soup.select('img')
     for image in images:
         if image.has_attr('src') and "base64" not in image['src']:
@@ -418,15 +452,17 @@ def fix_image_urls(content_soup):
                 img_url = f"https://leetcode.com/explore/{'/'.join(splitted_image_src[index:])}"
             else:
                 img_url = image['src']
+
+            image['src'] = img_url
             if CONFIG.cache_downloads:
-                image['src'] = load_image_in_b64(img_url)
-            else:
-                image['src'] = img_url
+                content = load_image_in_b64(img_url)
+                if content:
+                    image['src'] = content
     return content_soup
 
 
 def convert_display_math_to_inline(content_soup):
-    print("Converting display math $$ to inline math $")
+    logger.info("Converting display math $$ to inline math $")
     for element in content_soup.find_all(text=True):
         text = element.string.strip()
         if text:
@@ -436,12 +472,12 @@ def convert_display_math_to_inline(content_soup):
     return content_soup
 
 def place_solution_slides(content_soup, slides_json):
-    print("Placing solution slides")
+    logger.info("Placing solution slides")
     slide_p_tags = content_soup.select("p:contains('/Documents/')")
     temp = []
     for slide_p_tag in slide_p_tags:
         if len(slide_p_tag.find_all("p")) == 0 and ".json" in str(slide_p_tag) and slide_p_tag not in temp:
-            # print(slide_p_tag, type(slide_p_tag))
+            # logger.debug(slide_p_tag, type(slide_p_tag))
             temp.append(slide_p_tag)
     slide_p_tags = temp
     
@@ -471,8 +507,6 @@ def place_solution_slides(content_soup, slides_json):
 
 
 def replace_iframes_with_codes(content_soup, headers, question_id):
-    print("Replacing iframes with codes")
-
     iframes = content_soup.find_all('iframe')
     for if_idx, iframe in enumerate(iframes, start=1):
         src_url = iframe['src']
@@ -533,7 +567,6 @@ def replace_iframes_with_codes(content_soup, headers, question_id):
 
 
 def attach_header_in_html():
-    print("Attaching header in html")
     return r"""<head>
                     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
                     <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" rel="stylesheet"/>
@@ -676,7 +709,7 @@ def attach_header_in_html():
  """
 
 def find_slides_json(content):
-    print("Finding slides json")
+    logger.info("Finding slides json")
 
     slides_root_dir = os.path.join(CONFIG.save_path, "cache", "slides")
     os.makedirs(slides_root_dir, exist_ok=True)
@@ -689,14 +722,14 @@ def find_slides_json(content):
     for links in slides_json_list:
         slide_img_url = "https://leetcode.com/explore/" + \
             "/".join(links.strip().split(".json")[-2].split("/")[1:]) + ".json"
-        print(slide_img_url)
+        logger.info(slide_img_url)
 
         file_hash = hashlib.md5(slide_img_url.encode()).hexdigest()
         slides_data_json_file = f"{file_hash}.json"
         slides_data_json_path = os.path.join(slides_root_dir, slides_data_json_file)
 
         if CONFIG.cache_downloads and os.path.exists(slides_data_json_path):
-            print(f"Loading from {slides_data_json_file}")
+            logger.info(f"Loading from {slides_data_json_file}")
             with open(slides_data_json_path, "r") as file:
                 slides_json_content = json.load(file)
         else:
@@ -714,7 +747,7 @@ def find_slides_json(content):
     return slides_json
 
 def find_slides_json2(content):
-    print("Finding slides json")
+    logger.info("Finding slides json")
 
     slides_root_dir = os.path.join(CONFIG.save_path, "cache", "slides")
     os.makedirs(slides_root_dir, exist_ok=True)
@@ -751,7 +784,6 @@ def find_slides_json2(content):
             try:
                 slides_json_obj = SESSION.get(url=slide_img_url, headers=create_headers())
                 if slides_json_obj.status_code == 404:
-                    print(f"{slide_img_url} NOT FOUND")
                     # if not found try second variation
                     slide_img_url = f"https://assets.leetcode.com/static_assets/media/{file_var2}.json"
                     slides_json_obj = SESSION.get(url=slide_img_url, headers=create_headers())
@@ -770,7 +802,7 @@ def find_slides_json2(content):
 
 
 def get_article_data(item_content, item_title, headers, question_id):
-    print("Getting article data")
+    logger.info("Getting article data")
     if item_content['article']:
         articles_root_dir = os.path.join(CONFIG.save_path, "cache", "articles")
         os.makedirs(articles_root_dir, exist_ok=True)
@@ -803,7 +835,7 @@ def get_article_data(item_content, item_title, headers, question_id):
 
 
 def get_html_article_data(item_content, item_title, headers):
-    print("Getting html article data")
+    logger.info("Getting html article data")
     if item_content['htmlArticle']:
         html_article_id = item_content['htmlArticle']['id']
         html_article_data = {"operationName": "GetHtmlArticle", "variables": {
@@ -818,7 +850,7 @@ def get_html_article_data(item_content, item_title, headers):
 
 
 def generate_similar_questions(similar_questions):
-    print("Generating similar questions")
+    logger.info("Generating similar questions")
     similar_questions_html = ""
     if similar_questions:
         similar_questions = json.loads(similar_questions)
@@ -831,7 +863,6 @@ def generate_similar_questions(similar_questions):
 
 
 def get_question_company_tag_stats(company_tag_stats):
-    print("Getting question company tag stats")
     company_tag_stats_html = ""
     if company_tag_stats:
         company_tag_stats = json.loads(company_tag_stats)
@@ -960,7 +991,7 @@ def get_submission_data(item_content, headers, save_submission_as_file):
 
 
 def get_question_data(item_content, headers):
-    print("Getting question data")
+    logger.info("Getting question data")
     if item_content['question']:
         question_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
         question_title_slug = item_content['question']['titleSlug']
@@ -1046,7 +1077,7 @@ def get_question_data(item_content, headers):
 
 
 def create_card_index_html(chapters, card_slug, headers):
-    print("Creating index.html")
+    logger.info("Creating index.html")
     intro_data = {"operationName": "GetExtendedCardDetail", "variables": {"cardSlug": card_slug},
                   "query": "query GetExtendedCardDetail($cardSlug: String!) {\n  card(cardSlug: $cardSlug) {\n title\n  introduction\n}\n}\n", }
     introduction = json.loads(SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers,
@@ -1109,7 +1140,7 @@ def get_next_data_id():
     return next_data_id
 
 def scrape_all_company_questions(choice):
-    print("Scraping all company questions")
+    logger.info("Scraping all company questions")
     create_folder(os.path.join(CONFIG.save_path, "all_company_questions"))
     
 
@@ -1158,7 +1189,7 @@ def get_categories_slugs_for_company(company_slug, headers):
 
 
 def create_all_company_index_html(company_tags, headers):
-    print("Creating company index.html")
+    logger.info("Creating company index.html")
     cols = 10
     rows = len(company_tags)//10 + 1
     html = ''
@@ -1182,20 +1213,20 @@ def create_all_company_index_html(company_tags, headers):
                 </body>
                 </html>""")
     
-    favoriteDetails = get_categories_slugs_for_company(company_slug, headers)
-    favoriteSlugs = {item["favoriteSlug"]: item["displayName"] for item in favoriteDetails['generatedFavoritesInfo']['categoriesToSlugs']}
-    total_questions = favoriteDetails['questionNumber']
-
     for company in company_tags:
         company_slug = company['slug']
+
+        favoriteDetails = get_categories_slugs_for_company(company_slug, headers)
+        favoriteSlugs = {item["favoriteSlug"]: item["displayName"] for item in favoriteDetails['generatedFavoritesInfo']['categoriesToSlugs']}
+        total_questions = favoriteDetails['questionNumber']
 
         company_root_dir = os.path.join(CONFIG.save_path, "all_company_questions", company_slug)
         os.makedirs(company_root_dir, exist_ok=True)
 
         if CONFIG.overwrite == False and "index.html" in os.listdir(company_root_dir):
-            print("Already Scraped", company_slug)
+            logger.info(f"Already Scraped {company_slug}")
             continue
-        print("Scrapping Index for ", company_slug)
+        logger.info(f"Scrapping Index for {company_slug}")
 
         companies_data_root_dir = os.path.join(CONFIG.save_path, "cache", "companies")
         os.makedirs(companies_data_root_dir, exist_ok=True)
@@ -1272,7 +1303,7 @@ def create_all_company_index_html(company_tags, headers):
 
 
 def scrape_question_data(company_slug, headers):
-    print("Scraping question data")
+    logger.info("Scraping question data")
 
     questions_dir = os.path.join(CONFIG.save_path, "questions")
     questions_pdf_dir = os.path.join(questions_dir, "pdf")
@@ -1378,11 +1409,11 @@ if __name__ == '__main__':
     if args.proxy:
         os.environ['http_proxy'] = "http://"+args.proxy
         os.environ['https_proxy'] = "http://"+args.proxy
-        print("Proxy set", SESSION.get(
+        logger.info("Proxy set", SESSION.get(
             "https://httpbin.org/ip").content)
 
     while True:
-        # print("Proxy set", SESSION.get(
+        # logger.info("Proxy set", SESSION.get(
         #     "https://httpbin.org/ip").content)
         try:
             print("""Leetcode-Scraper v1.5-stable
