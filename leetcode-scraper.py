@@ -28,7 +28,7 @@ from logging.handlers import RotatingFileHandler
 
 # Set up logging
 log_file = 'conversion_errors.log'
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('ConversionLogger')
 handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=5)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -372,6 +372,16 @@ def create_card_html(item_content, item_title, item_id, headers):
     with open(f"{item_id}-{item_title}.html", "w", encoding="utf-8") as f:
         f.write(content_soup.prettify())
 
+def is_valid_image(image_path):
+    try:
+        # Open the image file
+        with Image.open(image_path) as img:
+            # Verify the image (this doesn't load the entire image into memory)
+            img.verify()
+        return True
+    except (IOError, SyntaxError, Image.UnidentifiedImageError) as e:
+        print(f"Invalid image: {image_path}. Error: {e}")
+        return False
 
 def decompose_gif(gif_path, filename_no_ext, output_folder):
     # Open the GIF file
@@ -453,6 +463,10 @@ def load_image_in_b64(img_url, decompose_gif_frames):
 
     imgs_decoded = []
     for frame in frames:
+        if not is_valid_image(frame):
+            imgs_decoded.append(None)
+            continue
+
         with open(frame, "rb") as img_file:
             img_data = img_file.read()
 
@@ -491,12 +505,16 @@ def fix_image_urls(content_soup):
                 frames = load_image_in_b64(img_url, False)
                 if frames:
                     if len(frames) == 1:
-                        image['src'] = frames[0]
+                        if frames[0]:
+                            image['src'] = frames[0]
+                        else:
+                            image.decompose()
                     else:
                         new_tags = []
                         for frame in frames:
-                            frame_tag = content_soup.new_tag('img', src=frame)
-                            new_tags.append(frame_tag)
+                            if frame:
+                                frame_tag = content_soup.new_tag('img', src=frame)
+                                new_tags.append(frame_tag)
 
                         # Replace the GIF <img> tag with the new image tags
                         image.replace_with(*new_tags)
@@ -1457,9 +1475,6 @@ def manual_convert_images_to_base64():
     for root, dirs, files in os.walk(root_dir):
         for file in files:
             if file.endswith('.html'):
-                parts = file.split('-')
-                question_id = parts[0]
-                question_title = str.join('-', parts[1:])
                 with open(os.path.join(root, file), "r") as f:
                     soup = BeautifulSoup(f.read(), 'html.parser')
                     res_soup = fix_image_urls(soup, True)
