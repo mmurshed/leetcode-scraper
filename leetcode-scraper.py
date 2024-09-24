@@ -18,7 +18,7 @@ from time import sleep
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from PyPDF2 import PdfMerger
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 import time
 import random
 from PIL import Image
@@ -373,12 +373,32 @@ def create_card_html(item_content, item_title, item_id, headers):
         f.write(content_soup.prettify())
 
 
-def get_image_data(img_path):
+def decompose_gif(gif_path, filename_no_ext, output_folder):
+    # Open the GIF file
+    gif = Image.open(gif_path)
+    
+    frames = []
+
+    # Iterate over each frame in the GIF
+    frame_number = 0
+    while True:
+        try:
+            # Save each frame as a separate image
+            frame_path = os.path.join(output_folder, f"{filename_no_ext}_{frame_number:03d}.png")
+            gif.seek(frame_number)
+            gif.save(frame_path, 'PNG')
+            frame_number += 1
+            frames.append(frame_path)
+        except EOFError:
+            break
+    return frames
+
+
+def convert_to_uncompressed_png(img_path, img_ext):
     # Open the PNG file
     try:
-        with Image.open(img_path) as img:
-            # Check if the image is in PNG format
-            if img.format == 'PNG':
+        if img_ext == 'png':
+            with Image.open(img_path) as img:
                 # Save the image without compression
                 img.save(img_path, 'PNG', compress_level=0)
                 logger.info(f"Decompressed PNG saved at {img_path}")
@@ -386,12 +406,8 @@ def get_image_data(img_path):
         logger.error(f"Error reading file {img_path}\n{e}")
         return None
 
-    with open(img_path, "rb") as img_file:
-        img_data = img_file.read()
-    return img_data
 
-
-def load_image_in_b64(img_url):
+def load_image_in_b64(img_url, decompose_gif_frames):
     if not validators.url(img_url):
         logger.error(f"Invalid image url: {img_url}")
         return
@@ -404,8 +420,10 @@ def load_image_in_b64(img_url):
     images_dir = os.path.join(CONFIG.save_path, "cache", "images")
     os.makedirs(images_dir, exist_ok=True)
     
-    image_file_name = os.path.basename(img_url)
-    img_ext = image_file_name.split('.')[-1]
+    parsed_url = urlsplit(img_url)
+    image_file_name = os.path.basename(parsed_url.path)    
+
+    img_ext = str.lower(image_file_name.split('.')[-1])
 
     url_hash = hashlib.md5(img_url.encode()).hexdigest()
     image_local_file_name = f"{url_hash}.{img_ext}"
@@ -419,22 +437,37 @@ def load_image_in_b64(img_url):
     if not CONFIG.cache_downloads or not os.path.exists(image_local_path):
         try:
             img_data = SESSION.get(url=img_url, headers=create_headers()).content
+
             with open(image_local_path, 'wb') as img_file:
                 img_file.write(img_data)
+
+            convert_to_uncompressed_png(image_local_path, img_ext)
+
         except Exception as e:
             raise Exception(f"Error loading image url: {img_url}")
 
-    img_data = get_image_data(image_local_path)
+    if decompose_gif_frames and img_ext == "gif":
+        frames = decompose_gif(image_local_path, url_hash, images_dir)
+    else:
+        frames = [image_local_path]
 
-    if img_data:
-        encoded_string = base64.b64encode(img_data)
+    imgs_decoded = []
+    for frame in frames:
+        with open(frame, "rb") as img_file:
+            img_data = img_file.read()
 
-    if not encoded_string:
-        logger.error(f"Error loading image url: {img_url}")
-        return None
+        if img_data:
+            encoded_string = base64.b64encode(img_data)
 
-    decoded_string = encoded_string.decode('utf-8')
-    return f"data:image/{img_ext};base64,{decoded_string}"
+        if not encoded_string:
+            logger.error(f"Error loading image url: {img_url}")
+            return None
+
+        decoded_string = encoded_string.decode('utf-8')
+        decoded_image = f"data:image/{img_ext};base64,{decoded_string}"
+        imgs_decoded.append(decoded_image)
+
+    return imgs_decoded
 
 
 
@@ -455,15 +488,24 @@ def fix_image_urls(content_soup):
 
             image['src'] = img_url
             if CONFIG.cache_downloads:
-                content = load_image_in_b64(img_url)
-                if content:
-                    image['src'] = content
+                frames = load_image_in_b64(img_url, False)
+                if frames:
+                    if len(frames) == 1:
+                        image['src'] = frames[0]
+                    else:
+                        new_tags = []
+                        for frame in frames:
+                            frame_tag = content_soup.new_tag('img', src=frame)
+                            new_tags.append(frame_tag)
+
+                        # Replace the GIF <img> tag with the new image tags
+                        image.replace_with(*new_tags)
     return content_soup
 
 
 def convert_display_math_to_inline(content_soup):
     logger.info("Converting display math $$ to inline math $")
-    for element in content_soup.find_all(text=True):
+    for element in content_soup.find_all(string=True):
         text = element.string.strip()
         if text:
             # Replace double $$ with single $
@@ -473,7 +515,7 @@ def convert_display_math_to_inline(content_soup):
 
 def place_solution_slides(content_soup, slides_json):
     logger.info("Placing solution slides")
-    slide_p_tags = content_soup.select("p:contains('/Documents/')")
+    slide_p_tags = content_soup.select("p:-soup-contains('/Documents/')")
     temp = []
     for slide_p_tag in slide_p_tags:
         if len(slide_p_tag.find_all("p")) == 0 and ".json" in str(slide_p_tag) and slide_p_tag not in temp:
@@ -989,6 +1031,37 @@ def get_submission_data(item_content, headers, save_submission_as_file):
                     outfile.write(submission_detail_content['code'])
     return list_of_submissions
 
+def get_solution_content(question_id, question_title_slug, headers):
+    logger.info("Getting solution data")
+
+    question_data_root_dir = os.path.join(CONFIG.save_path, "cache", "soldata")
+    os.makedirs(question_data_root_dir, exist_ok=True)
+
+    sol_data_json_file = f"{question_id:04}.json"
+    sol_data_json_path = os.path.join(question_data_root_dir, sol_data_json_file)
+
+    if CONFIG.cache_downloads and os.path.exists(sol_data_json_path):
+        with open(sol_data_json_path, "r") as file:
+            sol_content = json.load(file)
+    else:
+        sol_query = {"query":"\n    query officialSolution($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    solution {\n      id\n      title\n      content\n      contentTypeId\n      paidOnly\n      hasVideoSolution\n      paidOnlyVideo\n      canSeeDetail\n      rating {\n        count\n        average\n        userRating {\n          score\n        }\n      }\n      topic {\n        id\n        commentCount\n        topLevelCommentCount\n        viewCount\n        subscribed\n        solutionTags {\n          name\n          slug\n        }\n        post {\n          id\n          status\n          creationDate\n          author {\n            username\n            isActive\n            profile {\n              userAvatar\n              reputation\n            }\n          }\n        }\n      }\n    }\n  }\n}\n    ",
+                     "variables":{"titleSlug":question_title_slug},"operationName":"officialSolution"}
+        sol_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=sol_query).content
+
+        try:
+            sol_content = json.loads(sol_object)
+            sol_content = sol_content['data']['question']['solution']
+        except:
+            raise Exception("Error in getting solution data")
+
+        with open(sol_data_json_path, "w") as outfile:
+            outfile.write(json.dumps(sol_content))
+
+    solution = None
+    if sol_content:
+        solution = sol_content['content']
+    return solution
+
 
 def get_question_data(item_content, headers):
     logger.info("Getting question data")
@@ -1217,6 +1290,8 @@ def create_all_company_index_html(company_tags, headers):
         company_slug = company['slug']
 
         favoriteDetails = get_categories_slugs_for_company(company_slug, headers)
+        if not favoriteDetails:
+            continue
         favoriteSlugs = {item["favoriteSlug"]: item["displayName"] for item in favoriteDetails['generatedFavoritesInfo']['categoriesToSlugs']}
         total_questions = favoriteDetails['questionNumber']
 
@@ -1316,6 +1391,9 @@ def scrape_question_data(company_slug, headers):
     questions_seen = set()
     
     categoriesToSlug = get_categories_slugs_for_company(company_slug, headers)
+    if not categoriesToSlug:
+        return
+
     favoriteSlugs = [item["favoriteSlug"] for item in categoriesToSlug['generatedFavoritesInfo']['categoriesToSlugs']]
 
     for favoriteSlug in favoriteSlugs:
