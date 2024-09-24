@@ -1365,11 +1365,12 @@ def create_all_company_index_html(company_tags, headers):
                 question['title'] = re.sub(r'[:?|></\\]', replace_filename, question['title'])
 
                 frequency = round(float(question['frequency']), 1)            
-                frequency_label = '{:.2f}'.format(frequency)
+                frequency_label = '{:.1f}'.format(frequency)
+                question_title_format = f"{questionFrontEndId:04}-{question['title']}"
                 html += f'''<tr>
-                            <td><a slug="{question['titleSlug']}" title="{questionFrontEndId:04}-{question['title']}.html" href="{questionFrontEndId:04}-{question['title']}.html">{questionFrontEndId:04}-{question['title']}.html</a></td>
-                            <td> Difficulty: {question['difficulty']} </td><td>Frequency: {frequency_label}</td>
-                            <td><a target="_blank" href="https://leetcode.com/problems/{question['titleSlug']}">Leetcode Url</a></td>
+                            <td><a slug="{question['titleSlug']}" title="{question_title_format}" href="{question_title_format}.html">{question_title_format}</a></td>
+                            <td>Difficulty: {question['difficulty']} </td><td>Frequency: {frequency_label}</td>
+                            <td><a target="_blank" href="https://leetcode.com/problems/{question['titleSlug']}">Leet</a></td>
                             </tr>'''
             # Write each favorite slug
             with open(os.path.join(company_root_dir, f"{favoriteSlug}.html"), 'w') as f:
