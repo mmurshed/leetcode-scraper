@@ -2,7 +2,7 @@ import requests
 import json
 from requests.structures import CaseInsensitiveDict
 from bs4 import BeautifulSoup, NavigableString
-import markdown2
+import markdown
 import re
 import base64
 import os
@@ -22,36 +22,69 @@ from urllib.parse import urlparse, urlsplit
 import time
 import random
 from PIL import Image
+import cloudscraper
 
 import logging
 from logging.handlers import RotatingFileHandler
 
 # Set up logging
 log_file = 'conversion_errors.log'
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('ConversionLogger')
-handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=5)
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("Leet")
+handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-
 # Define default config with all necessary keys
-default_config = {
+DEFAULT_CONFIG = {
     "leetcode_cookie": "",
     "cards_url_path": "",
     "questions_url_path": "",
     "save_path": "",
     "company_tag_save_path": "",
-    "cache_downloads": False,
-    "overwrite": False,
+    "cache_data": False,
+    "force_download": False,
     "preferred_language_order": "csharp,cpp,python3,java,c,golang",
-    "include_submissions_count": 100
+    "include_submissions_count": 100,
+    "include_default_code": False
 }
+
+DEFAULT_HEADERS = CaseInsensitiveDict({
+    "content-type": "application/json",
+    "cookie": "LEETCODE_SESSION=",
+    "referer": "https://leetcode.com/",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+    # "accept-encoding": "gzip, deflate, br, zstd"
+})
 
 OS_ROOT = os.path.expanduser('~')
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+FILE_EXTENSIONS = {
+    "python": "py",
+    "python3": "py",
+    "pythondata": "pd.py",
+    "c": "c",
+    "cpp": "cpp",
+    "csharp": "cs",
+    "java": "java",
+    "kotlin": "kt",
+    "mysql": "sql",
+    "mssql": "sql",
+    "oraclesql": "sql",
+    "javascript": "js",
+    "html": "html",
+    "php": "php",
+    "golang": "go",
+    "scala": "scala",
+    "pythonml": "py",
+    "rust": "rs",
+    "ruby": "rb",
+    "bash": "sh",
+    "swift": "swift",
+}
 
 def clear():
     global current_os
@@ -68,12 +101,6 @@ def create_base_config_dir():
     if ".leetcode-scraper" not in os.listdir(OS_ROOT):
         os.mkdir(base_config_path)
     return base_config_path
-
-
-def create_folder(path):
-    if not os.path.exists(path):
-        os.mkdir(path)
-    os.chdir(path)
 
 
 def select_config():
@@ -99,7 +126,7 @@ def generate_config():
     ''')
 
     # Try to load existing config, or initialize empty config if it doesn't exist
-    config = default_config
+    config = DEFAULT_CONFIG
     try:
         config = load_config_dict()
     except Exception:
@@ -115,10 +142,11 @@ def generate_config():
         "questions_url_path": "Enter Questions URL Save Path: ",
         "save_path": "Enter Save Path: ",
         "company_tag_save_path": "Enter Company Tag Save Path: ",
-        "cache_downloads": "Cache images and json locally T/F? (T/F): ",
-        "overwrite": "Overwrite existing files T/F? (T/F): ",
+        "cache_data": "Cache temporary data files locally T/F? (T/F): ",
+        "force_download": "Download again even if the file exists T/F? (T/F): ",
         "preferred_language_order": "Enter order of the preferred solution language (all or a command separate list of languages c, cpp, csharp, java, python3, javascript, typescript, golang): ",
-        "include_submissions_count": "How many of your own submissions should be incldued (0 for none, a large integer for all): "
+        "include_submissions_count": "How many of your own submissions should be incldued (0 for none, a large integer for all): ",
+        "include_default_code": "Include default code section? (T/F): "
     }
 
     # Prompt user for values and retain existing config if no new input is provided
@@ -135,20 +163,20 @@ def generate_config():
 
 def load_config_dict():
     global selected_config
-    config_path = os.path.join(OS_ROOT, ".leetcode-scraper")
-    config_file_path = os.path.join(config_path, f"config_{selected_config}.json")
+    config_dir = os.path.join(OS_ROOT, ".leetcode-scraper")
+    config_path = os.path.join(config_dir, f"config_{selected_config}.json")
 
     # Check if config file exists
-    if not os.path.exists(config_file_path):
+    if not os.path.exists(config_path):
         raise Exception("No config found, please create one")
 
     # Load the JSON config file
-    with open(config_file_path, "r") as config_file:
+    with open(config_path, "r") as config_file:
         config = json.load(config_file)
 
     # Use the default config for missing fields
-    for key in default_config:
-        config[key] = config.get(key, default_config[key])
+    for key in DEFAULT_CONFIG:
+        config[key] = config.get(key, DEFAULT_CONFIG[key])
 
     return config
 
@@ -160,27 +188,54 @@ def load_config(config = None):
     config_class = type('Config', (object,), config)
     return config_class()
 
-CONFIG = load_config(default_config)
+CONFIG = load_config(DEFAULT_CONFIG)
 
 def create_headers(leetcode_cookie=""):
-    headers = CaseInsensitiveDict()
-    headers["content-type"] = "application/json"
-    headers['cookie'] = "LEETCODE_SESSION=" + \
-        leetcode_cookie if leetcode_cookie != "" else ""
-    headers["referer"] = "https://leetcode.com/"
-    headers["user-agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0"
-    headers["accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
-    # headers["accept-encoding"] = "gzip, deflate, br, zstd"
+    headers = DEFAULT_HEADERS
+    headers["cookie"] = f"LEETCODE_SESSION={leetcode_cookie}"
     return headers
 
+def html_toquestion(filename):
+    filename = os.path.basename(filename)
+
+    # Remove the file extension
+    name, ext = os.path.splitext(filename)
+    
+    # Split the string on the first dash and strip whitespace
+    try:
+        question_id, question_title = name.split('-', 1)
+        question_id = int(question_id.strip())
+        question_title = question_title.strip()
+        
+        return question_id, question_title
+    except ValueError:
+        raise ValueError(f"Filename format is incorrect: {filename}")
+
+def question_html(question_id, queston_title):
+    return f"{question_id_title(question_id, queston_title)}.html"
+
+def question_id_title(question_id, queston_title):
+    return f"{question_id:04}-{queston_title}"
 
 def get_all_cards_url():
     logger.info("Getting all cards url")
-    headers = create_headers()
-    cards_data = {"operationName": "GetCategories", "variables": {
-        "num": 1000}, "query": "query GetCategories($categorySlug: String, $num: Int) {\n  categories(slug: $categorySlug) {\n  slug\n    cards(num: $num) {\n ...CardDetailFragment\n }\n  }\n  }\n\nfragment CardDetailFragment on CardNode {\n   slug\n  categorySlug\n  }\n"}
-    cards = json.loads(SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers,
-                                     json=cards_data).content)['data']['categories']
+
+    query = {
+        "operationName": "GetCategories",
+        "variables": {
+            "num": 1000
+        },
+        "query": "query GetCategories($categorySlug: String, $num: Int) {\n  categories(slug: $categorySlug) {\n  slug\n    cards(num: $num) {\n ...CardDetailFragment\n }\n  }\n  }\n\nfragment CardDetailFragment on CardNode {\n   slug\n  categorySlug\n  }\n"
+    }
+
+    response = REQ_SESSION.post(
+        url=LEETCODE_GRAPHQL_URL,
+        headers=DEFAULT_HEADERS,
+        json=query)
+    response.raise_for_status()
+    response_content = json.loads(response.content)
+    cards = response_content['data']['categories']
+
     with open(CONFIG.cards_url_path, "w") as f:
         for category_card in cards:
             if category_card['slug'] != "featured":
@@ -192,17 +247,39 @@ def get_all_cards_url():
 
 def get_all_questions_url(self_function=True):
     logger.info("Getting all questions url")
-    headers = create_headers()
-    question_count_data = {
-        "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "}
-    all_questions_count = json.loads(SESSION.post(
-        url=LEETCODE_GRAPHQL_URL, headers=headers, json=question_count_data).content)['data']['allQuestionsCount'][0]['count']
-    logger.info("Total no of questions: ", all_questions_count)
 
-    question_data = {"query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ", "variables": {
-        "categorySlug": "", "skip": 0, "limit": int(all_questions_count), "filters": {}}}
-    all_questions = json.loads(SESSION.post(
-        url=LEETCODE_GRAPHQL_URL, headers=headers, json=question_data).content)['data']['problemsetQuestionList']['questions']
+    query_count = {
+        "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "
+    }
+
+    response = REQ_SESSION.post(
+        url=LEETCODE_GRAPHQL_URL,
+        headers=DEFAULT_HEADERS,
+        json=query_count)
+    response.raise_for_status()
+    response_content = json.loads(response.content)
+    all_questions_count = response_content['data']['allQuestionsCount'][0]['count']
+
+    logger.info(f"Total no of questions: {all_questions_count}")
+
+    query = {
+        "query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ",
+        "variables": {
+            "categorySlug": "",
+            "skip": 0,
+            "limit": int(all_questions_count),
+            "filters": {}
+        }
+    }
+    
+    response = REQ_SESSION.post(
+        url=LEETCODE_GRAPHQL_URL,
+        headers=DEFAULT_HEADERS,
+        json=query)
+    response.raise_for_status()
+    response_content = json.loads(response.content)
+    all_questions = response_content['data']['problemsetQuestionList']['questions']
+
     if not self_function:
         return all_questions
     write_questions_to_file(all_questions, CONFIG.questions_url_path)
@@ -218,10 +295,10 @@ def write_questions_to_file(all_questions, questions_url_path):
 
 
 def scrape_question_url():
-    headers = create_headers(CONFIG.leetcode_cookie)
     all_questions = get_all_questions_url(self_function=False)
-
-    create_folder(os.path.join(CONFIG.save_path, "questions"))
+    questions_dir = os.path.join(CONFIG.save_path, "questions")
+    os.makedirs(questions_dir, exist_ok=True)
+    os.chdir(questions_dir)
 
     with open(CONFIG.questions_url_path) as f:
         for row in csv.reader(f):
@@ -230,58 +307,68 @@ def scrape_question_url():
             question_url = question_url.strip()
             question_slug = question_url.split("/")[-2]
 
+            if question_id != 6:
+                continue
+
             for question in all_questions:
                 if question['titleSlug'] == question_slug:
                     question_title = re.sub(r'[:?|></\\]', replace_filename, question['title'])
                     break
 
-            question_file = f"{question_id:04}-{question_title}.html"
-            question_path = os.path.join(CONFIG.save_path, "questions", question_file)
-            if os.path.exists(question_path) and CONFIG.overwrite == False:
+            question_file = question_html(question_id, question_title)
+            question_path = os.path.join(questions_dir, question_file)
+            
+            if not CONFIG.force_download and os.path.exists(question_path):
                 logger.info(f"Already scraped {question_file}")
                 continue
+            
             logger.info(f"Scraping question {question_id} url: {question_url}")
-            create_question_html(question_id, question_slug, question_title, headers)
+            create_question_html(question_id, question_slug, question_title)
 
             sleepfor = random.randint(5, 15)
             logger.info(f"Waiting for {sleepfor} seconds")
             time.sleep(sleepfor)
             
-    with open(os.path.join(CONFIG.save_path, "questions", "index.html"), 'w') as main_index:
+    with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
         main_index_html = ""
-        for idx, files in enumerate(os.listdir(os.path.join(CONFIG.save_path, "questions")),start=1):
+        for idx, files in enumerate(os.listdir(questions_dir),start=1):
             if "index.html" not in files:
                 main_index_html += f"""<a href="{files}">{idx}-{files}</a><br>"""
         main_index.write(main_index_html)
     os.chdir('..')
 
 
-def create_question_html(question_id, question_slug, question_title, headers):
-    item_content = {"question": {'titleSlug': question_slug, 'frontendQuestionId': question_id, 'title': question_title}}
+def create_question_html(question_id, question_slug, question_title):
+    item_content = {
+        "question": {
+            'titleSlug': question_slug,
+            'frontendQuestionId': question_id,
+            'title': question_title
+        }
+    }
     content = """<body>"""
-    question_content, question_title = get_question_data(item_content, headers)
+    question_content, question_title = get_question_data(item_content)
     content += question_content
     content += """</body>"""
-    slides_json = find_slides_json2(content)
-    content = markdown2.markdown(content)
+    slides_json = find_slides_json2(content, question_id)
     content = attach_header_in_html() + content
     content_soup = BeautifulSoup(content, 'html.parser')
-    content_soup = replace_iframes_with_codes(content_soup, headers, question_id)
     content_soup = place_solution_slides(content_soup, slides_json)
-    content_soup = fix_image_urls(content_soup)
-    content_soup = convert_display_math_to_inline(content_soup)
-    with open(f"{question_id:04}-{question_title}.html", 'w', encoding="utf-8") as f:
+    content_soup = fix_image_urls(content_soup, question_id)
+
+    with open(question_html(question_id, question_title), 'w', encoding="utf-8") as f:
         f.write(content_soup.prettify())
 
-
 def scrape_card_url():
-    headers = create_headers(CONFIG.leetcode_cookie)
-    create_folder(os.path.join(CONFIG.save_path, "cards"))
-    if "questions" not in os.listdir(CONFIG.save_path):
-        os.mkdir(os.path.join(CONFIG.save_path, "questions"))
+    questions_dir = os.path.join(CONFIG.save_path, "questions")
+    os.makedirs(questions_dir, exist_ok=True)
+
+    cards_dir = os.path.join(CONFIG.save_path, "cards")
+    os.makedirs(cards_dir, exist_ok=True)
+    os.chdir(cards_dir)
 
     # Creating Index for Card Folder
-    with open(os.path.join(CONFIG.save_path, "cards", "index.html"), 'w') as main_index:
+    with open(os.path.join(cards_dir, "index.html"), 'w') as main_index:
         main_index_html = ""
         with open(CONFIG.cards_url_path, "r") as f:
             card_urls = f.readlines()
@@ -296,92 +383,105 @@ def scrape_card_url():
         card_urls = f.readlines()
         for card_url in card_urls:
             card_url = card_url.strip()
+
             logger.info("Scraping card url: ", card_url)
+
             card_slug = card_url.split("/")[-2]
-            card_data = {"operationName": "GetChaptersWithItems", "variables": {"cardSlug": card_slug},
-                        "query": "query GetChaptersWithItems($cardSlug: String!) {\n  chapters(cardSlug: $cardSlug) {\n    ...ExtendedChapterDetail\n   }\n}\n\nfragment ExtendedChapterDetail on ChapterNode {\n  id\n  title\n  slug\n description\n items {\n    id\n    title\n  }\n }\n"}
-            chapters = json.loads(SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers,
-                                                json=card_data).content)['data']['chapters']
+            query = {
+                "operationName": "GetChaptersWithItems",
+                "variables": {
+                    "cardSlug": card_slug
+                },
+                "query": "query GetChaptersWithItems($cardSlug: String!) {\n  chapters(cardSlug: $cardSlug) {\n    ...ExtendedChapterDetail\n   }\n}\n\nfragment ExtendedChapterDetail on ChapterNode {\n  id\n  title\n  slug\n description\n items {\n    id\n    title\n  }\n }\n"
+            }
+            
+            response = REQ_SESSION.post(
+                url=LEETCODE_GRAPHQL_URL,
+                headers=LEETCODE_HEADERS,
+                json=query)
+            response.raise_for_status()
+            response_content = json.loads(response.content)
+            chapters = response_content['data']['chapters']
+            
             if chapters:
-                create_folder(os.path.join(CONFIG.save_path, "cards", card_slug))
-                create_card_index_html(chapters, card_slug, headers)
+                cards_dir = os.path.join(CONFIG.save_path, "cards", card_slug)
+                os.makedirs(cards_dir, exist_ok=True)
+                
+                create_card_index_html(chapters, card_slug)
                 for subcategory in chapters:
                     logger.info("Scraping subcategory: ", subcategory['title'])
+
                     for item in subcategory['items']:
                         logger.info("Scraping Item: ", item['title'])
+
                         item_id = item['id']
                         item_title = re.sub(r'[:?|></\\]', replace_filename, item['title'])
 
-                        if f"{item_id}-{item_title}.html" in os.listdir(os.path.join(CONFIG.save_path, "cards", card_slug)) and overwrite == False:
-                            logger.info(f"Already scraped {item_id}-{item_title}.html")
-                            if f"{item_title}.html" in os.path.join(CONFIG.save_path, "questions"):
-                                if os.path.getsize(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html")) > os.path.getsize(os.path.join(
-                                    CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html")):
-                                    shutil.copy(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
-                                    CONFIG.save_path, "cards", card_slug))
-                                    try:
-                                        os.remove(os.path.join(
-                                            CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"))
-                                    except:
-                                        pass
-                                    os.rename(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_title}.html"), os.path.join(
-                                    CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"))
-                                elif os.path.getsize(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html")) < os.path.getsize(os.path.join(
-                                    CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html")):
-                                    shutil.copy(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"), os.path.join(save_path, "questions"))
-                                    try:
-                                        os.remove(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"))
-                                    except:
-                                        pass
-                                    os.rename(os.path.join(CONFIG.save_path, "questions", f"{item_id}-{item_title}.html"), os.path.join(
-                                    CONFIG.save_path, "questions", f"{item_title}.html"))
+                        filename = question_html(item_id, item_title)
+                        
+                        cards_filepath = os.path.join(cards_dir, filename)
+                        questions_filepath = os.path.join(questions_dir, filename)
+
+                        if not CONFIG.force_download and os.path.exists(cards_filepath):
+                            logger.info(f"Already scraped {cards_filepath}")
                             continue
-                        if f"{item_title}.html" in os.listdir(os.path.join(CONFIG.save_path, "questions")) and CONFIG.overwrite == False:
-                            logger.info("Copying from questions folder", item_title)
-                            shutil.copy(os.path.join(CONFIG.save_path, "questions", f"{item_title}.html"), os.path.join(
-                                CONFIG.save_path, "cards", card_slug))
-                            os.rename(os.path.join(CONFIG.save_path, "cards", card_slug, f"{item_title}.html"), os.path.join(
-                                CONFIG.save_path, "cards", card_slug, f"{item_id}-{item_title}.html"))
+
+                        if not CONFIG.force_download and os.path.exists(questions_filepath):
+                            logger.info(f"Copying from questions {questions_filepath}")
+                            shutil.copy2(questions_filepath, cards_filepath)
                             continue
-                        item_data = {"operationName": "GetItem", "variables": {"itemId": f"{item_id}"},
-                                    "query": "query GetItem($itemId: String!) {\n  item(id: $itemId) {\n    id\n title\n  question {\n questionId\n frontendQuestionId: questionFrontendId\n   title\n  titleSlug\n }\n  article {\n id\n title\n }\n  htmlArticle {\n id\n  }\n  webPage {\n id\n  }\n  }\n }\n"}
-                        item_content = json.loads(SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers,
-                                                                json=item_data).content)['data']['item']
+
+                        query = {
+                            "operationName": "GetItem",
+                            "variables": {
+                                "itemId": item_id
+                            },
+                            "query": "query GetItem($itemId: String!) {\n  item(id: $itemId) {\n    id\n title\n  question {\n questionId\n frontendQuestionId: questionFrontendId\n   title\n  titleSlug\n }\n  article {\n id\n title\n }\n  htmlArticle {\n id\n  }\n  webPage {\n id\n  }\n  }\n }\n"
+                        }
+                        
+                        response = REQ_SESSION.post(
+                            url=LEETCODE_GRAPHQL_URL,
+                            headers=LEETCODE_HEADERS,
+                            json=query)
+                        response.raise_for_status()
+                        response_content = json.loads(response.content)
+                        item_content = response_content['data']['item']
+
                         if item_content == None:
                             break
-                        create_card_html(
-                            item_content, item_title, item_id, headers)
+                        
+                        create_card_html(item_content, item_title, item_id)
                 os.chdir("..")
     os.chdir('..')
 
 
-def create_card_html(item_content, item_title, item_id, headers):
+def create_card_html(item_content, item_title, item_id):
     content = """<body>"""
-    question_content, question_title = get_question_data(item_content, headers)
+    question_content, _ = get_question_data(item_content)
     content += question_content
-    content += get_article_data(item_content, item_title, headers, item_id)
-    content += get_html_article_data(item_content, item_title, headers)
+    content += get_article_data(item_content, item_title, item_id)
+    content += get_html_article_data(item_content, item_title)
     content += """</body>"""
-    slides_json = find_slides_json2(content)
-    content = markdown2.markdown(content)
+    slides_json = find_slides_json2(content, item_id)
     content = attach_header_in_html() + content
     content_soup = BeautifulSoup(content, 'html.parser')
-    content_soup = replace_iframes_with_codes(content_soup, headers, item_id)
     content_soup = place_solution_slides(content_soup, slides_json)
-    content_soup = fix_image_urls(content_soup)
-    with open(f"{item_id}-{item_title}.html", "w", encoding="utf-8") as f:
+    content_soup = fix_image_urls(content_soup, item_id)
+
+    with open(question_html(item_id, item_title), "w", encoding="utf-8") as f:
         f.write(content_soup.prettify())
 
 def is_valid_image(image_path):
-    try:
-        # Open the image file
-        with Image.open(image_path) as img:
-            # Verify the image (this doesn't load the entire image into memory)
-            img.verify()
+    # Get the file extension
+    _, ext = os.path.splitext(image_path)
+    
+    # SVG file is allowed by default
+    if ext.lower() == '.svg':
         return True
-    except (IOError, SyntaxError, Image.UnidentifiedImageError) as e:
-        print(f"Invalid image: {image_path}. Error: {e}")
-        return False
+
+    with Image.open(image_path) as img:
+        img.verify()
+    return True
 
 def decompose_gif(gif_path, filename_no_ext, output_folder):
     # Open the GIF file
@@ -411,66 +511,64 @@ def convert_to_uncompressed_png(img_path, img_ext):
             with Image.open(img_path) as img:
                 # Save the image without compression
                 img.save(img_path, 'PNG', compress_level=0)
-                logger.info(f"Decompressed PNG saved at {img_path}")
+                logger.debug(f"Decompressed PNG saved at {img_path}")
     except Exception as e:
         logger.error(f"Error reading file {img_path}\n{e}")
         return None
 
 
-def load_image_in_b64(img_url, decompose_gif_frames):
+def load_image_in_b64(question_id, img_url, decompose_gif_frames):
+    logger.debug(f"Loading image: {img_url}")
+
     if not validators.url(img_url):
         logger.error(f"Invalid image url: {img_url}")
         return
     
     hostname = urlparse(img_url).hostname
     if hostname == "127.0.0.1" or hostname == "localhost":
-        logger.info(f"localhost detected: {img_url}")
+        logger.warning(f"localhost detected: {img_url}")
         return
 
-    images_dir = os.path.join(CONFIG.save_path, "cache", "images")
-    os.makedirs(images_dir, exist_ok=True)
+    data_dir = os.path.join(CONFIG.save_path, "cache", "images")
+    os.makedirs(data_dir, exist_ok=True)
     
     parsed_url = urlsplit(img_url)
-    image_file_name = os.path.basename(parsed_url.path)    
+    basename = os.path.basename(parsed_url.path)
 
-    img_ext = str.lower(image_file_name.split('.')[-1])
+    img_ext = str.lower(basename.split('.')[-1])
 
     url_hash = hashlib.md5(img_url.encode()).hexdigest()
-    image_local_file_name = f"{url_hash}.{img_ext}"
-    image_local_path = os.path.join(images_dir, image_local_file_name)
+    data_path = os.path.join(data_dir, f"{question_id_title(question_id, url_hash)}.{img_ext}")
 
     if img_ext == "svg":
         img_ext = "svg+xml"
 
     encoded_string = None
 
-    if not CONFIG.cache_downloads or not os.path.exists(image_local_path):
+    if not CONFIG.cache_data or not os.path.exists(data_path):
         try:
-            img_data = SESSION.get(url=img_url, headers=create_headers()).content
+            img_data = CLOUD_SCRAPER.get(url=img_url).content
 
-            with open(image_local_path, 'wb') as img_file:
-                img_file.write(img_data)
+            with open(data_path, 'wb') as file:
+                file.write(img_data)
 
-            convert_to_uncompressed_png(image_local_path, img_ext)
+            convert_to_uncompressed_png(data_path, img_ext)
 
         except Exception as e:
             raise Exception(f"Error loading image url: {img_url}")
 
     if decompose_gif_frames and img_ext == "gif":
-        frames = decompose_gif(image_local_path, url_hash, images_dir)
+        frames = decompose_gif(data_path, url_hash, data_dir)
     else:
-        frames = [image_local_path]
+        frames = [data_path]
 
     imgs_decoded = []
     for frame in frames:
         if not is_valid_image(frame):
-            imgs_decoded.append(None)
             continue
 
-        with open(frame, "rb") as img_file:
-            img_data = img_file.read()
-
-        if img_data:
+        with open(frame, "rb") as file:
+            img_data = file.read()
             encoded_string = base64.b64encode(img_data)
 
         if not encoded_string:
@@ -483,14 +581,16 @@ def load_image_in_b64(img_url, decompose_gif_frames):
 
     return imgs_decoded
 
-
-
-def fix_image_urls(content_soup):
+def fix_image_urls(content_soup, qustion_id):
     logger.info("Fixing image urls")
+
     images = content_soup.select('img')
+
     for image in images:
+        logger.debug(f"img[src]: {image['src']}")
         if image.has_attr('src') and "base64" not in image['src']:
             splitted_image_src = image['src'].split('/')
+
             if ".." in splitted_image_src:
                 index = 0
                 for idx in range(len(splitted_image_src)-1):
@@ -500,10 +600,13 @@ def fix_image_urls(content_soup):
             else:
                 img_url = image['src']
 
+            logger.debug(f"img_url: {img_url}")
+
             image['src'] = img_url
-            if CONFIG.cache_downloads:
-                frames = load_image_in_b64(img_url, False)
-                if frames:
+            if CONFIG.cache_data:
+                frames = load_image_in_b64(qustion_id, img_url, False)
+
+                if frames and len(frames) > 0:
                     if len(frames) == 1:
                         if frames[0]:
                             image['src'] = frames[0]
@@ -518,11 +621,14 @@ def fix_image_urls(content_soup):
 
                         # Replace the GIF <img> tag with the new image tags
                         image.replace_with(*new_tags)
+                else:
+                    image.decompose()
     return content_soup
 
 
 def convert_display_math_to_inline(content_soup):
-    logger.info("Converting display math $$ to inline math $")
+    logger.debug("Converting display math $$ to inline math $")
+
     for element in content_soup.find_all(string=True):
         text = element.string.strip()
         if text:
@@ -531,15 +637,22 @@ def convert_display_math_to_inline(content_soup):
             element.replace_with(new_text)
     return content_soup
 
+def convert_display_math_to_inline2(content):
+    logger.debug("Converting display math $$ to inline math $")
+    # Replace double $$ with single $
+    content = re.sub(r'\$\$(.*?)\$\$', r'$\1$', content)
+    return content
+
 def place_solution_slides(content_soup, slides_json):
-    logger.info("Placing solution slides")
-    slide_p_tags = content_soup.select("p:-soup-contains('/Documents/')")
-    temp = []
-    for slide_p_tag in slide_p_tags:
-        if len(slide_p_tag.find_all("p")) == 0 and ".json" in str(slide_p_tag) and slide_p_tag not in temp:
-            # logger.debug(slide_p_tag, type(slide_p_tag))
-            temp.append(slide_p_tag)
-    slide_p_tags = temp
+    logger.debug("Placing solution slides")
+
+    slide_p_tags = set()
+    for p in content_soup.find_all('p'):
+        text = p.get_text().lower()
+        if '/documents/' in text and ".json" in text:
+            slide_p_tags.add(p)
+
+    logger.debug(slide_p_tags)
     
     for slide_idx, slide_p_tag in enumerate(slide_p_tags):
         if slides_json[slide_idx] == []:
@@ -547,6 +660,7 @@ def place_solution_slides(content_soup, slides_json):
         slides_html = f"""<div id="carouselExampleControls-{slide_idx}" class="carousel slide" data-bs-ride="carousel">
                         <div  class="carousel-inner">"""
         for img_idx, img_links in enumerate(slides_json[slide_idx]):
+            logger.debug(f"Image links: {img_links}")
             slides_html += f"""<div class="carousel-item {'active' if img_idx == 0 else ''}">
                                 <img src="{img_links['image']}" class="d-block" alt="...">
                             </div>"""
@@ -566,34 +680,45 @@ def place_solution_slides(content_soup, slides_json):
     return content_soup
 
 
-def replace_iframes_with_codes(content_soup, headers, question_id):
+def replace_iframes_with_codes(content, question_id):
+    logger.debug("Replacing iframe with code")
+
+    data_dir = os.path.join(CONFIG.save_path, "cache", "code")
+    os.makedirs(data_dir, exist_ok=True)
+
+    content_soup = BeautifulSoup(content, 'html.parser')
     iframes = content_soup.find_all('iframe')
     for if_idx, iframe in enumerate(iframes, start=1):
         src_url = iframe['src']
-        if "playground" in src_url:
+        logger.debug(f"Playground url: {src_url}")
+
+        if "playground" in str.lower(src_url):
             uuid = src_url.split('/')[-2]
+            logger.debug(f"Playground uuid: {uuid} url: {src_url}")
+            
+            data_path = os.path.join(data_dir, f"{question_id_title(question_id, uuid)}.json")
 
-            question_code_root_dir = os.path.join(CONFIG.save_path, "cache", "code")
-            os.makedirs(question_code_root_dir, exist_ok=True)
-
-            question_code_data_json_file = f"{question_id:04}-{uuid}.json"
-            question_code_json_path = os.path.join(question_code_root_dir, question_code_data_json_file)
-
-            if CONFIG.cache_downloads and os.path.exists(question_code_json_path):
-                with open(question_code_json_path, "r") as file:
+            if CONFIG.cache_data and os.path.exists(data_path):
+                with open(data_path, "r") as file:
                     playground_content = json.load(file)
             else:
-                playground_data = {"operationName": "allPlaygroundCodes",
-                                "query": f"""query allPlaygroundCodes {{\n allPlaygroundCodes(uuid: \"{uuid}\") {{\n    code\n    langSlug\n }}\n}}\n"""}
-                playground_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=playground_data).content
-
+                query = {
+                    "operationName": "allPlaygroundCodes",
+                    "query": f"""query allPlaygroundCodes {{\n allPlaygroundCodes(uuid: \"{uuid}\") {{\n    code\n    langSlug\n }}\n}}\n"""
+                }
+                response = REQ_SESSION.post(
+                    url=LEETCODE_GRAPHQL_URL,
+                    headers=LEETCODE_HEADERS,
+                    json=query)
+                response.raise_for_status()
+                
                 try:
-                    playground_content = json.loads(playground_object)
-                    playground_content = playground_content['data']['allPlaygroundCodes']
+                    response_content = json.loads(response.content)
+                    playground_content = response_content['data']['allPlaygroundCodes']
                 except:
                     raise Exception(f"Error in getting code data from source url {src_url}")
 
-                with open(question_code_json_path, "w") as outfile:
+                with open(data_path, "w") as outfile:
                     outfile.write(json.dumps(playground_content))
 
             if not playground_content:
@@ -623,7 +748,7 @@ def replace_iframes_with_codes(content_soup, headers, question_id):
             code_html += f"""</div>"""
             iframe.replace_with(BeautifulSoup(
                 f""" {code_html} """, 'html.parser'))
-    return content_soup
+    return str(content_soup)
 
 
 def attach_header_in_html():
@@ -765,10 +890,19 @@ def attach_header_in_html():
                     mjx-container, .mjx-chtml {
                                         display: inline !important;
                                     }
-                    </style>
+                    </style></head>
  """
 
-def find_slides_json(content):
+def wrap_slides_with_p_tags(content):
+    # Define the regex pattern to match the entire target string, including the !?! at both ends
+    pattern = re.compile('(?<!<p>)(\!\?\!.*/Documents/.*\!\?\!)(?!</p>)', re.IGNORECASE | re.MULTILINE)
+
+    # Replace the matched pattern with the <p> wrapped version
+    result = pattern.sub(r'<p>\g<0></p>', content)
+
+    return result
+
+def find_slides_json(content, question_id):
     logger.info("Finding slides json")
 
     slides_root_dir = os.path.join(CONFIG.save_path, "cache", "slides")
@@ -779,23 +913,28 @@ def find_slides_json(content):
         fr".*{word}.*", re.MULTILINE).findall(content)
     slides_json_list = [x for x in all_slides_json_list if ".json" in x]
     slides_json = []
-    for links in slides_json_list:
-        slide_img_url = "https://leetcode.com/explore/" + \
-            "/".join(links.strip().split(".json")[-2].split("/")[1:]) + ".json"
-        logger.info(slide_img_url)
 
-        file_hash = hashlib.md5(slide_img_url.encode()).hexdigest()
-        slides_data_json_file = f"{file_hash}.json"
+    for link in slides_json_list:
+        slide_url = "https://leetcode.com/explore/" + \
+            "/".join(link.strip().split(".json")[-2].split("/")[1:]) + ".json"
+        logger.info(slide_url)
+
+        file_hash = hashlib.md5(slide_url.encode()).hexdigest()
+        slides_data_json_file = f"{question_id_title(question_id, file_hash)}.json"
         slides_data_json_path = os.path.join(slides_root_dir, slides_data_json_file)
 
-        if CONFIG.cache_downloads and os.path.exists(slides_data_json_path):
+        if CONFIG.cache_data and os.path.exists(slides_data_json_path):
             logger.info(f"Loading from {slides_data_json_file}")
             with open(slides_data_json_path, "r") as file:
                 slides_json_content = json.load(file)
         else:
             try:
-                slides_data = SESSION.get(url=slide_img_url, headers=create_headers())
-                slides_json_content = json.loads(slides_data.content)['timeline']
+                response = REQ_SESSION.get(
+                    url=slide_url,
+                    headers=DEFAULT_HEADERS)
+                response.raise_for_status()
+                response_content = json.loads(response.content)
+                slides_json_content = response_content['timeline']
             except Exception as e:
                 raise Exception("Error in getting slide json: ", e)
 
@@ -806,124 +945,172 @@ def find_slides_json(content):
 
     return slides_json
 
-def find_slides_json2(content):
+def find_slides_json2(content, question_id):
     logger.info("Finding slides json")
 
-    slides_root_dir = os.path.join(CONFIG.save_path, "cache", "slides")
-    os.makedirs(slides_root_dir, exist_ok=True)
+    data_dir = os.path.join(CONFIG.save_path, "cache", "slides")
+    os.makedirs(data_dir, exist_ok=True)
 
     word = "/Documents/"
-    all_slides_json_list = re.compile(fr"!?!.*{word}.*!?!", re.MULTILINE).findall(content)
-    
-    slides_json_list = [x for x in all_slides_json_list if ".json" in x]
+    pattern = re.compile(fr"!?!.*{word}.*!?!", re.IGNORECASE | re.MULTILINE)
+    slide_names_list = pattern.findall(content)
 
-    slides_json = []
-    for links in slides_json_list:
-        json_split = links.strip().split(".json")
-        json_name = json_split[-2]
+    slide_names = [x for x in slide_names_list if ".json" in x]
+
+    logger.debug(f"Slide names count: {len(slide_names)}")
+
+    slide_contents = []
+    for slide_name in slide_names:
+        logger.debug(f"Slide name: {slide_name}")
+        json_split = slide_name.strip().split(".json")
+        base_name = json_split[-2]
+
+        logger.debug(f"Base name: {base_name}")
         
-        json_split = json_name.split("/")
+        json_split = base_name.split("/")
         drop_dots = json_split[1:]
         
         documents = drop_dots[0] # Documents
-        rest_after_documents = drop_dots[1:] # 01_LIS.json
-        file = "/".join(rest_after_documents)
-        file_var1 = f"{str.lower(documents)}/{str.lower(file)}" # variation 1: all lower
-        file_var2 = f"{str.lower(documents)}/{file}" # variation 2: only documents/ lower
-    
-        file_hash = hashlib.md5(file_var1.encode()).hexdigest()
-        slides_data_json_file = f"{file_hash}.json"
-        slides_data_json_path = os.path.join(slides_root_dir, slides_data_json_file)
+        logger.debug(f"documents: {documents}")
 
-        if CONFIG.cache_downloads and os.path.exists(slides_data_json_path):
-            with open(slides_data_json_path, "r") as file:
-                slides_json_content = json.load(file)
+        rest_after_documents = drop_dots[1:] # 01_LIS.json
+        filename = "/".join(rest_after_documents)
+        logger.debug(f"filename: {filename}")
+
+        filename_var1 = f"{str.lower(documents)}/{filename}" # variation 1: only documents/ lower
+        filename_var2 = f"{str.lower(documents)}/{str.lower(filename)}" # variation 2: all lower
+        logger.debug(f"filename_var1: {filename_var1}")
+        logger.debug(f"filename_var2: {filename_var2}")
+    
+        file_hash = hashlib.md5(filename_var1.encode()).hexdigest()
+        data_path = os.path.join(data_dir, f"{question_id_title(question_id, file_hash)}.json")
+
+        if CONFIG.cache_data and os.path.exists(data_path):
+            with open(data_path, "r") as file:
+                slide_content = json.load(file)
         else:
-            slide_img_url = f"https://assets.leetcode.com/static_assets/media/{file_var1}.json"
+            slide_url = f"https://assets.leetcode.com/static_assets/media/{filename_var1}.json"
+            logger.debug(f"Slide url1: {slide_url}")
 
             try:
-                slides_json_obj = SESSION.get(url=slide_img_url, headers=create_headers())
-                if slides_json_obj.status_code == 404:
+                response = REQ_SESSION.get(
+                    url=slide_url,
+                    headers=DEFAULT_HEADERS)
+                if response.status_code == 404:
                     # if not found try second variation
-                    slide_img_url = f"https://assets.leetcode.com/static_assets/media/{file_var2}.json"
-                    slides_json_obj = SESSION.get(url=slide_img_url, headers=create_headers())
+                    slide_url = f"https://assets.leetcode.com/static_assets/media/{filename_var2}.json"
+                    logger.debug(f"Slide url2: {slide_url}")
+                    response = REQ_SESSION.get(
+                        url=slide_url,
+                        headers=DEFAULT_HEADERS)
+                    response.raise_for_status()
 
-                slides_json_content = json.loads(slides_json_obj.content)
-                slides_json_content = slides_json_content['timeline']
+                response_content = json.loads(response.content)
+                slide_content = response_content['timeline']
             except:
-                raise Exception(f"Error in getting slides data {slide_img_url}")                
+                raise Exception(f"Error in getting slides data {slide_url}")                
 
-            with open(slides_data_json_path, "w") as outfile:
-                outfile.write(json.dumps(slides_json_content))
+            with open(data_path, "w") as outfile:
+                outfile.write(json.dumps(slide_content))
 
-        slides_json.append(slides_json_content)
+        slide_contents.append(slide_content)
 
-    return slides_json
+    return slide_contents
 
 
-def get_article_data(item_content, item_title, headers, question_id):
+def get_article_data(item_content, item_title, question_id):
     logger.info("Getting article data")
+
+    article_data = ""
+
     if item_content['article']:
-        articles_root_dir = os.path.join(CONFIG.save_path, "cache", "articles")
-        os.makedirs(articles_root_dir, exist_ok=True)
+        data_dir = os.path.join(CONFIG.save_path, "cache", "articles")
+        os.makedirs(data_dir, exist_ok=True)
         
         article_id = item_content['article']['id']
-        articles_data_json_file = f"{question_id:04}-{article_id}.json"
-        articles_data_json_path = os.path.join(articles_root_dir, articles_data_json_file)
+        data_path = os.path.join(data_dir, f"{question_id_title(question_id, article_id)}.json")
 
-        if CONFIG.cache_downloads and os.path.exists(articles_data_json_path):
-            with open(articles_data_json_path, "r") as file:
+        if CONFIG.cache_data and os.path.exists(data_path):
+            with open(data_path, "r") as file:
                 article_content = json.load(file)
         else:            
-            article_data = {"operationName": "GetArticle", "variables": {
-                "articleId": f"{article_id}"}, "query": "query GetArticle($articleId: String!) {\n  article(id: $articleId) {\n    id\n    title\n    body\n  }\n}\n"}
-            article_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=article_data).content
-            
-            try:
-                article_content = json.loads(article_object)
-                article_content = article_content['data']['article']['body']
-            except:
-                raise Exception("Error in getting submission data")
+            query = {
+                "operationName": "GetArticle",
+                "variables": {
+                    "articleId": article_id
+                },
+                "query": "query GetArticle($articleId: String!) {\n  article(id: $articleId) {\n    id\n    title\n    body\n  }\n}\n"
+            }
 
-            with open(articles_data_json_path, "w") as outfile:
+            response = REQ_SESSION.post(
+                url=LEETCODE_GRAPHQL_URL,
+                headers=LEETCODE_HEADERS,
+                json=query)
+            response.raise_for_status()
+
+            try:
+                response_content = json.loads(response.content)
+                article_content = response_content['data']['article']['body']
+            except:
+                raise Exception("Error in getting article data")
+
+            with open(data_path, "w") as outfile:
                 outfile.write(json.dumps(article_content))            
 
-        return f"""<h3>{item_title}</h3>
+        article_data = f"""<h3>{item_title}</h3>
                     <md-block class="article__content">{article_content}</md-block>
                 """
-    return ""
+    return article_data
 
-
-def get_html_article_data(item_content, item_title, headers):
+def get_html_article_data(item_content, item_title):
     logger.info("Getting html article data")
+
+    html_article_data = ""
     if item_content['htmlArticle']:
         html_article_id = item_content['htmlArticle']['id']
-        html_article_data = {"operationName": "GetHtmlArticle", "variables": {
-            "htmlArticleId": f"{html_article_id}"}, "query": "query GetHtmlArticle($htmlArticleId: String!) {\n  htmlArticle(id: $htmlArticleId) {\n    id\n    html\n      }\n}\n"}
-        html_article_content = json.loads(SESSION.post(
-            url=LEETCODE_GRAPHQL_URL, headers=headers, json=html_article_data).content)['data']['htmlArticle']
-        html_article = html_article_content['html']
-        return f"""<h3>{item_title}</h3>
+
+        query = {
+            "operationName": "GetHtmlArticle",
+            "variables": {
+                "htmlArticleId": html_article_id
+            },
+            "query": "query GetHtmlArticle($htmlArticleId: String!) {\n  htmlArticle(id: $htmlArticleId) {\n    id\n    html\n      }\n}\n"
+        }
+        
+        response = REQ_SESSION.post(
+            url=LEETCODE_GRAPHQL_URL,
+            headers=LEETCODE_HEADERS,
+            json=query)
+        response.raise_for_status()
+        response_content = json.loads(response.content)
+        html_article = response_content['data']['htmlArticle']['html']
+
+        html_article_data = f"""<h3>{item_title}</h3>
                     <md-block class="html_article__content">{html_article}</md-block>
                 """
-    return ""
+    return html_article_data
+
 
 
 def generate_similar_questions(similar_questions):
     logger.info("Generating similar questions")
     similar_questions_html = ""
+
     if similar_questions:
         similar_questions = json.loads(similar_questions)
         if similar_questions != []:
             similar_questions_html += f"""<div style="background: white;"><h3>Similar Questions</h3>"""
             for idx, similar_question in enumerate(similar_questions, start=1):
+                # similar_question = question_html(similar_question['title'], similar_question['title'])
                 similar_questions_html += f"""<div class="similar-questions-container"><div>{idx}. <a target="_blank" href="https://leetcode.com/problems/{similar_question['titleSlug']}">{similar_question['title']}</a> ({similar_question['difficulty']}) <a target="_blank" href="./{similar_question['title']}.html">Local</a></div></div>"""
             similar_questions_html += f"""</div>"""
+
     return similar_questions_html
 
 
 def get_question_company_tag_stats(company_tag_stats):
     company_tag_stats_html = ""
+
     if company_tag_stats:
         company_tag_stats = json.loads(company_tag_stats)
         if company_tag_stats != {}:
@@ -941,38 +1128,13 @@ def get_question_company_tag_stats(company_tag_stats):
     return company_tag_stats_html
 
 
-FILE_EXTENSIONS = {
-    "python": "py",
-    "python3": "py",
-    "pythondata": "pd.py",
-    "c": "c",
-    "cpp": "cpp",
-    "csharp": "cs",
-    "java": "java",
-    "kotlin": "kt",
-    "mysql": "sql",
-    "mssql": "sql",
-    "oraclesql": "sql",
-    "javascript": "js",
-    "html": "html",
-    "php": "php",
-    "golang": "go",
-    "scala": "scala",
-    "pythonml": "py",
-    "rust": "rs",
-    "ruby": "rb",
-    "bash": "sh",
-    "swift": "swift",
-}
-
 def get_all_submissions():
-    headers = create_headers(CONFIG.leetcode_cookie)
     all_questions = get_all_questions_url(self_function=False)
     for question in all_questions:
         item_content = {"question": {'titleSlug': question['titleSlug'], 'frontendQuestionId': question['frontendQuestionId'], 'title': question['title']}}
-        get_submission_data(item_content, headers, False)
+        get_submission_data(item_content, False)
 
-def get_submission_data(item_content, headers, save_submission_as_file):
+def get_submission_data(item_content, save_submission_as_file):
 
     list_of_submissions = {}
 
@@ -980,36 +1142,39 @@ def get_submission_data(item_content, headers, save_submission_as_file):
         question_frontend_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
         question_title_slug = item_content['question']['titleSlug']
 
-        submissions_root_dir = os.path.join(CONFIG.save_path, "cache", "submissions")
-        os.makedirs(submissions_root_dir, exist_ok=True)
+        data_dir = os.path.join(CONFIG.save_path, "cache", "submissions")
+        os.makedirs(data_dir, exist_ok=True)
         
-        submission_data_json_file = f"{question_frontend_id:04}.json"
-        submission_data_json_path = os.path.join(submissions_root_dir, submission_data_json_file)
+        data_path = os.path.join(data_dir, f"{question_id_title(question_frontend_id, 'subm')}.json")
 
-        if CONFIG.cache_downloads and os.path.exists(submission_data_json_path):
-            with open(submission_data_json_path, "r") as file:
+        if CONFIG.cache_data and os.path.exists(data_path):
+            with open(data_path, "r") as file:
                 submission_content = json.load(file)
         else:
-            submission_data = {
-                "query": "\n    query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!, $lang: Int, $status: Int) {\n  questionSubmissionList(\n    offset: $offset\n    limit: $limit\n    lastKey: $lastKey\n    questionSlug: $questionSlug\n    lang: $lang\n    status: $status\n  ) {\n    lastKey\n    hasNext\n    submissions {\n      id\n      title\n      titleSlug\n      status\n      statusDisplay\n      lang\n      langName\n      runtime\n      timestamp\n      url\n      isPending\n      memory\n      hasNotes\n      notes\n      flagType\n      topicTags {\n        id\n      }\n    }\n  }\n}\n    ",
+            query = {
+                "operationName": "submissionList",
                 "variables": {
                     "questionSlug": question_title_slug,
                     "offset": 0,
                     "limit": 20,
                     "lastKey": None
                 },
-                "operationName": "submissionList"
+                "query": "\n    query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!, $lang: Int, $status: Int) {\n  questionSubmissionList(\n    offset: $offset\n    limit: $limit\n    lastKey: $lastKey\n    questionSlug: $questionSlug\n    lang: $lang\n    status: $status\n  ) {\n    lastKey\n    hasNext\n    submissions {\n      id\n      title\n      titleSlug\n      status\n      statusDisplay\n      lang\n      langName\n      runtime\n      timestamp\n      url\n      isPending\n      memory\n      hasNotes\n      notes\n      flagType\n      topicTags {\n        id\n      }\n    }\n  }\n}\n    "
             }
 
-            submission_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=submission_data).content
-
+            response = REQ_SESSION.post(
+                url=LEETCODE_GRAPHQL_URL,
+                headers=LEETCODE_HEADERS,
+                json=query)
+            response.raise_for_status()
+            
             try:
-                submission_content = json.loads(submission_object)
-                submission_content = submission_content['data']['questionSubmissionList']['submissions']
+                response_content = json.loads(response.content)
+                submission_content = response_content['data']['questionSubmissionList']['submissions']
             except:
                 raise Exception("Error in getting submission data")
 
-            with open(submission_data_json_path, "w") as outfile:
+            with open(data_path, "w") as outfile:
                 outfile.write(json.dumps(submission_content))
             
         if not submission_content or len(submission_content) == 0:
@@ -1020,17 +1185,21 @@ def get_submission_data(item_content, headers, save_submission_as_file):
             if submission["statusDisplay"] != "Accepted":
                 continue
             
-            submission_detail_data = {
-                "query":"\n    query submissionDetails($submissionId: Int!) {\n  submissionDetails(submissionId: $submissionId) {\n    runtime\n    runtimeDisplay\n    runtimePercentile\n    runtimeDistribution\n    memory\n    memoryDisplay\n    memoryPercentile\n    memoryDistribution\n    code\n    timestamp\n    statusCode\n    user {\n      username\n      profile {\n        realName\n        userAvatar\n      }\n    }\n    lang {\n      name\n      verboseName\n    }\n    question {\n      questionId\n      titleSlug\n      hasFrontendPreview\n    }\n    notes\n    flagType\n    topicTags {\n      tagId\n      slug\n      name\n    }\n    runtimeError\n    compileError\n    lastTestcase\n    totalCorrect\n    totalTestcases\n    fullCodeOutput\n    testDescriptions\n    testBodies\n    testInfo\n  }\n}\n    ",
-                "variables":{
+            query = {
+                "operationName": "submissionDetails",
+                "variables": {
                     "submissionId": submission_id
-                },
-                "operationName":"submissionDetails"
+                },                
+                "query":"\n    query submissionDetails($submissionId: Int!) {\n  submissionDetails(submissionId: $submissionId) {\n    runtime\n    runtimeDisplay\n    runtimePercentile\n    runtimeDistribution\n    memory\n    memoryDisplay\n    memoryPercentile\n    memoryDistribution\n    code\n    timestamp\n    statusCode\n    user {\n      username\n      profile {\n        realName\n        userAvatar\n      }\n    }\n    lang {\n      name\n      verboseName\n    }\n    question {\n      questionId\n      titleSlug\n      hasFrontendPreview\n    }\n    notes\n    flagType\n    topicTags {\n      tagId\n      slug\n      name\n    }\n    runtimeError\n    compileError\n    lastTestcase\n    totalCorrect\n    totalTestcases\n    fullCodeOutput\n    testDescriptions\n    testBodies\n    testInfo\n  }\n}\n    "
             }
-            submission_detail_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=submission_detail_data).content
-            submission_detail_content = json.loads(submission_detail_object)
+            response = REQ_SESSION.post(
+                url=LEETCODE_GRAPHQL_URL,
+                headers=LEETCODE_HEADERS,
+                json=query)
+            response.raise_for_status()
 
-            submission_detail_content = submission_detail_content['data']['submissionDetails']
+            response_content = json.loads(response.content)
+            submission_detail_content = response_content['data']['submissionDetails']
 
             if not submission_detail_content:
                 continue
@@ -1049,30 +1218,39 @@ def get_submission_data(item_content, headers, save_submission_as_file):
                     outfile.write(submission_detail_content['code'])
     return list_of_submissions
 
-def get_solution_content(question_id, question_title_slug, headers):
+def get_solution_content(question_id, question_title_slug):
     logger.info("Getting solution data")
 
-    question_data_root_dir = os.path.join(CONFIG.save_path, "cache", "soldata")
-    os.makedirs(question_data_root_dir, exist_ok=True)
+    data_dir = os.path.join(CONFIG.save_path, "cache", "soldata")
+    os.makedirs(data_dir, exist_ok=True)
 
-    sol_data_json_file = f"{question_id:04}.json"
-    sol_data_json_path = os.path.join(question_data_root_dir, sol_data_json_file)
+    data_path = os.path.join(data_dir, f"{question_id_title(question_id, 'sol')}.json")
 
-    if CONFIG.cache_downloads and os.path.exists(sol_data_json_path):
-        with open(sol_data_json_path, "r") as file:
+    if CONFIG.cache_data and os.path.exists(data_path):
+        with open(data_path, "r") as file:
             sol_content = json.load(file)
     else:
-        sol_query = {"query":"\n    query officialSolution($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    solution {\n      id\n      title\n      content\n      contentTypeId\n      paidOnly\n      hasVideoSolution\n      paidOnlyVideo\n      canSeeDetail\n      rating {\n        count\n        average\n        userRating {\n          score\n        }\n      }\n      topic {\n        id\n        commentCount\n        topLevelCommentCount\n        viewCount\n        subscribed\n        solutionTags {\n          name\n          slug\n        }\n        post {\n          id\n          status\n          creationDate\n          author {\n            username\n            isActive\n            profile {\n              userAvatar\n              reputation\n            }\n          }\n        }\n      }\n    }\n  }\n}\n    ",
-                     "variables":{"titleSlug":question_title_slug},"operationName":"officialSolution"}
-        sol_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=sol_query).content
+        query = {
+            "operationName": "officialSolution",
+            "variables": {
+                "titleSlug": question_title_slug
+            },
+            "query": "\n    query officialSolution($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    solution {\n      id\n      title\n      content\n      contentTypeId\n      paidOnly\n      hasVideoSolution\n      paidOnlyVideo\n      canSeeDetail\n      rating {\n        count\n        average\n        userRating {\n          score\n        }\n      }\n      topic {\n        id\n        commentCount\n        topLevelCommentCount\n        viewCount\n        subscribed\n        solutionTags {\n          name\n          slug\n        }\n        post {\n          id\n          status\n          creationDate\n          author {\n            username\n            isActive\n            profile {\n              userAvatar\n              reputation\n            }\n          }\n        }\n      }\n    }\n  }\n}\n    "
+        }
 
+        response = REQ_SESSION.post(
+            url=LEETCODE_GRAPHQL_URL,
+            headers=LEETCODE_HEADERS,
+            json=query)
+        response.raise_for_status()
+        
         try:
-            sol_content = json.loads(sol_object)
-            sol_content = sol_content['data']['question']['solution']
+            response_content = json.loads(response.content)
+            sol_content = response_content['data']['question']['solution']
         except:
             raise Exception("Error in getting solution data")
 
-        with open(sol_data_json_path, "w") as outfile:
+        with open(data_path, "w") as outfile:
             outfile.write(json.dumps(sol_content))
 
     solution = None
@@ -1081,34 +1259,43 @@ def get_solution_content(question_id, question_title_slug, headers):
     return solution
 
 
-def get_question_data(item_content, headers):
+def get_question_data(item_content):
     logger.info("Getting question data")
     if item_content['question']:
         question_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
         question_title_slug = item_content['question']['titleSlug']
         question_title = item_content['question']['title'] if item_content['question']['title'] else question_title_slug
 
-        question_data_root_dir = os.path.join(CONFIG.save_path, "cache", "qdata")
-        os.makedirs(question_data_root_dir, exist_ok=True)
+        data_dir = os.path.join(CONFIG.save_path, "cache", "qdata")
+        os.makedirs(data_dir, exist_ok=True)
 
-        question_data_json_file = f"{question_id:04}.json"
-        question_data_json_path = os.path.join(question_data_root_dir, question_data_json_file)
+        data_path = os.path.join(data_dir, f"{question_id_title(question_id, 'qdat')}.json")
 
-        if CONFIG.cache_downloads and os.path.exists(question_data_json_path):
-            with open(question_data_json_path, "r") as file:
+        if CONFIG.cache_data and os.path.exists(data_path):
+            with open(data_path, "r") as file:
                 question_content = json.load(file)
         else:
-            question_data = {"operationName": "GetQuestion", "variables": {"titleSlug": question_title_slug},
-                         "query": "query GetQuestion($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n title\n submitUrl\n similarQuestions\n difficulty\n  companyTagStats\n codeDefinition\n    content\n    hints\n    solution {\n      content\n   }\n   }\n }\n"}
-            question_object = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=question_data).content
+            query = {
+                "operationName": "GetQuestion",
+                "variables": {
+                    "titleSlug": question_title_slug
+                },
+                "query": "query GetQuestion($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n title\n submitUrl\n similarQuestions\n difficulty\n  companyTagStats\n codeDefinition\n    content\n    hints\n    solution {\n      content\n   }\n   }\n }\n"
+            }
 
+            response = REQ_SESSION.post(
+                url=LEETCODE_GRAPHQL_URL,
+                headers=LEETCODE_HEADERS,
+                json=query)
+            response.raise_for_status()
+            
             try:
-                question_content = json.loads(question_object)
-                question_content = question_content['data']['question']
+                response_content = json.loads(response.content)
+                question_content = response_content['data']['question']
             except:
                 raise Exception("Error in getting question data")
 
-            with open(question_data_json_path, "w") as outfile:
+            with open(data_path, "w") as outfile:
                 outfile.write(json.dumps(question_content))
 
         question_title = re.sub(r'[:?|></\\]', replace_filename, question_content['title'])        
@@ -1123,21 +1310,29 @@ def get_question_data(item_content, headers):
         if solution:
             solution = solution['content']
         else:
-            solution = "No Solution"
+            solution = None
+
         hints = question_content['hints']
 
+        hint_content = None
         if hints:
             hint_content = ""
             for hint in hints:
+                hint = convert_display_math_to_inline2(hint)
                 hint_content += f"<div> > {hint}</div>"
-        else:
-            hint_content = "No Hints"
+            
 
-        submission_content = "No accepted submissions."
+        submission_content = None
 
         if CONFIG.include_submissions_count > 0:
-            item_content = {"question": {'titleSlug': question_title_slug, 'frontendQuestionId': question_id, 'title': question_title}}
-            submissions = get_submission_data(item_content, headers, True)
+            item_content = {
+                "question": {
+                    'titleSlug': question_title_slug,
+                    'frontendQuestionId': question_id,
+                    'title': question_title
+                }
+            }
+            submissions = get_submission_data(item_content, True)
             if submissions and len(submissions) > 0:
                 # Sorted by timestamp in descending order
                 ordered_submissions = sorted(submissions.items(), key=lambda item: item[0], reverse=True)
@@ -1150,29 +1345,74 @@ def get_question_data(item_content, headers):
                     submission_content += f"""<div><h4>Submission Time: {submission_time}</h4>
                     <pre class="question__default_code">{code}</pre></div>"""
 
- 
-        return f""" <h2 class="question__url"><a target="_blank" href="{question_url}">{question_id}. {question_title}</a></h2><p> Difficulty: {difficulty}</p>
-                    <div>{company_tag_stats}</div>
-                    <div>{similar_questions}</div>
-                    <div><h3>Question</h3>
-                    <md-block class="question__content">{question}</md-block></div>
-                    <div><h3>Default Code</h3>
-                    <pre class="question__default_code">{default_code}</pre></div>
+        question = convert_display_math_to_inline2(question)
+        question = markdown.markdown(question, extensions=['extra'])
+        
+        solution = convert_display_math_to_inline2(solution)
+        solution = markdown.markdown(solution, extensions=['extra'])
+        solution = replace_iframes_with_codes(solution, question_id)
+        solution = wrap_slides_with_p_tags(solution)
+
+        default_code_html = """"""
+        if CONFIG.include_default_code:
+            default_code_html = f"""
+                        <div><h3>Default Code</h3>
+                        <pre class="question__default_code">{default_code}</pre></div>
+            """
+
+        hint_content_html = """"""
+        if hint_content:
+            hint_content_html = f"""
                     <div><h3>Hints</h3>
                     <md-block class="question__hints">{hint_content}</md-block></div>
+            """
+
+        submission_content_html = """"""
+        if submission_content:
+            submission_content_html = f"""
+                    <div><h3>Accepted Submissions</h3>
+                    {submission_content}</div>
+            """
+        
+        solution_html = """"""
+        if solution:
+            solution_html = f"""
                     <div><h3>Solution</h3>
                     <md-block class="question__solution">{solution}</md-block></div>
-                    <div><h3>Accepted Submissions</h3>{submission_content}</div>
+            """
+
+        return f""" <h2 class="question__url"><a target="_blank" href="{question_url}">{question_id}. {question_title}</a></h2><p> Difficulty: {difficulty}</p>
+                    <div><h3>Question</h3>
+                    <md-block class="question__content">{question}</md-block></div>
+                    {hint_content_html}
+                    {default_code_html}
+                    {solution_html}
+                    <div>{company_tag_stats}</div>
+                    <div>{similar_questions}</div>
+                    {submission_content_html}
                 """, question_title
     return """""", ""
 
 
-def create_card_index_html(chapters, card_slug, headers):
+def create_card_index_html(chapters, card_slug):
     logger.info("Creating index.html")
-    intro_data = {"operationName": "GetExtendedCardDetail", "variables": {"cardSlug": card_slug},
-                  "query": "query GetExtendedCardDetail($cardSlug: String!) {\n  card(cardSlug: $cardSlug) {\n title\n  introduction\n}\n}\n", }
-    introduction = json.loads(SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers,
-                                            json=intro_data).content)['data']['card']
+
+    query = {
+        "operationName": "GetExtendedCardDetail",
+        "variables": {
+            "cardSlug": card_slug
+        },
+        "query": "query GetExtendedCardDetail($cardSlug: String!) {\n  card(cardSlug: $cardSlug) {\n title\n  introduction\n}\n}\n"
+    }
+
+    response = REQ_SESSION.post(
+        url=LEETCODE_GRAPHQL_URL,
+        headers=LEETCODE_HEADERS,
+        json=query)
+    response.raise_for_status()
+    response_content = json.loads(response.content)
+    introduction = response_content['data']['card']
+
     body = ""
     for chapter in chapters:
         body += f"""
@@ -1183,7 +1423,8 @@ def create_card_index_html(chapters, card_slug, headers):
         """
         for item in chapter['items']:
             item['title'] = re.sub(r'[:?|></\\]', replace_filename, item['title'])
-            body += f"""<a href="{item['id']}-{item['title']}.html">{item['id']}-{item['title']}</a><br>"""
+            item_fname = question_html(item['id'], item['title'])
+            body += f"""<a href="{item_fname}">{item['id']}-{item['title']}</a><br>"""
     with open("index.html", 'w') as f:
         f.write(f"""<!DOCTYPE html>
                 <html lang="en">
@@ -1201,8 +1442,10 @@ def create_card_index_html(chapters, card_slug, headers):
 
 
 def scrape_selected_company_questions(choice):
-    create_folder(os.path.join(CONFIG.save_path, "all_company_questions"))
-    headers = create_headers(CONFIG.leetcode_cookie)
+    all_comp_dir = os.path.join(CONFIG.save_path, "all_company_questions")
+    os.makedirs(all_comp_dir, exist_ok=True)
+    os.chdir(all_comp_dir)
+    
     final_company_tags = []
 
     with open(CONFIG.company_tag_save_path, 'r') as f:
@@ -1214,16 +1457,21 @@ def scrape_selected_company_questions(choice):
                  'slug': company_tag})
 
     if choice == 9:
-        create_all_company_index_html(final_company_tags, headers)
+        create_all_company_index_html(final_company_tags)
     elif choice == 10:
         for company in final_company_tags:
             company_slug = company['slug']
-            scrape_question_data(company_slug, headers)
+            scrape_question_data(company_slug)
             os.chdir("..")
     os.chdir("..")
 
 def get_next_data_id():
-    next_data = SESSION.get(url="https://leetcode.com/problemset/", headers=create_headers()).content
+    response = REQ_SESSION.get(
+        url="https://leetcode.com/problemset/",
+        headers=DEFAULT_HEADERS)
+    response.raise_for_status()
+    next_data = response.content
+    
     next_data_soup = BeautifulSoup(next_data, "html.parser")
     next_data_tag = next_data_soup.find('script', {'id': '__NEXT_DATA__'})
     next_data_json = json.loads(next_data_tag.text)
@@ -1232,45 +1480,62 @@ def get_next_data_id():
 
 def scrape_all_company_questions(choice):
     logger.info("Scraping all company questions")
-    create_folder(os.path.join(CONFIG.save_path, "all_company_questions"))
-    
 
-    headers = create_headers(CONFIG.leetcode_cookie)
-    company_data = {"operationName": "questionCompanyTags", "variables": {},
-                        "query": "query questionCompanyTags {\n  companyTags {\n    name\n    slug\n    questionCount\n  }\n}\n"}
-    company_tags = json.loads(SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers,
-                                                json=company_data).content)['data']['companyTags']
+    all_comp_dir = os.path.join(CONFIG.save_path, "all_company_questions")
+    os.makedirs(all_comp_dir, exist_ok=True)  
+    os.chdir(all_comp_dir)
+
+    query = {
+        "operationName": "questionCompanyTags",
+        "variables": {},
+        "query": "query questionCompanyTags {\n  companyTags {\n    name\n    slug\n    questionCount\n  }\n}\n"
+    }
+    response = REQ_SESSION.post(
+        url=LEETCODE_GRAPHQL_URL,
+        headers=LEETCODE_HEADERS,
+        json=query)
+    response.raise_for_status()
+    response_content = json.loads(response.content)
+    company_tags = response_content['data']['companyTags']
 
     if choice == 7:
-        create_all_company_index_html(company_tags, headers)
+        create_all_company_index_html(company_tags)
     elif choice == 8:
         for company in company_tags:
             company_slug = company['slug']
-            scrape_question_data(company_slug, headers)
+            scrape_question_data(company_slug)
             os.chdir("..")
     os.chdir('..')
 
-def get_categories_slugs_for_company(company_slug, headers):
-    companies_data_root_dir = os.path.join(CONFIG.save_path, "cache", "companies")
-    os.makedirs(companies_data_root_dir, exist_ok=True)
-    comapny_fav_data_json_file = f"{company_slug}-favdetails.json"
-    company_fav_data_json_path = os.path.join(companies_data_root_dir, comapny_fav_data_json_file)
+def get_categories_slugs_for_company(company_slug):
+    data_dir = os.path.join(CONFIG.save_path, "cache", "companies")
+    os.makedirs(data_dir, exist_ok=True)
 
-    if CONFIG.cache_downloads and os.path.exists(company_fav_data_json_path):
-        with open(company_fav_data_json_path, "r") as file:
+    data_path = os.path.join(data_dir, f"{company_slug}-favdetails.json")
+
+    if CONFIG.cache_data and os.path.exists(data_path):
+        with open(data_path, "r") as file:
             favoriteDetails = json.load(file)
     else:
         try:
-            company_fav_data = {"operationName": "favoriteDetailV2ForCompany", "variables": {"favoriteSlug": company_slug},
-                    "query": "query favoriteDetailV2ForCompany($favoriteSlug: String!) {\n  favoriteDetailV2(favoriteSlug: $favoriteSlug) {\n    questionNumber\n    collectCount\n    generatedFavoritesInfo {\n      defaultFavoriteSlug\n      categoriesToSlugs {\n        categoryName\n        favoriteSlug\n        displayName\n      }\n    }\n  }\n}\n    "}
+            query = {
+                "operationName": "favoriteDetailV2ForCompany",
+                "variables": {
+                    "favoriteSlug": company_slug
+                },
+                "query": "query favoriteDetailV2ForCompany($favoriteSlug: String!) {\n  favoriteDetailV2(favoriteSlug: $favoriteSlug) {\n    questionNumber\n    collectCount\n    generatedFavoritesInfo {\n      defaultFavoriteSlug\n      categoriesToSlugs {\n        categoryName\n        favoriteSlug\n        displayName\n      }\n    }\n  }\n}\n    "
+            }
 
-            response = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=company_fav_data)
+            response = REQ_SESSION.post(
+                url=LEETCODE_GRAPHQL_URL,
+                headers=LEETCODE_HEADERS,
+                json=query)
             response.raise_for_status()
 
             response_content = json.loads(response.content)
             favoriteDetails = response_content['data']['favoriteDetailV2']
 
-            with open(company_fav_data_json_path, 'w') as f:
+            with open(data_path, 'w') as f:
                 f.write(json.dumps(favoriteDetails))
 
         except:
@@ -1279,7 +1544,7 @@ def get_categories_slugs_for_company(company_slug, headers):
     return favoriteDetails
 
 
-def create_all_company_index_html(company_tags, headers):
+def create_all_company_index_html(company_tags):
     logger.info("Creating company index.html")
     cols = 10
     rows = len(company_tags)//10 + 1
@@ -1307,7 +1572,7 @@ def create_all_company_index_html(company_tags, headers):
     for company in company_tags:
         company_slug = company['slug']
 
-        favoriteDetails = get_categories_slugs_for_company(company_slug, headers)
+        favoriteDetails = get_categories_slugs_for_company(company_slug)
         if not favoriteDetails:
             continue
         favoriteSlugs = {item["favoriteSlug"]: item["displayName"] for item in favoriteDetails['generatedFavoritesInfo']['categoriesToSlugs']}
@@ -1316,26 +1581,25 @@ def create_all_company_index_html(company_tags, headers):
         company_root_dir = os.path.join(CONFIG.save_path, "all_company_questions", company_slug)
         os.makedirs(company_root_dir, exist_ok=True)
 
-        if CONFIG.overwrite == False and "index.html" in os.listdir(company_root_dir):
+        if not CONFIG.force_download and "index.html" in os.listdir(company_root_dir):
             logger.info(f"Already Scraped {company_slug}")
             continue
         logger.info(f"Scrapping Index for {company_slug}")
 
-        companies_data_root_dir = os.path.join(CONFIG.save_path, "cache", "companies")
-        os.makedirs(companies_data_root_dir, exist_ok=True)
+        data_dir = os.path.join(CONFIG.save_path, "cache", "companies")
+        os.makedirs(data_dir, exist_ok=True)
 
         overall_html = ''
 
         for favoriteSlug in favoriteSlugs:
-            comapny_data_json_file = f"{favoriteSlug}.json"
-            company_data_json_path = os.path.join(companies_data_root_dir, comapny_data_json_file)
+            data_path = os.path.join(data_dir, f"{favoriteSlug}.json")
 
-            if CONFIG.cache_downloads and os.path.exists(company_data_json_path):
-                with open(company_data_json_path, "r") as file:
+            if CONFIG.cache_data and os.path.exists(data_path):
+                with open(data_path, "r") as file:
                     company_questions = json.load(file)
             else:
                 try:
-                    company_data = {
+                    query = {
                         "operationName": "favoriteQuestionList",
                         "variables": {
                             "favoriteSlug": favoriteSlug,
@@ -1347,12 +1611,15 @@ def create_all_company_index_html(company_tags, headers):
                         },
                         "query": "\n    query favoriteQuestionList($favoriteSlug: String!, $filter: FavoriteQuestionFilterInput) {\n  favoriteQuestionList(favoriteSlug: $favoriteSlug, filter: $filter) {\n    questions {\n      difficulty\n      id\n      paidOnly\n      questionFrontendId\n      status\n      title\n      titleSlug\n      translatedTitle\n      isInMyFavorites\n      frequency\n      topicTags {\n        name\n        nameTranslated\n        slug\n      }\n    }\n    totalLength\n    hasMore\n  }\n}\n    "}
 
-                    response = SESSION.post(url=LEETCODE_GRAPHQL_URL, headers=headers, json=company_data)
+                    response = REQ_SESSION.post(
+                        url=LEETCODE_GRAPHQL_URL,
+                        headers=LEETCODE_HEADERS,
+                        json=query)
                     response.raise_for_status()
 
                     company_response_content = json.loads(response.content)
                     company_questions = company_response_content['data']['favoriteQuestionList']['questions']
-                    with open(company_data_json_path, 'w') as f:
+                    with open(data_path, 'w') as f:
                         f.write(json.dumps(company_questions))
 
                 except:
@@ -1366,9 +1633,10 @@ def create_all_company_index_html(company_tags, headers):
 
                 frequency = round(float(question['frequency']), 1)            
                 frequency_label = '{:.1f}'.format(frequency)
-                question_title_format = f"{questionFrontEndId:04}-{question['title']}"
+                question_title_format = question_id_title(questionFrontEndId, question['title'])
+                question_fname = question_html(questionFrontEndId, question['title'])
                 html += f'''<tr>
-                            <td><a slug="{question['titleSlug']}" title="{question_title_format}" href="{question_title_format}.html">{question_title_format}</a></td>
+                            <td><a slug="{question['titleSlug']}" title="{question_title_format}" href="{question_fname}">{question_title_format}</a></td>
                             <td>Difficulty: {question['difficulty']} </td><td>Frequency: {frequency_label}</td>
                             <td><a target="_blank" href="https://leetcode.com/problems/{question['titleSlug']}">Leet</a></td>
                             </tr>'''
@@ -1396,32 +1664,32 @@ def create_all_company_index_html(company_tags, headers):
         os.chdir("..")
 
 
-def scrape_question_data(company_slug, headers):
+def scrape_question_data(company_slug):
     logger.info("Scraping question data")
 
     questions_dir = os.path.join(CONFIG.save_path, "questions")
     questions_pdf_dir = os.path.join(questions_dir, "pdf")
     company_root_dir = os.path.join(CONFIG.save_path, "all_company_questions", company_slug)
-    companies_data_root_dir = os.path.join(CONFIG.save_path, "cache", "companies")
+    data_dir = os.path.join(CONFIG.save_path, "cache", "companies")
     os.makedirs(questions_dir, exist_ok=True)
     os.makedirs(questions_pdf_dir, exist_ok=True)
     os.makedirs(company_root_dir, exist_ok=True)
 
     questions_seen = set()
     
-    categoriesToSlug = get_categories_slugs_for_company(company_slug, headers)
+    categoriesToSlug = get_categories_slugs_for_company(company_slug)
     if not categoriesToSlug:
         return
 
     favoriteSlugs = [item["favoriteSlug"] for item in categoriesToSlug['generatedFavoritesInfo']['categoriesToSlugs']]
 
     for favoriteSlug in favoriteSlugs:
-        company_data_json_path = os.path.join(companies_data_root_dir, f"{favoriteSlug}.json")
+        data_path = os.path.join(data_dir, f"{favoriteSlug}.json")
 
-        if not os.path.exists(company_data_json_path):
-            raise Exception(f"Company data not found {company_data_json_path}")
+        if not os.path.exists(data_path):
+            raise Exception(f"Company data not found {data_path}")
 
-        with open(company_data_json_path, 'r') as f:
+        with open(data_path, 'r') as f:
             questions = json.loads(f.read())
 
         company_fav_dir  = os.path.join(company_root_dir, favoriteSlug)
@@ -1441,14 +1709,13 @@ def scrape_question_data(company_slug, headers):
             questions_seen.add(question_id)
 
             question_sort_order_idx = question_sort_order_idx + 1
-
             
             question_title = question['title']
             question_slug = question['titleSlug']
             question_filename = re.sub(r'[:?|></\\]', replace_filename, question_title)
 
-            question_filename = f"{question_id:04}-{question_title}"
-            question_html_filename = f"{question_filename}.html"
+            question_filename = question_id_title(question_id, question_title)
+            question_html_filename = question_html(question_id, question_title)
             question_pdf_filename = f"{question_filename}.pdf"
        
             questions_html_path   = os.path.join(questions_dir, question_html_filename)
@@ -1457,8 +1724,8 @@ def scrape_question_data(company_slug, headers):
             company_html_path = os.path.join(company_fav_dir, question_html_filename)
             company_pdf_path = os.path.join(company_fav_dir, question_pdf_filename)
 
-            if CONFIG.overwrite:
-                create_question_html(question_id, question_slug, question_filename, headers)
+            if CONFIG.force_download:
+                create_question_html(question_id, question_slug, question_filename)
                 shutil.copy(company_html_path, questions_html_path)
             else:
                 if os.path.exists(questions_html_path):
@@ -1478,7 +1745,8 @@ def manual_convert_images_to_base64():
             if file.endswith('.html'):
                 with open(os.path.join(root, file), "r") as f:
                     soup = BeautifulSoup(f.read(), 'html.parser')
-                    res_soup = fix_image_urls(soup, True)
+                    question_id, question_title = html_toquestion(file)
+                    res_soup = fix_image_urls(soup, question_id)
                 with open(os.path.join(root, file), "w") as f:
                     f.write(res_soup.prettify())
     
@@ -1487,7 +1755,8 @@ if __name__ == '__main__':
     current_os = sys.platform
     SUBMISSIONS_API_URL = "https://leetcode.com/api/submissions/?offset={}&limit={}"
     LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
-    SESSION = requests.Session()
+    REQ_SESSION = requests.Session()
+    CLOUD_SCRAPER = cloudscraper.create_scraper()
 
     selected_config = "0"
     parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
@@ -1503,8 +1772,8 @@ if __name__ == '__main__':
     if args.proxy:
         os.environ['http_proxy'] = "http://"+args.proxy
         os.environ['https_proxy'] = "http://"+args.proxy
-        logger.info("Proxy set", SESSION.get(
-            "https://httpbin.org/ip").content)
+        response = REQ_SESSION.get("https://httpbin.org/ip")
+        logger.info("Proxy set", response.content)
 
     while True:
         # logger.info("Proxy set", SESSION.get(
@@ -1538,6 +1807,7 @@ Press any to quit
 
             if choice > 2:
                 CONFIG = load_config()
+                LEETCODE_HEADERS = create_headers(CONFIG.leetcode_cookie)
 
             if choice == 1:
                 generate_config()
