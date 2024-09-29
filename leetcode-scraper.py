@@ -23,12 +23,13 @@ import time
 import random
 from PIL import Image
 import cloudscraper
+import pypandoc
 
 import logging
 from logging.handlers import RotatingFileHandler
 
 # Set up logging
-log_file = 'conversion_errors.log'
+log_file = 'scrape_errors.log'
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("Leet")
 handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
@@ -47,7 +48,11 @@ DEFAULT_CONFIG = {
     "force_download": False,
     "preferred_language_order": "csharp,cpp,python3,java,c,golang",
     "include_submissions_count": 100,
-    "include_default_code": False
+    "include_default_code": False,
+    "convert_to_pdf": True,
+    "extract_gif_frames": False,
+    "decompress_png": False,
+    "base64_encode_image": False
 }
 
 DEFAULT_HEADERS = CaseInsensitiveDict({
@@ -146,7 +151,8 @@ def generate_config():
         "force_download": "Download again even if the file exists T/F? (T/F): ",
         "preferred_language_order": "Enter order of the preferred solution language (all or a command separate list of languages c, cpp, csharp, java, python3, javascript, typescript, golang): ",
         "include_submissions_count": "How many of your own submissions should be incldued (0 for none, a large integer for all): ",
-        "include_default_code": "Include default code section? (T/F): "
+        "include_default_code": "Include default code section? (T/F): ",
+        "convert_to_pdf": "Convert to pdf? (T/F): "
     }
 
     # Prompt user for values and retain existing config if no new input is provided
@@ -216,6 +222,61 @@ def question_html(question_id, queston_title):
 
 def question_id_title(question_id, queston_title):
     return f"{question_id:04}-{queston_title}"
+
+def convert_html_to_pdf(question_id, question_title):
+    if not CONFIG.convert_to_pdf:
+        return
+
+    base_name = question_id_title(question_id, question_title)
+    html_filename = question_html(question_id, question_title)
+    question_dir = os.path.join(CONFIG.save_path, "questions")
+    html_path = os.path.join(question_dir, html_filename)
+
+    if not os.path.exists(html_path):
+        raise Exception(f"html file doesn't exist {html_path}")
+    
+    logger.info(f"Converting to pdf: {html_path}")
+
+    docx_dir = os.path.join(question_dir, "docx")
+    pdf_dir = os.path.join(question_dir, "pdf")
+    os.makedirs(docx_dir, exist_ok=True)
+    os.makedirs(pdf_dir, exist_ok=True)
+
+    docx_path = os.path.join(docx_dir, f"{base_name}.docx",)
+    pdf_path = os.path.join(pdf_dir, f"{base_name}.pdf")
+    
+    if CONFIG.force_download or not os.path.exists(docx_path):
+        try:
+            pypandoc.convert_file(
+                source_file=html_path,
+                to='docx',
+                format='html+tex_math_dollars+tex_math_single_backslash',
+                outputfile=docx_path)
+        except Exception as e:
+            if os.path.exists(docx_path):
+                os.remove(docx_path)
+            print(f"ERROR: {docx_path}\n{e}")
+
+    if not os.path.exists(docx_path):
+        raise Exception(f"Docx file doesn't exist {docx_path}")
+
+    if CONFIG.force_download or not os.path.exists(pdf_path):
+        # Define additional arguments
+        pdfArgs = [
+            '-V', 'geometry:margin=0.5in',
+            '--pdf-engine=xelatex',
+            '--template=/Users/mahbub/Projects/leetcode-scraper/leet-template.latex'
+        ]
+
+        try:
+            pypandoc.convert_file(
+                source_file=docx_path,
+                to='pdf',
+                outputfile=pdf_path,
+                extra_args=pdfArgs)
+        except Exception as e:
+            print(f"ERROR: {pdf_path}\n{e}")
+
 
 def get_all_cards_url():
     logger.info("Getting all cards url")
@@ -300,6 +361,9 @@ def scrape_question_url():
     os.makedirs(questions_dir, exist_ok=True)
     os.chdir(questions_dir)
 
+    # Convert the list of questions to a dictionary using titleSlug as the key
+    questions_dict = {question['titleSlug']: question for question in all_questions}
+
     with open(CONFIG.questions_url_path) as f:
         for row in csv.reader(f):
             question_id = int(row[0])
@@ -307,27 +371,22 @@ def scrape_question_url():
             question_url = question_url.strip()
             question_slug = question_url.split("/")[-2]
 
-            if question_id != 6:
-                continue
-
-            for question in all_questions:
-                if question['titleSlug'] == question_slug:
-                    question_title = re.sub(r'[:?|></\\]', replace_filename, question['title'])
-                    break
+            if question_slug in questions_dict:
+                question = questions_dict[question_slug]
+                question_title = re.sub(r'[:?|></\\]', replace_filename, question['title'])
+            else:
+                raise Exception(f"Question id {question_id}, slug {question_slug} not found")
 
             question_file = question_html(question_id, question_title)
             question_path = os.path.join(questions_dir, question_file)
             
-            if not CONFIG.force_download and os.path.exists(question_path):
+            if CONFIG.force_download or not os.path.exists(question_path):            
+                logger.info(f"Scraping question {question_id} url: {question_url}")
+                create_question_html(question_id, question_slug, question_title)
+            else:
                 logger.info(f"Already scraped {question_file}")
-                continue
-            
-            logger.info(f"Scraping question {question_id} url: {question_url}")
-            create_question_html(question_id, question_slug, question_title)
 
-            sleepfor = random.randint(5, 15)
-            logger.info(f"Waiting for {sleepfor} seconds")
-            time.sleep(sleepfor)
+            convert_html_to_pdf(question_id, question_title)
             
     with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
         main_index_html = ""
@@ -516,9 +575,8 @@ def convert_to_uncompressed_png(img_path, img_ext):
         logger.error(f"Error reading file {img_path}\n{e}")
         return None
 
-
-def load_image_in_b64(question_id, img_url, decompose_gif_frames):
-    logger.debug(f"Loading image: {img_url}")
+def download_image(question_id, img_url):
+    logger.debug(f"Downloading image: {img_url}")
 
     if not validators.url(img_url):
         logger.error(f"Invalid image url: {img_url}")
@@ -529,7 +587,7 @@ def load_image_in_b64(question_id, img_url, decompose_gif_frames):
         logger.warning(f"localhost detected: {img_url}")
         return
 
-    data_dir = os.path.join(CONFIG.save_path, "cache", "images")
+    data_dir = os.path.join(CONFIG.save_path, "questions", "images")
     os.makedirs(data_dir, exist_ok=True)
     
     parsed_url = urlsplit(img_url)
@@ -540,11 +598,6 @@ def load_image_in_b64(question_id, img_url, decompose_gif_frames):
     url_hash = hashlib.md5(img_url.encode()).hexdigest()
     data_path = os.path.join(data_dir, f"{question_id_title(question_id, url_hash)}.{img_ext}")
 
-    if img_ext == "svg":
-        img_ext = "svg+xml"
-
-    encoded_string = None
-
     if not CONFIG.cache_data or not os.path.exists(data_path):
         try:
             img_data = CLOUD_SCRAPER.get(url=img_url).content
@@ -552,22 +605,43 @@ def load_image_in_b64(question_id, img_url, decompose_gif_frames):
             with open(data_path, 'wb') as file:
                 file.write(img_data)
 
-            convert_to_uncompressed_png(data_path, img_ext)
+            if CONFIG.decompress_png:
+                convert_to_uncompressed_png(data_path, img_ext)
 
         except Exception as e:
             raise Exception(f"Error loading image url: {img_url}")
 
-    if decompose_gif_frames and img_ext == "gif":
+    if CONFIG.extract_gif_frames and img_ext == "gif":
         frames = decompose_gif(data_path, url_hash, data_dir)
     else:
         frames = [data_path]
 
+    return frames
+
+def load_image_local(files):
+    questions_dir = os.path.join(CONFIG.save_path, "questions")
+    relframes = [os.path.relpath(frame, questions_dir) for frame in files]
+
+    return relframes
+
+def load_image_in_b64(files, img_url):
+    logger.debug(f"Loading image: {img_url}")
+
+    parsed_url = urlsplit(img_url)
+    basename = os.path.basename(parsed_url.path)
+    img_ext = str.lower(basename.split('.')[-1])
+
+    if img_ext == "svg":
+        img_ext = "svg+xml"
+
+    encoded_string = None
+
     imgs_decoded = []
-    for frame in frames:
-        if not is_valid_image(frame):
+    for file in files:
+        if not is_valid_image(file):
             continue
 
-        with open(frame, "rb") as file:
+        with open(file, "rb") as file:
             img_data = file.read()
             encoded_string = base64.b64encode(img_data)
 
@@ -581,7 +655,7 @@ def load_image_in_b64(question_id, img_url, decompose_gif_frames):
 
     return imgs_decoded
 
-def fix_image_urls(content_soup, qustion_id):
+def fix_image_urls(content_soup, question_id):
     logger.info("Fixing image urls")
 
     images = content_soup.select('img')
@@ -604,7 +678,11 @@ def fix_image_urls(content_soup, qustion_id):
 
             image['src'] = img_url
             if CONFIG.cache_data:
-                frames = load_image_in_b64(qustion_id, img_url, False)
+                files = download_image(question_id, img_url)
+                if CONFIG.base64_encode_image:
+                    frames = load_image_in_b64(files, img_url)
+                else:
+                    frames = load_image_local(files)
 
                 if frames and len(frames) > 0:
                     if len(frames) == 1:
@@ -655,6 +733,7 @@ def place_solution_slides(content_soup, slides_json):
     logger.debug(slide_p_tags)
     
     for slide_idx, slide_p_tag in enumerate(slide_p_tags):
+        logger.debug(slide_p_tag)
         if slides_json[slide_idx] == []:
             continue
         slides_html = f"""<div id="carouselExampleControls-{slide_idx}" class="carousel slide" data-bs-ride="carousel">
@@ -771,7 +850,8 @@ def attach_header_in_html():
                                             }
                                         },
                                         tex2jax: {
-                                            inlineMath: [["$", "$"], ["\\(", "\\)"], ["$$", "$$"], ["\\[", "\\]"]],
+                                            inlineMath: [["$", "$"], ["\\(", "\\)"] ],
+                                            displayMath: [ ["$$", "$$"], ["\\[", "\\]"] ],
                                             processEscapes: true,
                                             processEnvironments: true,
                                             skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
@@ -895,7 +975,7 @@ def attach_header_in_html():
 
 def wrap_slides_with_p_tags(content):
     # Define the regex pattern to match the entire target string, including the !?! at both ends
-    pattern = re.compile('(?<!<p>)(\!\?\!.*/Documents/.*\!\?\!)(?!</p>)', re.IGNORECASE | re.MULTILINE)
+    pattern = re.compile(r'(?<!<p>)(\!\?\!.*/Documents/.*\!\?\!)(?!</p>)', re.IGNORECASE | re.MULTILINE)
 
     # Replace the matched pattern with the <p> wrapped version
     result = pattern.sub(r'<p>\g<0></p>', content)
@@ -1259,6 +1339,46 @@ def get_solution_content(question_id, question_title_slug):
     return solution
 
 
+# Function to clean up math expressions
+def clean_tex_math(content):
+    # Replace \space with a regular space
+    return re.sub(r'\\space', ' ', content)
+
+def markdown_with_math(content):
+    content = convert_display_math_to_inline2(content)
+    content = clean_tex_math(content)
+    # Convert Markdown to HTML and ensure TeX math is not escaped
+    return markdown.markdown(
+        content,
+        extensions=['extra', 'mdx_math'])
+
+def markdown_with_iframe(content):
+    return markdown_with_math(content)
+
+def markdown2_with_math(content):
+    # Convert Markdown to HTML and ensure TeX math is not escaped
+    return markdown2.markdown(
+        content,
+        extras=["code-friendly", "fenced-code-blocks", "html-classes"])
+
+def markdown2_with_iframe(content):
+    # Store iframe before processing markdown
+    iframe_tags = re.findall(r'<iframe.*?>.*?</iframe>', content, re.DOTALL)
+
+    # Placeholder text for iframes
+    for idx, iframe in enumerate(iframe_tags):
+        content = content.replace(iframe, f"{{iframe_placeholder_{idx}}}")
+
+    # Convert the rest of the markdown to HTML
+    html_content = markdown2_with_math(content)
+
+    # Replace the placeholders with actual iframe tags
+    for idx, iframe in enumerate(iframe_tags):
+        html_content = html_content.replace(f"{{iframe_placeholder_{idx}}}", iframe)
+    
+    return html_content
+
+
 def get_question_data(item_content):
     logger.info("Getting question data")
     if item_content['question']:
@@ -1309,6 +1429,7 @@ def get_question_data(item_content):
         solution = question_content['solution']
         if solution:
             solution = solution['content']
+            solution = re.sub(r'\[TOC\]', '', solution) # remove [TOC]
         else:
             solution = None
 
@@ -1318,8 +1439,12 @@ def get_question_data(item_content):
         if hints:
             hint_content = ""
             for hint in hints:
-                hint = convert_display_math_to_inline2(hint)
-                hint_content += f"<div> > {hint}</div>"
+                # hint = convert_display_math_to_inline2(hint)
+                hint = str.strip(hint)
+                hint = markdown_with_math(hint)
+                hint = str.strip(hint)
+                hint_content += f"<li>{hint}</li>"
+            hint_content += f"<div><ul>{hint_content}</ul></div>"
             
 
         submission_content = None
@@ -1345,13 +1470,14 @@ def get_question_data(item_content):
                     submission_content += f"""<div><h4>Submission Time: {submission_time}</h4>
                     <pre class="question__default_code">{code}</pre></div>"""
 
-        question = convert_display_math_to_inline2(question)
-        question = markdown.markdown(question, extensions=['extra'])
+        # question = convert_display_math_to_inline2(question)
+        question = markdown_with_math(question)
         
-        solution = convert_display_math_to_inline2(solution)
-        solution = markdown.markdown(solution, extensions=['extra'])
-        solution = replace_iframes_with_codes(solution, question_id)
-        solution = wrap_slides_with_p_tags(solution)
+        # solution = convert_display_math_to_inline2(solution)
+        if solution:
+            solution = markdown_with_iframe(solution)
+            solution = replace_iframes_with_codes(solution, question_id)
+            solution = wrap_slides_with_p_tags(solution)
 
         default_code_html = """"""
         if CONFIG.include_default_code:
