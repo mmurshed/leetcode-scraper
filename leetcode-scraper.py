@@ -537,7 +537,7 @@ def write_questions_to_file(all_questions, questions_url_path):
             f.write(f"{frontendQuestionId},{question_url}")
 
 
-def scrape_question_url():
+def scrape_question_url(selected_question_id = None):
     all_questions = get_all_questions_url(force_download=CONFIG.force_download)
     questions_dir = os.path.join(CONFIG.save_path, "questions")
     os.makedirs(questions_dir, exist_ok=True)
@@ -552,6 +552,9 @@ def scrape_question_url():
             question_url = row[1]
             question_url = question_url.strip()
             question_slug = question_url.split("/")[-2]
+
+            if selected_question_id and question_id != selected_question_id:
+                continue
 
             if question_slug in questions_dict:
                 question = questions_dict[question_slug]
@@ -603,7 +606,8 @@ def create_question_html(question_id, question_slug, question_title):
     content_soup = place_solution_slides(content_soup, slides_json)
     content_soup = fix_image_urls(content_soup, question_id)
 
-    with open(question_html(question_id, question_title), 'w', encoding="utf-8") as f:
+    question_path = os.path.join(CONFIG.save_path, "questions", question_html(question_id, question_title))
+    with open(question_path, 'w', encoding="utf-8") as f:
         f.write(content_soup.prettify())
 
 def scrape_card_url():
@@ -815,6 +819,10 @@ def download_image(question_id, img_url):
         except Exception as e:
             logger.error(f"Error downloading image url: {img_url}")
             return None
+
+    if not os.path.exists(image_path):
+        logger.error(f"File not found {image_path}\n{img_url}")
+        return None
 
     if not is_valid_image(image_path):
         os.remove(image_path)
@@ -2086,18 +2094,19 @@ if __name__ == '__main__':
         #     "https://httpbin.org/ip").content)
         try:
             print("""Leetcode-Scraper v1.5-stable
-1: To setup config
-2: To select config[Default: 0]
-3: To get all cards url
-4: To get all question url
-5: To scrape card url
-6: To scrape question url
-7: To scrape all company questions indexes
-8: To scrape all company questions
-9: To scrape selected company questions indexes
-10: To scrape selected company questions
-11: To convert images to base64 using os.walk
-12: To save submissions in files
+1: Setup config
+2: Select config[Default: 0]
+3: Get all cards url
+4: Get all question url
+5: Scrape card url
+6: Scrape question url
+7: Scrape all company questions indexes
+8: Scrape all company questions
+9: Scrape selected company questions indexes
+10: Scrape selected company questions
+11: Convert images to base64 using os.walk
+12: Save submissions in files
+13: Scrape a single question with frontend id
                   
 Press any to quit
                 """)
@@ -2135,6 +2144,10 @@ Press any to quit
                 manual_convert_images_to_base64()
             elif choice == 12:
                 get_all_submissions()
+            elif choice == 13:
+                question_id = input("Enter question frontend id: ")
+                scrape_question_url(int(question_id))
+                pass
             else:
                 break
 
