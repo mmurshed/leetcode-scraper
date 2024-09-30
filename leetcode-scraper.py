@@ -26,7 +26,7 @@ import yt_dlp.downloader
 
 # Set up logging
 log_file = 'scrape_errors.log'
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Leet")
 handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -209,10 +209,15 @@ def copy_question_file(question_id, question_title, dest_dir, copy_pdf = True, c
     question_filename = question_html(question_id, question_title)
     question_filepath = os.path.join(questions_dir, question_filename)
 
+    logger.info(f"Copying {question_filepath} to {dest_dir}")
+
     if not os.path.exists(question_filepath):
+        logger.error(f"File not found: {question_filepath}")
         return False
-    
-    os.makedirs(dest_dir, exist_ok=True)
+
+    if not os.path.exists(dest_dir):
+        logger.error(f"Destination not found: {dest_dir}")
+        return False
 
     # Copy html
     destination_filepath = os.path.join(dest_dir, question_filename)
@@ -428,6 +433,7 @@ def convert_html_to_pdf(question_id, question_title, overwrite):
     if overwrite or not os.path.exists(pdf_path):
         # Define additional arguments
         pdfArgs = [
+            # '-V', 'mainfont="Unifont"',
             '-V', 'geometry:margin=0.5in',
             '--pdf-engine=xelatex',
             f'--template={script_dir}/leet-template.latex',
@@ -445,9 +451,8 @@ def convert_html_to_pdf(question_id, question_title, overwrite):
             logger.error(f"{pdf_path}\n{e}")
             return False
 
-    if not CONFIG.cache_data:
-        logger.info(f"Removing docx {docx_path}")
-        os.remove(docx_path)
+    logger.info(f"Removing docx {docx_path}")
+    os.remove(docx_path)
 
     return True
 
@@ -563,7 +568,8 @@ def scrape_question_url():
             else:
                 logger.info(f"Already scraped {question_file}")
 
-            if CONFIG.convert_to_pdf:
+        if CONFIG.convert_to_pdf:
+            for row in csv.reader(f):
                 converted = convert_html_to_pdf(question_id, question_title, overwrite=CONFIG.force_download)
                 if not converted:
                     logger.info(f"Compressing images and retrying pdf convert")
@@ -928,14 +934,14 @@ def convert_display_math_to_inline(content_soup):
         text = element.string.strip()
         if text:
             # Replace double $$ with single $
-            new_text = re.sub(r'\$\$(.*?)\$\$', r'$\1$', text)
+            new_text = re.sub(r'\$\$\s*(.*?)\s*\$\$', r'$\1$', text)
             element.replace_with(new_text)
     return content_soup
 
 def convert_display_math_to_inline2(content):
     logger.debug("Converting display math $$ to inline math $")
-    # Replace double $$ with single $
-    content = re.sub(r'\$\$(.*?)\$\$', r'$\1$', content)
+    # Strip spaces inside $$ ... $$ and convert it to $ ... $
+    content = re.sub(r'\$\$\s*(.*?)\s*\$\$', r'$\1$', content)
     return content
 
 def place_solution_slides(content_soup, slides_json):
@@ -1015,9 +1021,8 @@ def place_solution_slides(content_soup, slides_json):
 def replace_iframes_with_codes(content, question_id):
     logger.debug("Replacing iframe with code")
 
-    if CONFIG.download_videos:
-        videos_dir = os.path.join(CONFIG.save_path, "questions", "videos")
-        os.makedirs(videos_dir, exist_ok=True)
+    videos_dir = os.path.join(CONFIG.save_path, "questions", "videos")
+    os.makedirs(videos_dir, exist_ok=True)
 
     content_soup = BeautifulSoup(content, 'html.parser')
     iframes = content_soup.find_all('iframe')
@@ -1076,25 +1081,30 @@ def replace_iframes_with_codes(content, question_id):
             width = iframe.get('width') or 640
             height = iframe.get('height') or 360
 
-            ydl_opts = {
-                'outtmpl': f'{videos_dir}/{question_id:04}-%(id)s.%(ext)s',
-                'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-                'http_headers': {
-                    'Referer': 'https://leetcode.com',
+            video_id = src_url.split("/")[-1]
+            video_extension = "mp4"
+            video_basename = f"{question_id_title(question_id, video_id)}.{video_extension}"
+
+            if CONFIG.download_videos:
+                ydl_opts = {
+                    'outtmpl': f'{videos_dir}/{qstr(question_id)}-%(id)s.%(ext)s',
+                    'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+                    'http_headers': {
+                        'Referer': 'https://leetcode.com',
+                    }
                 }
-            }
 
-            # Download the video using yt-dlp
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(src_url, download=CONFIG.download_videos)
-                video_extension = info_dict.get('ext')
-                video_filename = ydl.prepare_filename(info_dict)
+                # Download the video using yt-dlp
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(src_url, download=CONFIG.download_videos)
+                    video_extension = info_dict.get('ext')
+                    video_filename = ydl.prepare_filename(info_dict)
+                    video_basename = os.path.basename(video_filename)
 
-            if video_filename:
-                basename = os.path.basename(video_filename)
+            if video_basename:
                 video_html = f"""
                     <video width="{width}" height="{height}" controls>
-                        <source src="videos/{basename}" type="video/{video_extension}">
+                        <source src="videos/{video_basename}" type="video/{video_extension}">
                     </video>
                 """
                 iframe.replace_with(BeautifulSoup(video_html, 'html.parser'))
@@ -1122,8 +1132,7 @@ def attach_header_in_html():
                                             }
                                         },
                                         tex2jax: {
-                                            inlineMath: [["$", "$"], ["\\(", "\\)"] ],
-                                            displayMath: [ ["$$", "$$"], ["\\[", "\\]"] ],
+                                            inlineMath: [["$", "$"], ["\\(", "\\)"], ["$$", "$$"], ["\\[", "\\]"] ],
                                             processEscapes: true,
                                             processEnvironments: true,
                                             skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
@@ -1559,8 +1568,8 @@ def clean_tex_math(content):
     return re.sub(r'\\space', ' ', content)
 
 def markdown_with_math(content):
-    # content = convert_display_math_to_inline2(content)
-    # content = clean_tex_math(content)
+    content = convert_display_math_to_inline2(content)
+    content = clean_tex_math(content)
 
     # Convert Markdown to HTML and ensure TeX math is not escaped
     return markdown.markdown(
@@ -2022,6 +2031,7 @@ def scrape_question_data(company_slug):
 
             # if copy failed retry
             if not copied:
+                logger.warning("Copy failed downloading again and retrying copy")
                 create_question_html(question_id, question_slug, question_title)
                 copy_question_file(question_id, question_title, company_fav_dir)
 
