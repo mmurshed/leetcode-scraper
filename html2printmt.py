@@ -27,17 +27,17 @@ def valid_num_threads(value):
     except ValueError:
         raise argparse.ArgumentTypeError("Invalid number of threads")
 
-def convert_html_to_docx(source_folder, num_threads=32):
+def convert_html_to_docx(source_path, num_threads=32):
 
-    os.chdir(source_folder)
+    # Get the absolute path to the script
+    script_path = os.path.abspath(__file__)
 
-    # Set the PDF output folder one level up from the source folder and rename to 'questions_pdf'
-    pdf_output_folder = os.path.join(os.path.dirname(source_folder), 'questions_pdf')
-    os.makedirs(pdf_output_folder, exist_ok=True)
+    # Get the directory containing the script
+    script_dir = os.path.dirname(script_path)
 
-    # The docx output folder is no longer needed since both DOCX and PDF files will go in pdf_output_folder
-    images_dir = os.path.join(source_folder, "images")
-
+    # Define conversion arguments for docx and pdf
+    images_dir = os.path.join(os.path.dirname(source_path), "images")
+    logger.info(f"Images dir {images_dir}")
     docxArgs = [
         '--resource-path', images_dir
     ]
@@ -45,13 +45,35 @@ def convert_html_to_docx(source_folder, num_threads=32):
     pdfArgs = [
         '-V', 'geometry:margin=0.5in',
         '--pdf-engine=xelatex',
-        f'--template={os.path.abspath(__file__)}/leet-template.latex',
-        f'--include-in-header={os.path.abspath(__file__)}/enumitem.tex',
+        f'--template={script_dir}/leet-template.latex',
+        f'--include-in-header={script_dir}/enumitem.tex',
         '--resource-path', images_dir
     ]
 
     # Start the timer
     start_time = time.time()
+
+    # Check if the provided path is a file or folder
+    if os.path.isfile(source_path):
+        # Single file conversion
+        convert_single_file(source_path, docxArgs, pdfArgs)
+    elif os.path.isdir(source_path):
+        # Folder conversion
+        convert_folder(source_path, num_threads, docxArgs, pdfArgs)
+    else:
+        logger.error(f"Invalid path: {source_path}. It is neither a file nor a folder.")
+
+    # End the timer and log the total time taken
+    end_time = time.time()
+    total_time = end_time - start_time
+    logger.info(f"Total conversion time: {total_time:.2f} seconds")
+
+def convert_folder(source_folder, num_threads, docxArgs, pdfArgs):
+    os.chdir(source_folder)
+
+    # Set the PDF output folder one level up from the source folder and rename to 'questions_pdf'
+    pdf_output_folder = os.path.join(os.path.dirname(source_folder), 'questions_pdf')
+    os.makedirs(pdf_output_folder, exist_ok=True)
 
     # Create the task queue
     task_queue = Queue()
@@ -60,7 +82,7 @@ def convert_html_to_docx(source_folder, num_threads=32):
     workers = []
     for _ in range(num_threads):
         worker = Thread(target=worker_thread, args=(task_queue, docxArgs, pdfArgs))
-        worker.start()  # Do not set daemon to True
+        worker.start()
         workers.append(worker)
 
     # Populate the task queue with file paths
@@ -83,10 +105,20 @@ def convert_html_to_docx(source_folder, num_threads=32):
     for worker in workers:
         worker.join()
 
-    # End the timer and log the total time taken
-    end_time = time.time()
-    total_time = end_time - start_time
-    logger.info(f"Total conversion time: {total_time:.2f} seconds")
+def convert_single_file(file_path, docxArgs, pdfArgs):
+    # Set the PDF output folder one level up from the file's directory and rename to 'questions_pdf'
+    source_folder = os.path.dirname(file_path)
+    os.makedirs(source_folder, exist_ok=True)
+
+    os.chdir(source_folder)
+
+    # Get the output paths
+    docx_output_path = os.path.join(source_folder, os.path.basename(file_path).replace('.html', '.docx'))
+    pdf_output_path = os.path.join(source_folder, os.path.basename(file_path).replace('.html', '.pdf'))
+
+    # Convert the single file
+    convert_file(file_path, docx_output_path, pdf_output_path, docxArgs, pdfArgs)
+
 
 def worker_thread(task_queue, docxArgs, pdfArgs):
     while True:
@@ -128,7 +160,7 @@ def convert_file(html_file_path, docx_output_path, pdf_output_path, docxArgs, pd
                 extra_args=pdfArgs)
 
             # Remove the DOCX file after PDF conversion
-            if os.path.exists(pdf_output_path):
+            if os.path.exists(docx_output_path):
                 logger.info(f"Removing DOCX file: {docx_output_path}")
                 os.remove(docx_output_path)
         except Exception as e:
@@ -136,7 +168,7 @@ def convert_file(html_file_path, docx_output_path, pdf_output_path, docxArgs, pd
 
 def main():
     parser = argparse.ArgumentParser(description="Convert HTML files to DOCX and PDF")
-    parser.add_argument("path", help="Path to the folder containing HTML files")
+    parser.add_argument("path", help="Path to the folder or file to convert (HTML file or folder containing HTML files)")
     parser.add_argument("--threads", "-t", type=valid_num_threads, default=32,
                         help="Number of threads to use (default: 32, valid range: 1-128)")
     
