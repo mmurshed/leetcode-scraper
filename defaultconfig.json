@@ -1,0 +1,18 @@
+{
+    "leetcode_cookie": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJfYXV0aF91c2VyX2lkIjoiODg4MjEzIiwiX2F1dGhfdXNlcl9iYWNrZW5kIjoiYWxsYXV0aC5hY2NvdW50LmF1dGhfYmFja2VuZHMuQXV0aGVudGljYXRpb25CYWNrZW5kIiwiX2F1dGhfdXNlcl9oYXNoIjoiNTI1YTkyMTkxNTllZGNkOTdlMmRmMWU4MDhmOGQ5NzI5YmE1NzM5OWE0NTMyYzM2YzRhZmI4NjNlZmY5NjVjNiIsImlkIjo4ODgyMTMsImVtYWlsIjoibXVyc2hlZEBnbWFpbC5jb20iLCJ1c2VybmFtZSI6Im11cnNoZWQiLCJ1c2VyX3NsdWciOiJtdXJzaGVkIiwiYXZhdGFyIjoiaHR0cHM6Ly9hc3NldHMubGVldGNvZGUuY29tL3VzZXJzL2RlZmF1bHRfYXZhdGFyLmpwZyIsInJlZnJlc2hlZF9hdCI6MTcyNzU4ODcxOCwiaXAiOiI1MC40Ni4xNDcuMTQ3IiwiaWRlbnRpdHkiOiJmZTA2NzNmMmE0OGQwNDdiOTEyYjI3ZTJhMGMwMmY5ZiIsImRldmljZV93aXRoX2lwIjpbImNiYTY0ODFlNDBhYjVlMTY1YzczZTM1OTQ5ZTA0NWY5IiwiNTAuNDYuMTQ3LjE0NyJdLCJzZXNzaW9uX2lkIjo3MjY4MTA1OSwiX3Nlc3Npb25fZXhwaXJ5IjoxMjA5NjAwfQ.IpoeNjeMjsQB7rNxD1TsCGczbD634uzyyz6jfoVRMwI",
+    "cards_url_path": "/Users/mahbub/Downloads/leet2/cards",
+    "questions_url_path": "/Users/mahbub/Downloads/leet2/ques",
+    "save_path": "/Users/mahbub/Downloads/leet2/all",
+    "cache_data": true,
+    "force_download": false,
+    "company_tag_save_path": "/Users/mahbub/Downloads/leet2/company",
+    "preferred_language_order": "csharp,cpp,python3,python,java,golang",
+    "include_submissions_count": 1,
+    "include_default_code": false,
+    "convert_to_pdf": true,
+    "extract_gif_frames": false,
+    "recompress_image": false,
+    "base64_encode_image": false,
+    "download_images": true,
+    "download_videos": true
+}
