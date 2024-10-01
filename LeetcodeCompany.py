@@ -5,10 +5,11 @@ from bs4 import BeautifulSoup
 from LeetcodeUtility import LeetcodeUtility
 
 class LeetcodeCompany:
-    def __init__(self, config, logger, leetapi):
+    def __init__(self, config, logger, leetapi, question):
         self.config = config
         self.logger = logger
         self.lc = leetapi
+        self.question = question
 
     def scrape_selected_company_questions(self, choice):
         all_comp_dir = os.path.join(self.configsave_path, "all_company_questions")
@@ -67,7 +68,7 @@ class LeetcodeCompany:
         elif choice == 8:
             for company in company_tags:
                 company_slug = company['slug']
-                scrape_question_data(company_slug)
+                self.question.scrape_question_data(company_slug)
                 os.chdir("..")
         os.chdir('..')
 

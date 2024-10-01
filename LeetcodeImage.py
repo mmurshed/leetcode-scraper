@@ -1,8 +1,21 @@
-class LeetcodeImage:
-    def __init__(self):
-        pass
+import base64
+import hashlib
+import os
+from urllib.parse import urlparse, urlsplit
+from PIL import Image
+from bs4 import BeautifulSoup
+import validators
+import cloudscraper
 
-    def is_valid_image(image_path):
+from LeetcodeUtility import LeetcodeUtility
+
+class LeetcodeImage:
+    def __init__(self, config, logger):
+        self.config = config
+        self.logger = logger
+        self.cloudscaper = cloudscraper.create_scraper()
+
+    def is_valid_image(self, image_path):
         # SVG file is allowed by default
         if image_path.lower().endswith('.svg'):
             return True
@@ -14,7 +27,7 @@ class LeetcodeImage:
             return False
         return True
 
-    def decompose_gif(gif_path, filename_no_ext, output_folder):
+    def decompose_gif(self, gif_path, filename_no_ext, output_folder):
         # Open the GIF file
         gif = Image.open(gif_path)
         
@@ -34,33 +47,32 @@ class LeetcodeImage:
                 break
         return frame_paths
 
-
-    def convert_to_uncompressed_png(img_path, img_ext):
+    def convert_to_uncompressed_png(self, img_path, img_ext):
         # Open the PNG file
         try:
             if img_ext == 'png':
                 with Image.open(img_path) as img:
                     # Save the image without compression
                     img.save(img_path, 'PNG', compress_level=0)
-                    logger.debug(f"Decompressed PNG saved at {img_path}")
+                    self.logger.debug(f"Decompressed PNG saved at {img_path}")
         except Exception as e:
-            logger.error(f"Error reading file {img_path}\n{e}")
+            self.logger.error(f"Error reading file {img_path}\n{e}")
             return None
 
-    def recompress_images(question_id):
-        images_dir = os.path.join(CONFIG.save_path, "questions", "images")
+    def recompress_images(self, question_id):
+        images_dir = os.path.join(self.self.config.save_path, "questions", "images")
 
         # Convert the question_id to a zero-padded 4-digit string
-        question_id_str = qstr(question_id)
+        question_id_str = LeetcodeUtility.qstr(question_id)
 
         # Loop through all files in the source folder
         for filename in os.listdir(images_dir):
             if filename.startswith(question_id_str):
                 input_image_path = os.path.join(images_dir, filename)
-                recompress_image(input_image_path)
+                self.recompress_image(input_image_path)
 
 
-    def recompress_image(img_path):
+    def recompress_image(self, img_path):
         try:
             img_path_lower = img_path.lower()
             # Open the image
@@ -68,23 +80,23 @@ class LeetcodeImage:
                 if img_path_lower.endswith('.png'):
                     # Save the image with optimization
                     img.save(img_path, optimize=True)
-                    logger.debug(f"Recompressed and overwrote: {img_path}")
+                    self.logger.debug(f"Recompressed and overwrote: {img_path}")
                 elif img_path_lower.endswith(('.jpg', '.jpeg')):
                     # Recompress JPEG with a quality parameter (default is 75, you can adjust)
                     img.save(img_path, 'JPEG', quality=85, optimize=True)
-                    logger.debug(f"Recompressed and overwrote: {img_path}")
+                    self.logger.debug(f"Recompressed and overwrote: {img_path}")
         except Exception as e:
-            logger.error(f"Error recompressing {img_path}: {e}")
+            self.logger.error(f"Error recompressing {img_path}: {e}")
             return
 
-    def download_image(question_id, img_url):
-        logger.debug(f"Downloading image: {img_url}")
+    def download_image(self, question_id, img_url):
+        self.logger.debug(f"Downloading image: {img_url}")
 
         if not validators.url(img_url):
-            logger.error(f"Invalid image url: {img_url}")
+            self.logger.error(f"Invalid image url: {img_url}")
             return
         
-        images_dir = os.path.join(CONFIG.save_path, "questions", "images")
+        images_dir = os.path.join(self.config.save_path, "questions", "images")
         os.makedirs(images_dir, exist_ok=True)
         
         parsed_url = urlsplit(img_url)
@@ -93,46 +105,46 @@ class LeetcodeImage:
         img_ext = str.lower(basename.split('.')[-1])
 
         url_hash = hashlib.md5(img_url.encode()).hexdigest()
-        image_path = os.path.join(images_dir, f"{question_id_title(question_id, url_hash)}.{img_ext}")
+        image_path = os.path.join(images_dir, f"{LeetcodeUtility.question_id_title(question_id, url_hash)}.{img_ext}")
 
-        if not CONFIG.cache_data or not os.path.exists(image_path):
+        if not self.config.cache_data or not os.path.exists(image_path):
             try:
-                img_data = CLOUD_SCRAPER.get(url=img_url).content
+                img_data = self.cloudscaper.get(url=img_url).content
 
                 with open(image_path, 'wb') as file:
                     file.write(img_data)
 
-                if CONFIG.recompress_image:
-                    recompress_image(image_path)
+                if self.config.recompress_image:
+                    self.recompress_image(image_path)
 
             except Exception as e:
-                logger.error(f"Error downloading image url: {img_url}")
+                self.logger.error(f"Error downloading image url: {img_url}")
                 return None
 
         if not os.path.exists(image_path):
-            logger.error(f"File not found {image_path}\n{img_url}")
+            self.logger.error(f"File not found {image_path}\n{img_url}")
             return None
 
-        if not is_valid_image(image_path):
+        if not self.is_valid_image(image_path):
             os.remove(image_path)
-            logger.error(f"Invalid image file from url: {img_url}")
+            self.logger.error(f"Invalid image file from url: {img_url}")
             return None
 
-        if CONFIG.extract_gif_frames and img_ext == "gif":
-            files = decompose_gif(image_path, url_hash, images_dir)
+        if self.config.extract_gif_frames and img_ext == "gif":
+            files = self.decompose_gif(image_path, url_hash, images_dir)
         else:
             files = [image_path]
 
         return files
 
-    def load_image_local(files):
-        questions_dir = os.path.join(CONFIG.save_path, "questions")
+    def load_image_local(self, files):
+        questions_dir = os.path.join(self.config.save_path, "questions")
         relframes = [os.path.relpath(frame, questions_dir) for frame in files]
 
         return relframes
 
-    def load_image_in_b64(files, img_url):
-        logger.debug(f"Loading image: {img_url}")
+    def load_image_in_b64(self, files, img_url):
+        self.logger.debug(f"Loading image: {img_url}")
 
         parsed_url = urlsplit(img_url)
         basename = os.path.basename(parsed_url.path)
@@ -145,7 +157,7 @@ class LeetcodeImage:
 
         imgs_decoded = []
         for file in files:
-            if not is_valid_image(file):
+            if not self.is_valid_image(file):
                 continue
 
             with open(file, "rb") as file:
@@ -153,7 +165,7 @@ class LeetcodeImage:
                 encoded_string = base64.b64encode(img_data)
 
             if not encoded_string:
-                logger.error(f"Error loading image url: {img_url}")
+                self.logger.error(f"Error loading image url: {img_url}")
                 return None
 
             decoded_string = encoded_string.decode('utf-8')
@@ -162,13 +174,13 @@ class LeetcodeImage:
 
         return imgs_decoded
 
-    def fix_image_urls(content_soup, question_id):
-        logger.info("Fixing image urls")
+    def fix_image_urls(self, content_soup, question_id):
+        self.logger.info("Fixing image urls")
 
         images = content_soup.select('img')
 
         for image in images:
-            logger.debug(f"img[src]: {image['src']}")
+            self.logger.debug(f"img[src]: {image['src']}")
             if image.has_attr('src') and "base64" not in image['src']:
                 splitted_image_src = image['src'].split('/')
 
@@ -186,21 +198,21 @@ class LeetcodeImage:
 
                     # Check for localhost or 127.0.0.1
                     if hostname == "127.0.0.1" or hostname == "localhost":
-                        logger.warning(f"localhost detected: {img_url}")
+                        self.logger.warning(f"localhost detected: {img_url}")
                         # Remove leading `/` from the path before appending, or directly append the path
                         img_url = f"https://leetcode.com/explore{img_url_parsed.path}"                    
 
-                logger.debug(f"img_url: {img_url}")
+                self.logger.debug(f"img_url: {img_url}")
 
                 image['src'] = img_url
 
-                if CONFIG.download_images:
-                    files = download_image(question_id, img_url)
+                if self.config.download_images:
+                    files = self.download_image(question_id, img_url)
                     if files:
-                        if CONFIG.base64_encode_image:
-                            frames = load_image_in_b64(files, img_url)
+                        if self.config.base64_encode_image:
+                            frames = self.load_image_in_b64(files, img_url)
                         else:
-                            frames = load_image_local(files)
+                            frames = self.load_image_local(files)
 
                         if frames and len(frames) > 0:
                             if len(frames) == 1:
@@ -223,15 +235,15 @@ class LeetcodeImage:
                         image.decompose()
         return content_soup
 
-    def manual_convert_images_to_base64():
+    def manual_convert_images_to_base64(self):
         root_dir = input("Enter path of the folder where html are located: ")
         for root, dirs, files in os.walk(root_dir):
             for file in files:
                 if file.endswith('.html'):
                     with open(os.path.join(root, file), "r") as f:
                         soup = BeautifulSoup(f.read(), 'html.parser')
-                        question_id, _ = html_toquestion(file)
-                        res_soup = fix_image_urls(soup, question_id)
+                        question_id, _ = LeetcodeUtility.html_toquestion(file)
+                        res_soup = self.fix_image_urls(soup, question_id)
                     with open(os.path.join(root, file), "w") as f:
                         f.write(res_soup.prettify())
         

@@ -1,18 +1,24 @@
+import datetime
 import os
 import csv
 import re
 import json
 from bs4 import BeautifulSoup
 
+from LeetcodeCompany import LeetcodeCompany
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeImage import LeetcodeImage
 from LeetcodePdfConverter import LeetcodePdfConverter
+from LeetcodeSolution import LeetcodeSolution
 
 class LeetcodeQuestion:
-    def __init__(self, config, logger, leetapi):
+    def __init__(self, config, logger, leetapi, solution, imagehandler):
         self.config = config
         self.logger = logger
         self.lc = leetapi
+        self.solution = solution
+        self.imagehandler = imagehandler
+        self.company = LeetcodeCompany(config, logger, leetapi)
 
     def get_all_questions_url(self, force_download):
         self.logger.info("Getting all questions url")
@@ -78,7 +84,7 @@ class LeetcodeQuestion:
                     converted = LeetcodePdfConverter.convert_file(question_id, question_title, overwrite=self.configforce_download)
                     if not converted:
                         self.logger.info(f"Compressing images and retrying pdf convert")
-                        LeetcodeImage.recompress_images(question_id)
+                        self.imagehandler.recompress_images(question_id)
                         converted = LeetcodePdfConverter.convert_file(question_id, question_title, overwrite=True)
                 
         with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
@@ -102,13 +108,13 @@ class LeetcodeQuestion:
         question_content, question_title = self.get_question_data(item_content)
         content += question_content
         content += """</body>"""
-        slides_json = find_slides_json2(content, question_id)
+        slides_json = self.solution.find_slides_json(content, question_id)
         content = self.attach_header_in_html() + content
         content_soup = BeautifulSoup(content, 'html.parser')
-        content_soup = place_solution_slides(content_soup, slides_json)
-        content_soup = fix_image_urls(content_soup, question_id)
+        content_soup = self.solution.place_solution_slides(content_soup, slides_json)
+        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id)
 
-        question_path = os.path.join(self.configsave_path, "questions", question_html(question_id, question_title))
+        question_path = os.path.join(self.configsave_path, "questions", LeetcodeUtility.question_html(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
             f.write(content_soup.prettify())
 
@@ -154,13 +160,13 @@ class LeetcodeQuestion:
             question_title_slug = item_content['question']['titleSlug']
             question_title = item_content['question']['title'] if item_content['question']['title'] else question_title_slug
 
-            question_content = self.lc.get_question(question_id_title(question_id, 'qdat'), question_title_slug)
+            question_content = self.lc.get_question(LeetcodeUtility.question_id_title(question_id, 'qdat'), question_title_slug)
 
-            question_title = re.sub(r'[:?|></\\]', replace_filename, question_content['title'])        
+            question_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, question_content['title'])        
             question = question_content['content']
             difficulty = question_content['difficulty']
-            company_tag_stats = get_question_company_tag_stats(question_content['companyTagStats'])
-            similar_questions = generate_similar_questions(question_content['similarQuestions'])
+            company_tag_stats = self.get_question_company_tag_stats(question_content['companyTagStats'])
+            similar_questions = self.generate_similar_questions(question_content['similarQuestions'])
             question_url = "https://leetcode.com" + question_content['submitUrl'][:-7]
 
             default_code = json.loads(question_content['codeDefinition'])[0]['defaultCode']
@@ -177,9 +183,9 @@ class LeetcodeQuestion:
             if hints:
                 hint_content = ""
                 for hint in hints:
-                    hint = convert_display_math_to_inline(hint)
+                    hint = LeetcodeUtility.convert_display_math_to_inline(hint)
                     hint = str.strip(hint)
-                    hint = markdown_with_math(hint)
+                    hint = LeetcodeUtility.markdown_with_math(hint)
                     hint = str.strip(hint)
                     hint_content += f"<li>{hint}</li>"
                 hint_content += f"<div><ul>{hint_content}</ul></div>"
@@ -195,7 +201,7 @@ class LeetcodeQuestion:
                         'title': question_title
                     }
                 }
-                submissions = get_submission_data(item_content, True)
+                submissions = self.solution.get_submission_data(item_content, True)
                 if submissions and len(submissions) > 0:
                     # Sorted by timestamp in descending order
                     ordered_submissions = sorted(submissions.items(), key=lambda item: item[0], reverse=True)
@@ -208,14 +214,14 @@ class LeetcodeQuestion:
                         submission_content += f"""<div><h4>Submission Time: {submission_time}</h4>
                         <pre class="question__default_code">{code}</pre></div>"""
 
-            question = convert_display_math_to_inline(question)
-            question = markdown_with_math(question)
+            question = LeetcodeUtility.convert_display_math_to_inline(question)
+            question = LeetcodeUtility.markdown_with_math(question)
             
-            solution = convert_display_math_to_inline(solution)
+            solution = LeetcodeUtility.convert_display_math_to_inline(solution)
             if solution:
-                solution = markdown_with_iframe(solution)
-                solution = replace_iframes_with_codes(solution, question_id)
-                solution = wrap_slides_with_p_tags(solution)
+                solution = self.solution.markdown_with_iframe(solution)
+                solution = self.solution.replace_iframes_with_codes(solution, question_id)
+                solution = self.solution.wrap_slides_with_p_tags(solution)
 
             default_code_html = """"""
             if self.configinclude_default_code:
@@ -270,7 +276,7 @@ class LeetcodeQuestion:
 
         questions_seen = set()
         
-        categoriesToSlug = get_categories_slugs_for_company(company_slug)
+        categoriesToSlug = self.company.get_categories_slugs_for_company(company_slug)
         if not categoriesToSlug:
             return
 
@@ -305,10 +311,10 @@ class LeetcodeQuestion:
                 if self.configforce_download:
                     self.create_question_html(question_id, question_slug, question_title)
                 
-                copied = copy_question_file(question_id, question_title, company_fav_dir)
+                copied = LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, question_id, question_title, company_fav_dir)
 
                 # if copy failed retry
                 if not copied:
                     self.logger.warning("Copy failed downloading again and retrying copy")
                     self.create_question_html(question_id, question_slug, question_title)
-                    copy_question_file(question_id, question_title, company_fav_dir)
+                    LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, question_id, question_title, company_fav_dir)

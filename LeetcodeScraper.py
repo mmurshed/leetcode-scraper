@@ -4,10 +4,13 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 
+import requests
+
 from LeetcodeApi import LeetcodeApi
 from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeImage import LeetcodeImage
 from LeetcodeUtility import LeetcodeUtility
+from LeetcodeConfigLoader import LeetcodeConfigLoader
 
 
 if __name__ == '__main__':
@@ -20,11 +23,9 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    global selected_config
-    selected_config = "0"
+    selected_config = 0
 
-    DEFAULT_CONFIG = load_default_config()
-    CONFIG = load_config(DEFAULT_CONFIG)
+    CONFIG = LeetcodeConfigLoader.DEFAULT_CONFIG
 
     parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
     parser.add_argument('--non-stop', type=bool,
@@ -33,13 +34,15 @@ if __name__ == '__main__':
     parser.add_argument('--proxy', type=str,
                         help='Add rotating or static proxy username:password@ip:port',
                         required=False)
-    clear()
+    
+    LeetcodeUtility.clear()
+
     args = parser.parse_args()
     previous_choice = 0
     if args.proxy:
         os.environ['http_proxy'] = "http://"+args.proxy
         os.environ['https_proxy'] = "http://"+args.proxy
-        response = REQ_SESSION.get("https://httpbin.org/ip")
+        response = requests.get("https://httpbin.org/ip")
         logger.info("Proxy set", response.content)
 
     while True:
@@ -74,7 +77,7 @@ Press any to quit
                 break
 
             if choice > 2:
-                CONFIG = load_config()
+                LeetcodeConfigLoader.load_config(selected_config)
                 LEETCODE_HEADERS = create_headers(CONFIG.leetcode_cookie)
                 LEETAPI = LeetcodeApi(CONFIG, logger, DEFAULT_HEADERS, LEETCODE_HEADERS)
 

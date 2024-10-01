@@ -1,14 +1,17 @@
+import hashlib
 import os
+import re
 from bs4 import BeautifulSoup
 import yt_dlp
 
 from LeetcodeUtility import LeetcodeUtility
 
 class LeetcodeSolution:
-    def __init__(self, config, logger, leetapi):
+    def __init__(self, config, logger, leetapi, question):
         self.config = config
         self.logger = logger
         self.lc = leetapi
+        self.question = question
 
     def place_solution_slides(self, content_soup, slides_json):
             self.logger.debug("Placing solution slides")
@@ -167,149 +170,6 @@ class LeetcodeSolution:
 
         return str(content_soup)
 
-
-    def attach_header_in_html():
-        return r"""<head>
-                        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
-                        <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" rel="stylesheet"/>
-                        <script crossorigin="anonymous" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js">
-                        </script>
-                        <script src="https://md-block.verou.me/md-block.js" type="module">
-                        </script>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/prism.min.js">
-                        </script>
-                        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6">
-                        </script>
-                        <script async="" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript">
-                        MathJax.Hub.Config({
-                                            TeX: {
-                                                Macros: {
-                                                "exclude": "\\def\\exclude#1{}"
-                                                }
-                                            },
-                                            tex2jax: {
-                                                inlineMath: [["$", "$"], ["\\(", "\\)"], ["$$", "$$"], ["\\[", "\\]"] ],
-                                                processEscapes: true,
-                                                processEnvironments: true,
-                                                skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
-                                            },
-                                            CommonHTML: {
-                                                                scale: 80
-                                                            },
-                                            });
-
-                                            MathJax.Hub.Register.StartupHook("TeX Jax Ready", function() {
-                                            MathJax.Hub.Insert(MathJax.InputJax.TeX.Definitions.macros, {
-                                                exclude: "exclude"
-                                            });
-                                            });
-                        </script>
-                        <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                                                    const carousel = document.querySelectorAll('.carousel');
-                                                    console.log(carousel)
-                                                    const items = Array.from(document.querySelectorAll('.carousel-item'));
-                                                    console.log(items)
-                                                    const maxWidth = Math.max(...items.map(item => item.querySelector('img').clientWidth));
-                                                    console.log(maxWidth);
-                                                    for (let i = 0; i < carousel.length; i++) {
-                                                        carousel[i].style.width = maxWidth + 'px';            }
-                                                    
-                                                    $( ".change" ).on("click", function() {
-                                                    if( $( "body" ).hasClass( "dark" )) {
-                                                        $( "body" ).removeClass( "dark" );
-                                                        $( "div[style*='background: wheat;']" ).removeClass( "dark-banner" );
-                                                        $( "div[style*='background: beige;']" ).removeClass( "dark-banner-sq" );
-                                                        $("div[id*='v-pills-tabContent']").removeClass( "tab-content dark" );
-                                                        $("table").removeClass( "table-color-dark" );
-                                                        $("table").addClass( "table-color" );
-                                                        $("div[id*='v-pills-tabContent']").addClass( "tab-content" );
-                                                        $( ".change" ).text( "OFF" );
-                                                    } else {
-                                                        $( "body" ).addClass( "dark" );
-                                                        $( "div[style*='background: wheat;']" ).addClass( "dark-banner" );
-                                                        $( "div[style*='background: beige;']" ).addClass( "dark-banner-sq" );
-                                                        $("div[id*='v-pills-tabContent']").addClass( "tab-content dark" );
-                                                        $("table").removeClass( "table-color" );
-                                                        $("table").addClass( "table-color-dark" );
-                                                        $( ".change" ).text( "ON" );
-                                                    }
-                                });
-                                        });
-                        </script>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
-                        <style>
-                                    body {
-                                        overflow-x: hidden;
-                                        background-color: white;
-                                        left: 10% !important;
-                                        right: 10% !important;
-                                        position: absolute;
-
-                                        }
-                                        .similar-questions-container {
-                                            display: flex;
-                                            justify-content: space-between;
-                                            }
-
-                                            .left::after {
-                                            content: "-";
-                                            margin-left: 5px;
-                                            }
-
-                                            .right::before {
-                                            content: "-";
-                                            margin-right: 5px;
-                                            }
-                                        .mode {
-                                            float:right;
-                                        }
-                                        .dark.tab-content{
-                                                background: repeating-linear-gradient(45deg, #130f0f, #3b3b3b4d 100px) !important;
-                                        }
-                                        .dark-banner-sq{
-                                                background-color: #3b3451b8 !important;
-                                                border: 1px solid #DCDCDC;
-                                        }
-                                        .tab-content{
-                                            background: white !important;
-                                        }
-                                        .change {
-                                            cursor: pointer;
-                                            border: 1px solid #555;
-                                            border-radius: 40%;
-                                            width: 20px;
-                                            text-align: center;
-                                            padding: 5px;
-                                            margin-left: 8px;
-                                        }
-                                        .dark{
-                                            background-color: #222;
-                                            color: #e6e6e6;
-                                        }
-                                        .dark-banner{
-                                            background-color: darkslategray !important;
-                                            color: #e6e6e6 !important;
-                                        }
-                                        .carousel-control-prev > span,
-                                        .carousel-control-next > span {
-                                        background-color: #007bff; 
-                                        border-color: #007bff; 
-                                        }
-                                        img {
-                                            width: auto;
-                                            height: auto;
-                                            max-width: 100%;
-                                            max-height: 100%;
-                                        }
-                        </style>
-                        <style>
-                        mjx-container, .mjx-chtml {
-                                            display: inline !important;
-                                        }
-                        </style></head>
-    """
-
     def wrap_slides_with_p_tags(self, content):
         # Define the regex pattern to match the entire target string, including the !?! at both ends
         pattern = re.compile(r'(?<!<p>)(\!\?\!.*/Documents/.*\!\?\!)(?!</p>)', re.IGNORECASE | re.MULTILINE)
@@ -320,7 +180,7 @@ class LeetcodeSolution:
         return result
 
 
-    def find_slides_json2(self, content, question_id):
+    def find_slides_json(self, content, question_id):
         self.logger.info("Finding slides json")
 
         word = "/Documents/"
@@ -356,7 +216,7 @@ class LeetcodeSolution:
         
             file_hash = hashlib.md5(filename_var1.encode()).hexdigest()
 
-            slide_content = self.lc.get_slide_content(question_id_title(question_id, file_hash), filename_var1, filename_var2)
+            slide_content = self.lc.get_slide_content(LeetcodeUtility.question_id_title(question_id, file_hash), filename_var1, filename_var2)
             if not slide_content:    
                 slide_content = []
 
@@ -364,13 +224,20 @@ class LeetcodeSolution:
 
         return slide_contents
 
-    def get_all_submissions():
-        all_questions = get_all_questions_url(force_download=self.config.force_download)
-        for question in all_questions:
-            item_content = {"question": {'titleSlug': question['titleSlug'], 'frontendQuestionId': question['frontendQuestionId'], 'title': question['title']}}
-            get_submission_data(item_content, False)
+    def get_all_submissions(self):
+        all_questions = self.question.get_all_questions_url(force_download=self.config.force_download)
 
-    def get_submission_data(item_content, save_submission_as_file):
+        for question in all_questions:
+            item_content = {
+                "question": {
+                    'titleSlug': question['titleSlug'],
+                    'frontendQuestionId': question['frontendQuestionId'],
+                    'title': question['title']
+                }
+            }
+            self.get_submission_data(item_content, False)
+
+    def get_submission_data(self, item_content, save_submission_as_file):
 
         list_of_submissions = {}
 
@@ -378,7 +245,7 @@ class LeetcodeSolution:
             question_frontend_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
             question_title_slug = item_content['question']['titleSlug']
 
-            submission_content = self.lc.get_submission_list(question_id_title(question_frontend_id, 'subm'), question_title_slug)
+            submission_content = self.lc.get_submission_list(LeetcodeUtility.question_id_title(question_frontend_id, 'subm'), question_title_slug)
             if not submission_content or len(submission_content) == 0:
                 return
 
@@ -387,7 +254,7 @@ class LeetcodeSolution:
                 if submission["statusDisplay"] != "Accepted":
                     continue
 
-                submission_detail_content = self.lc.get_submission_details(question_id_title(question_frontend_id, submission_id), submission_id)
+                submission_detail_content = self.lc.get_submission_details(LeetcodeUtility.question_id_title(question_frontend_id, submission_id), submission_id)
                 if not submission_detail_content:
                     continue
                 
@@ -397,7 +264,7 @@ class LeetcodeSolution:
                     submissions_download_dir = os.path.join(self.config.save_path, "questions", "submissions")
                     os.makedirs(submissions_download_dir, exist_ok=True)
 
-                    file_extension = FILE_EXTENSIONS[submission["lang"]]
+                    file_extension = LeetcodeUtility.FILE_EXTENSIONS[submission["lang"]]
                     submission_file_name = f"{question_frontend_id:04}-{i+1:02}-{submission_id}.{file_extension}"
                     submission_file_path = os.path.join(submissions_download_dir, submission_file_name)
 
@@ -405,8 +272,8 @@ class LeetcodeSolution:
                         outfile.write(submission_detail_content['code'])
         return list_of_submissions
 
-    def get_solution_content(question_id, question_title_slug):
+    def get_solution_content(self, question_id, question_title_slug):
         self.logger.info("Getting solution data")
 
-        solution = self.lc.get_official_solution(question_id_title(question_id, 'sol'), question_title_slug)
+        solution = self.lc.get_official_solution(LeetcodeUtility.question_id_title(question_id, 'sol'), question_title_slug)
         return solution
