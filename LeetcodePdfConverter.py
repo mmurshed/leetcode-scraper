@@ -7,15 +7,15 @@ from threading import Thread
 from logging import Logger
 
 from LeetcodeConfig import LeetcodeConfig
+from LeetcodeConstants import LeetcodeConstants
 
 class LeetcodePdfConverter:
     def __init__(
         self, 
         config: LeetcodeConfig,
         logger: Logger,
-        num_threads: int,
-        script_dir: str,
-        images_dir: str):
+        images_dir: str,
+        num_threads: int = 8):
         
         self.config = config
         self.logger = logger
@@ -25,11 +25,20 @@ class LeetcodePdfConverter:
             '--resource-path', images_dir
         ]
 
+        template_file = os.path.join(LeetcodeConstants.ROOT_DIR, "leet-template.latex")
+        header_file = os.path.join(LeetcodeConstants.ROOT_DIR, "enumitem.tex")
+
+        if not os.path.exists(template_file):
+            raise Exception(f"Template file missing {template_file}")
+
+        if not os.path.exists(header_file):
+            raise Exception(f"Header file missing {header_file}")
+
         self.pdfArgs = [
             '-V', 'geometry:margin=0.5in',
             '--pdf-engine=xelatex',
-            f'--template={script_dir}/leet-template.latex',
-            f'--include-in-header={script_dir}/enumitem.tex',
+            f'--template={template_file}',
+            f'--include-in-header={header_file}',
             '--resource-path', images_dir
         ]
 
@@ -85,16 +94,18 @@ class LeetcodePdfConverter:
     def convert_single_file(self, file_path):
         # Set the PDF output folder one level up from the file's directory and rename to 'questions_pdf'
         source_folder = os.path.dirname(file_path)
-        os.makedirs(source_folder, exist_ok=True)
-
         os.chdir(source_folder)
 
+        basename = os.path.basename(file_path)
+
         # Get the output paths
-        docx_output_path = os.path.join(source_folder, os.path.basename(file_path).replace('.html', '.docx'))
-        pdf_output_path = os.path.join(source_folder, os.path.basename(file_path).replace('.html', '.pdf'))
+        docx_output_path = os.path.join(source_folder, basename.replace('.html', '.docx'))
+        pdf_output_path = os.path.join(source_folder, basename.replace('.html', '.pdf'))
 
         # Convert the single file
-        self.convert_file(file_path, docx_output_path, pdf_output_path, self.docxArgs, self.pdfArgs)
+        converted = self.convert_file(file_path, docx_output_path, pdf_output_path, self.docxArgs, self.pdfArgs)
+
+        return converted
 
 
     def worker_thread(self, task_queue, docxArgs, pdfArgs):
@@ -125,6 +136,7 @@ class LeetcodePdfConverter:
                     extra_args=docxArgs)
             except Exception as e:
                 self.logger.error(f"ERROR converting to DOCX: {docx_output_path}\n{str(e)}")
+                return False
 
         # Convert DOCX to PDF
         if os.path.exists(docx_output_path) and not os.path.exists(pdf_output_path):
@@ -142,3 +154,6 @@ class LeetcodePdfConverter:
                     os.remove(docx_output_path)
             except Exception as e:
                 self.logger.error(f"ERROR converting to PDF: {pdf_output_path}\n{str(e)}")
+                return False
+
+        return True

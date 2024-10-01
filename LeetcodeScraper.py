@@ -7,6 +7,7 @@ from LeetcodeCards import LeetcodeCards
 from LeetcodeCompany import LeetcodeCompany
 from LeetcodeConstants import LeetcodeConstants
 from LeetcodeImage import LeetcodeImage
+from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeQuestion import LeetcodeQuestion
 from LeetcodeSolution import LeetcodeSolution
 from LeetcodeSubmission import LeetcodeSubmission
@@ -110,7 +111,7 @@ Press any to quit
                     config=config,
                     logger=logger,
                     leetapi=leetapi,
-                    question=question)
+                    questionhandler=question)
 
 
             if choice == 1:
@@ -136,7 +137,11 @@ Press any to quit
             elif choice == 11:
                 submission.get_all_submissions(question=question)
             elif choice == 12:
-                pass
+                converter = LeetcodePdfConverter(
+                    config=config,
+                    logger=logger,
+                    images_dir=imagehandler.get_images_dir())
+                converter.convert_folder(question.get_questions_dir())
             else:
                 break
 

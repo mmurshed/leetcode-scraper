@@ -31,6 +31,11 @@ class LeetcodeCards:
         self.solution = solutionhandler
         self.imagehandler = imagehandler
 
+    def get_cards_dir(self):
+        dir = os.path.join(self.config.save_path, "cards")
+        os.makedirs(dir, exist_ok=True)
+        return dir
+
     def get_all_cards_url(self):
         self.logger.info("Getting all cards url")
 
@@ -45,15 +50,14 @@ class LeetcodeCards:
 
 
     def scrape_card_url(self):
-        cards_dir = os.path.join(self.config.save_path, "cards")
-        os.makedirs(cards_dir, exist_ok=True)
+        cards_dir = self.get_cards_dir()
         os.chdir(cards_dir)
 
         # Creating Index for Card Folder
         with open(os.path.join(cards_dir, "index.html"), 'w') as main_index:
             main_index_html = ""
-            with open(self.config.cards_url_path, "r") as f:
-                card_urls = f.readlines()
+            with open(self.config.cards_url_path, "r") as file:
+                card_urls = file.readlines()
                 for card_url in card_urls:
                     card_url = card_url.strip()
                     card_slug = card_url.split("/")[-2]
@@ -61,27 +65,27 @@ class LeetcodeCards:
             main_index.write(main_index_html)
 
         # Creating HTML for each cards topics
-        with open(self.config.cards_url_path, "r") as f:
-            card_urls = f.readlines()
+        with open(self.config.cards_url_path, "r") as file:
+            card_urls = file.readlines()
             for card_url in card_urls:
                 card_url = card_url.strip()
 
-                self.logger.info("Scraping card url: ", card_url)
+                self.logger.info(f"Scraping card url: {card_url}")
 
                 card_slug = card_url.split("/")[-2]
 
                 chapters = self.lc.get_chapter_with_items(card_slug)
 
                 if chapters:
-                    cards_dir = os.path.join(self.config.save_path, "cards", card_slug)
+                    cards_dir = os.path.join(self.get_cards_dir(), card_slug)
                     os.makedirs(cards_dir, exist_ok=True)
                     
                     self.create_card_index_html(chapters, card_slug)
                     for subcategory in chapters:
-                        self.logger.info("Scraping subcategory: ", subcategory['title'])
+                        self.logger.info(f"Scraping subcategory: {subcategory['title']}")
 
                         for item in subcategory['items']:
-                            self.logger.info("Scraping Item: ", item['title'])
+                            self.logger.info(f"Scraping Item: {item['title']}")
 
                             item_id = item['id']
                             item_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, item['title'])
@@ -116,7 +120,8 @@ class LeetcodeCards:
         content_soup = self.solution.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, item_id)
 
-        with open(LeetcodeUtility.qhtml(item_id, item_title), "w", encoding="utf-8") as f:
+        card_path = os.path.join(self.get_cards_dir(), LeetcodeUtility.qhtml(item_id, item_title))
+        with open(card_path, "w", encoding="utf-8") as f:
             f.write(content_soup.prettify())
 
     def create_card_index_html(self, chapters, card_slug):

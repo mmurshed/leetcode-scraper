@@ -33,6 +33,18 @@ class LeetcodeQuestion:
         self.solutionhandler = solutionhandler
         self.imagehandler = imagehandler
 
+    def get_questions_dir(self):
+        dir = os.path.join(self.config.save_path, "questions")
+        os.makedirs(dir, exist_ok=True)
+        return dir
+    
+    def get_question_file(self, question_id, question_title):
+        dir = self.get_questions_dir()
+        filename = LeetcodeUtility.qhtml(question_id, question_title)
+        filepath = os.path.join(dir, filename)
+
+        return filepath
+    
     def get_all_questions_url(self, force_download):
         self.logger.info("Getting all questions url")
 
@@ -59,8 +71,7 @@ class LeetcodeQuestion:
 
     def scrape_question_url(self, selected_question_id = None):
         all_questions = self.get_all_questions_url(force_download=self.config.force_download)
-        questions_dir = os.path.join(self.config.save_path, "questions")
-        os.makedirs(questions_dir, exist_ok=True)
+        questions_dir = self.get_questions_dir()
         os.chdir(questions_dir)
 
         # Convert the list of questions to a dictionary using titleSlug as the key
@@ -92,12 +103,18 @@ class LeetcodeQuestion:
                     self.logger.info(f"Already scraped {question_file}")
 
             if self.config.convert_to_pdf:
+                converter = LeetcodePdfConverter(
+                    config=self.config,
+                    logger=self.logger,
+                    images_dir=self.imagehandler.get_images_dir())
+
                 for row in csv.reader(f):
-                    converted = LeetcodePdfConverter.convert_file(question_id, question_title, overwrite=self.config.force_download)
+                    question_path = self.get_question_file(question_id, question_title)
+                    converted = converter.convert_single_file(question_path)
                     if not converted:
                         self.logger.info(f"Compressing images and retrying pdf convert")
                         self.imagehandler.recompress_images(question_id)
-                        converted = LeetcodePdfConverter.convert_file(question_id, question_title, overwrite=True)
+                        converted = converter.convert_single_file(question_path)
                 
         with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
             main_index_html = ""
@@ -126,7 +143,7 @@ class LeetcodeQuestion:
         content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, question_id)
 
-        question_path = os.path.join(self.config.save_path, "questions", LeetcodeUtility.qhtml(question_id, question_title))
+        question_path = os.path.join(self.get_questions_dir(), LeetcodeUtility.qhtml(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
             f.write(content_soup.prettify())
 

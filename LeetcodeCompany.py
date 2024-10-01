@@ -1,17 +1,28 @@
 import os
 import json
 import re
+
+from logging import Logger
 from bs4 import BeautifulSoup
 
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeConstants import LeetcodeConstants
+from LeetcodeConfig import LeetcodeConfig
+from LeetcodeApi import LeetcodeApi
+from LeetcodeQuestion import LeetcodeQuestion
 
 class LeetcodeCompany:
-    def __init__(self, config, logger, leetapi, question):
+    def __init__(
+        self, 
+        config: LeetcodeConfig,
+        logger: Logger,
+        leetapi: LeetcodeApi,
+        questionhandler: LeetcodeQuestion):
+
         self.config = config
         self.logger = logger
         self.lc = leetapi
-        self.question = question
+        self.questionhandler = questionhandler
 
     def scrape_selected_company_questions(self, choice):
         all_comp_dir = os.path.join(self.config.save_path, "all_company_questions")
@@ -70,7 +81,7 @@ class LeetcodeCompany:
         elif choice == 8:
             for company in company_tags:
                 company_slug = company['slug']
-                self.question.scrape_question_data(company_slug)
+                self.questionhandler.scrape_question_data(company_slug)
                 os.chdir("..")
         os.chdir('..')
 
@@ -171,7 +182,6 @@ class LeetcodeCompany:
         questions_dir = os.path.join(self.config.save_path, "questions")
         questions_pdf_dir = os.path.join(self.config.save_path, "questions_pdf")
         company_root_dir = os.path.join(self.config.save_path, "all_company_questions", company_slug)
-        data_dir = os.path.join(self.config.save_path, "cache", "companies")
         os.makedirs(questions_dir, exist_ok=True)
         os.makedirs(questions_pdf_dir, exist_ok=True)
         os.makedirs(company_root_dir, exist_ok=True)
@@ -183,15 +193,10 @@ class LeetcodeCompany:
             return
 
         favoriteSlugs = [item["favoriteSlug"] for item in categoriesToSlug['generatedFavoritesInfo']['categoriesToSlugs']]
-
+        total_questions = categoriesToSlug['questionNumber']
+        
         for favoriteSlug in favoriteSlugs:
-            data_path = os.path.join(data_dir, f"{favoriteSlug}.json")
-
-            if not os.path.exists(data_path):
-                raise Exception(f"Company data not found {data_path}")
-
-            with open(data_path, 'r') as f:
-                questions = json.loads(f.read())
+            questions = self.lc.get_favorite_question_list_for_company(favoriteSlug, total_questions)
 
             company_fav_dir  = os.path.join(company_root_dir, favoriteSlug)
             os.makedirs(company_fav_dir, exist_ok=True)
@@ -211,12 +216,10 @@ class LeetcodeCompany:
                 question_slug = question['titleSlug']
         
                 if self.config.force_download:
-                    self.create_question_html(question_id, question_slug, question_title)
+                    self.questionhandler.create_question_html(question_id, question_slug, question_title)
                 
                 copied = LeetcodeUtility.copy_question_file(self.config.save_path, question_id, question_title, company_fav_dir)
 
                 # if copy failed retry
                 if not copied:
-                    self.logger.warning("Copy failed downloading again and retrying copy")
-                    self.create_question_html(question_id, question_slug, question_title)
-                    LeetcodeUtility.copy_question_file(self.config.save_path, question_id, question_title, company_fav_dir)
+                    self.logger.error("Copy failed")

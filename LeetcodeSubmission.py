@@ -2,6 +2,7 @@ import os
 
 from logging import Logger
 
+from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeConfig import LeetcodeConfig
 from LeetcodeApi import LeetcodeApi
@@ -57,7 +58,7 @@ class LeetcodeSubmission:
                     submissions_download_dir = os.path.join(self.config.save_path, "questions", "submissions")
                     os.makedirs(submissions_download_dir, exist_ok=True)
 
-                    file_extension = LeetcodeUtility.FILE_EXTENSIONS[submission["lang"]]
+                    file_extension = LeetcodeConstants.FILE_EXTENSIONS[submission["lang"]]
                     submission_file_name = f"{question_frontend_id:04}-{i+1:02}-{submission_id}.{file_extension}"
                     submission_file_path = os.path.join(submissions_download_dir, submission_file_name)
 

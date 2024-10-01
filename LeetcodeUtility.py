@@ -101,8 +101,8 @@ class LeetcodeUtility:
         return f"{question_id:04}"
 
     @staticmethod
-    def qhtml(question_id, queston_title):
-        return f"{LeetcodeUtility.qbasename(question_id, queston_title)}.html"
+    def qhtml(question_id, question_title):
+        return f"{LeetcodeUtility.qbasename(question_id, question_title)}.html"
 
     @staticmethod
     def qbasename(question_id, queston_title):

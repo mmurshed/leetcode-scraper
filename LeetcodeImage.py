@@ -22,6 +22,11 @@ class LeetcodeImage:
         self.logger = logger
         self.cloudscaper = cloudscraper.create_scraper()
 
+    def get_images_dir(self):
+        dir = os.path.join(self.config.save_path, "questions", "images")
+        os.makedirs(dir, exist_ok=True)
+        return dir
+
     def is_valid_image(self, image_path):
         # SVG file is allowed by default
         if image_path.lower().endswith('.svg'):
@@ -67,7 +72,7 @@ class LeetcodeImage:
             return None
 
     def recompress_images(self, question_id):
-        images_dir = os.path.join(self.self.config.save_path, "questions", "images")
+        images_dir = self.get_images_dir()
 
         # Convert the question_id to a zero-padded 4-digit string
         question_id_str = LeetcodeUtility.qstr(question_id)
@@ -103,8 +108,7 @@ class LeetcodeImage:
             self.logger.error(f"Invalid image url: {img_url}")
             return
         
-        images_dir = os.path.join(self.config.save_path, "questions", "images")
-        os.makedirs(images_dir, exist_ok=True)
+        images_dir = self.get_images_dir()
         
         parsed_url = urlsplit(img_url)
         basename = os.path.basename(parsed_url.path)
