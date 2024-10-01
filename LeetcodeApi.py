@@ -2,10 +2,19 @@ import os
 import json
 import requests
 
+from logging import Logger
+
+from LeetcodeConfig import LeetcodeConfig
 from LeetcodeConstants import LeetcodeConstants
 
 class LeetcodeApi:
-    def __init__(self, config, logger, default_headers = None, leetcode_headers = None):
+    def __init__(
+        self,
+        config: LeetcodeConfig,
+        logger: Logger,
+        default_headers:str = None,
+        leetcode_headers:str = None):
+        
         self.config = config
         self.logger = logger
         self.default_headers = default_headers or LeetcodeConstants.DEFAULT_HEADERS

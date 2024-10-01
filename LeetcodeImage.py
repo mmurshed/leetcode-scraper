@@ -7,10 +7,17 @@ from bs4 import BeautifulSoup
 import validators
 import cloudscraper
 
+from logging import Logger
+
 from LeetcodeUtility import LeetcodeUtility
+from LeetcodeConfig import LeetcodeConfig
 
 class LeetcodeImage:
-    def __init__(self, config, logger):
+    def __init__(
+        self, 
+        config: LeetcodeConfig,
+        logger: Logger):
+
         self.config = config
         self.logger = logger
         self.cloudscaper = cloudscraper.create_scraper()

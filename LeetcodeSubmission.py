@@ -1,9 +1,18 @@
 import os
 
+from logging import Logger
+
 from LeetcodeUtility import LeetcodeUtility
+from LeetcodeConfig import LeetcodeConfig
+from LeetcodeApi import LeetcodeApi
 
 class LeetcodeSubmission:
-    def __init__(self, config, logger, leetapi):
+    def __init__(
+        self,
+        config: LeetcodeConfig,
+        logger: Logger,
+        leetapi: LeetcodeApi):
+
         self.config = config
         self.logger = logger
         self.lc = leetapi

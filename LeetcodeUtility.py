@@ -4,8 +4,6 @@ import shutil
 import sys
 import markdown
 
-from LeetcodeConstants import LeetcodeConstants
-
 class LeetcodeUtility:
     @staticmethod
     def clear():
@@ -143,12 +141,3 @@ class LeetcodeUtility:
         data_path = os.path.join(data_dir, filename)
         return data_path
     
-    @staticmethod
-    def get_html_header():
-        filepath = os.path.join(LeetcodeConstants.ROOT_DIR, "leetheader.txt")
-        if os.path.exists(filepath):
-            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
-        with open(filepath, "r") as file:
-            data = file.read()
-
-        return data

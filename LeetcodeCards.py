@@ -1,19 +1,34 @@
 import os
 import re
 
+from logging import Logger
 from bs4 import BeautifulSoup
-from LeetcodeArticle import LeetcodeArticle
+
 from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
+from LeetcodeImage import LeetcodeImage
+from LeetcodeSolution import LeetcodeSolution
+from LeetcodeConfig import LeetcodeConfig
+from LeetcodeApi import LeetcodeApi
+from LeetcodeQuestion import LeetcodeQuestion
+from LeetcodeArticle import LeetcodeArticle
 
 class LeetcodeCards:
-    def __init__(self, config, logger, leetapi, question, solution, imagehandler):
+    def __init__(
+        self, 
+        config: LeetcodeConfig,
+        logger: Logger,
+        leetapi: LeetcodeApi,
+        questionhandler: LeetcodeQuestion,
+        solutionhandler: LeetcodeSolution,
+        imagehandler: LeetcodeImage):
+
         self.config = config
         self.logger = logger
         self.lc = leetapi
         self.article = LeetcodeArticle(config, logger, leetapi)
-        self.question = question
-        self.solution = solution
+        self.question = questionhandler
+        self.solution = solutionhandler
         self.imagehandler = imagehandler
 
     def get_all_cards_url(self):
@@ -96,7 +111,7 @@ class LeetcodeCards:
         content += self.article.get_html_article_data(item_content, item_title)
         content += """</body>"""
         slides_json = self.solution.find_slides_json(content, item_id)
-        content = LeetcodeConstants.get_html_header + content
+        content = LeetcodeConstants.HTML_HEADER + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solution.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, item_id)
@@ -124,7 +139,7 @@ class LeetcodeCards:
         with open("index.html", 'w') as f:
             f.write(f"""<!DOCTYPE html>
                     <html lang="en">
-                    {LeetcodeConstants.get_html_header}
+                    {LeetcodeConstants.HTML_HEADER}
                     <body>
                         <div class="mode">
                         Dark mode:  <span class="change">OFF</span>

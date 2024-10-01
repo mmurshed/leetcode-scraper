@@ -39,7 +39,17 @@ class LeetcodeConstants:
         "swift": "swift",
     }
 
-    HTML_HEADER = LeetcodeUtility.get_html_header()
+    HTML_HEADER = None
+
+    @staticmethod
+    def get_html_header():
+        filepath = os.path.join(LeetcodeConstants.ROOT_DIR, "leetheader.txt")
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+        with open(filepath, "r") as file:
+            data = file.read()
+
+        return data
 
     #region headers
     @staticmethod
@@ -60,3 +70,5 @@ class LeetcodeConstants:
     LEETCODE_HEADERS = CaseInsensitiveDict(DEFAULT_HEADERS.copy())
 
     #endregion headers
+
+LeetcodeConstants.HTML_HEADER = LeetcodeConstants.get_html_header()

@@ -114,8 +114,8 @@ Press any to quit
                     config=config,
                     logger=logger,
                     leetapi=leetapi,
-                    question=question,
-                    solution=solution,
+                    questionhandler=question,
+                    solutionhandler=solution,
                     imagehandler=imagehandler
                 )
 

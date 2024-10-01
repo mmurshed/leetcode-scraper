@@ -3,17 +3,29 @@ import os
 import csv
 import re
 import json
+
+from logging import Logger
 from bs4 import BeautifulSoup
 
-from LeetcodeCompany import LeetcodeCompany
 from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeImage import LeetcodeImage
 from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeSolution import LeetcodeSolution
+from LeetcodeConfig import LeetcodeConfig
+from LeetcodeApi import LeetcodeApi
+from LeetcodeSubmission import LeetcodeSubmission
 
 class LeetcodeQuestion:
-    def __init__(self, config, logger, leetapi, solutionhandler, imagehandler, submissionhandler):
+    def __init__(
+        self, 
+        config: LeetcodeConfig,
+        logger: Logger,
+        leetapi: LeetcodeApi,
+        solutionhandler: LeetcodeSolution,
+        imagehandler: LeetcodeImage,
+        submissionhandler: LeetcodeSubmission):
+        
         self.config = config
         self.logger = logger
         self.lc = leetapi
@@ -41,8 +53,7 @@ class LeetcodeQuestion:
         with open(self.config.questions_url_path, "w") as file:
             for question in all_questions:
                 frontendQuestionId = question['frontendQuestionId']
-                question_url = "https://leetcode.com/problems/" + \
-                    question['titleSlug'] + "/\n"
+                question_url = f"{LeetcodeConstants.LEETCODE_URL}/problems/{question['titleSlug']}/\n"
                 file.write(f"{frontendQuestionId},{question_url}")
 
 
@@ -110,7 +121,7 @@ class LeetcodeQuestion:
         content += question_content
         content += """</body>"""
         slides_json = self.solutionhandler.find_slides_json(content, question_id)
-        content = LeetcodeConstants.get_html_header + content
+        content = LeetcodeConstants.HTML_HEADER + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, question_id)
@@ -169,7 +180,7 @@ class LeetcodeQuestion:
             difficulty = question_content['difficulty']
             company_tag_stats = self.get_question_company_tag_stats(question_content['companyTagStats'])
             similar_questions = self.generate_similar_questions(question_content['similarQuestions'])
-            question_url = "https://leetcode.com" + question_content['submitUrl'][:-7]
+            question_url = LeetcodeConstants.LEETCODE_URL + question_content['submitUrl'][:-7]
 
             default_code = json.loads(question_content['codeDefinition'])[0]['defaultCode']
             solution = question_content['solution']

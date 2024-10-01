@@ -4,8 +4,19 @@ import pypandoc
 from queue import Queue
 from threading import Thread
 
+from logging import Logger
+
+from LeetcodeConfig import LeetcodeConfig
+
 class LeetcodePdfConverter:
-    def __init__(self, config, logger, num_threads, script_dir, images_dir):
+    def __init__(
+        self, 
+        config: LeetcodeConfig,
+        logger: Logger,
+        num_threads: int,
+        script_dir: str,
+        images_dir: str):
+        
         self.config = config
         self.logger = logger
         self.num_threads = self.valid_num_threads(num_threads)
