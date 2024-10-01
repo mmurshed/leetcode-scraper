@@ -632,7 +632,7 @@ def scrape_card_url():
         for card_url in card_urls:
             card_url = card_url.strip()
 
-            logger.info("Scraping card url: ", card_url)
+            logger.info(f"Scraping card url: {card_url}")
 
             card_slug = card_url.split("/")[-2]
 
@@ -658,10 +658,10 @@ def scrape_card_url():
                 
                 create_card_index_html(chapters, card_slug)
                 for subcategory in chapters:
-                    logger.info("Scraping subcategory: ", subcategory['title'])
+                    logger.info(f"Scraping subcategory: {subcategory['title']}")
 
                     for item in subcategory['items']:
-                        logger.info("Scraping Item: ", item['title'])
+                        logger.info(f"Scraping Item: {item['title']}")
 
                         item_id = item['id']
                         item_title = re.sub(r'[:?|></\\]', replace_filename, item['title'])
@@ -710,7 +710,8 @@ def create_card_html(item_content, item_title, item_id):
     content_soup = place_solution_slides(content_soup, slides_json)
     content_soup = fix_image_urls(content_soup, item_id)
 
-    with open(question_html(item_id, item_title), "w", encoding="utf-8") as f:
+    card_path = os.path.join(CONFIG.save_path, "cards", question_html(item_id, item_title))
+    with open(card_path, "w", encoding="utf-8") as f:
         f.write(content_soup.prettify())
 
 def is_valid_image(image_path):
@@ -2093,7 +2094,7 @@ if __name__ == '__main__':
         # logger.info("Proxy set", SESSION.get(
         #     "https://httpbin.org/ip").content)
         try:
-            print("""Leetcode-Scraper v1.5-stable
+            print("""Leetcode-Scraper v1.6-stable
 1: Setup config
 2: Select config[Default: 0]
 3: Get all cards url
