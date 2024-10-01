@@ -1,16 +1,11 @@
 import os
 import argparse
-
-import logging
-from logging.handlers import RotatingFileHandler
-
 import requests
 
 from LeetcodeApi import LeetcodeApi
 from LeetcodeCards import LeetcodeCards
 from LeetcodeCompany import LeetcodeCompany
 from LeetcodeConstants import LeetcodeConstants
-from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeImage import LeetcodeImage
 from LeetcodeQuestion import LeetcodeQuestion
 from LeetcodeSolution import LeetcodeSolution
@@ -20,16 +15,8 @@ from LeetcodeConfigLoader import LeetcodeConfigLoader
 
 
 if __name__ == '__main__':
-    # Set up logging
-    log_file = 'scrape_errors.log'
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("Leet")
-    handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
 
-    selected_config = 0
+    logger = LeetcodeUtility.get_logger()
 
     parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
     parser.add_argument('--non-stop', type=bool,
@@ -124,7 +111,6 @@ Press any to quit
                     logger=logger,
                     leetapi=leetapi,
                     question=question)
-
 
 
             if choice == 1:

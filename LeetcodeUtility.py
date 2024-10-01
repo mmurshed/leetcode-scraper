@@ -1,3 +1,6 @@
+from logging import Logger
+import logging
+from logging.handlers import RotatingFileHandler
 import os
 import re
 import shutil
@@ -141,3 +144,15 @@ class LeetcodeUtility:
         data_path = os.path.join(data_dir, filename)
         return data_path
     
+    @staticmethod
+    def get_logger() -> Logger:
+        # Set up logging
+        log_file = 'scrape_errors.log'
+        logging.basicConfig(level=logging.DEBUG)
+        logger = logging.getLogger("Leet")
+        handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        return logger
