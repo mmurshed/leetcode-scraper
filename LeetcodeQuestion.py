@@ -6,19 +6,20 @@ import json
 from bs4 import BeautifulSoup
 
 from LeetcodeCompany import LeetcodeCompany
+from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeImage import LeetcodeImage
 from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeSolution import LeetcodeSolution
 
 class LeetcodeQuestion:
-    def __init__(self, config, logger, leetapi, solution, imagehandler):
+    def __init__(self, config, logger, leetapi, solutionhandler, imagehandler, submissionhandler):
         self.config = config
         self.logger = logger
         self.lc = leetapi
-        self.solution = solution
+        self.submissionhandler = submissionhandler
+        self.solutionhandler = solutionhandler
         self.imagehandler = imagehandler
-        self.company = LeetcodeCompany(config, logger, leetapi)
 
     def get_all_questions_url(self, force_download):
         self.logger.info("Getting all questions url")
@@ -31,30 +32,30 @@ class LeetcodeQuestion:
         all_questions = self.lc.get_all_questions(all_questions_count)
 
         if force_download:
-            self.write_questions_to_file(all_questions, self.configquestions_url_path)
+            self.write_questions_to_file(all_questions)
 
         return all_questions
 
 
-    def write_questions_to_file(self, all_questions, questions_url_path):
-        with open(questions_url_path, "w") as f:
+    def write_questions_to_file(self, all_questions):
+        with open(self.config.questions_url_path, "w") as file:
             for question in all_questions:
                 frontendQuestionId = question['frontendQuestionId']
                 question_url = "https://leetcode.com/problems/" + \
                     question['titleSlug'] + "/\n"
-                f.write(f"{frontendQuestionId},{question_url}")
+                file.write(f"{frontendQuestionId},{question_url}")
 
 
     def scrape_question_url(self, selected_question_id = None):
-        all_questions = self.get_all_questions_url(force_download=self.configforce_download)
-        questions_dir = os.path.join(self.configsave_path, "questions")
+        all_questions = self.get_all_questions_url(force_download=self.config.force_download)
+        questions_dir = os.path.join(self.config.save_path, "questions")
         os.makedirs(questions_dir, exist_ok=True)
         os.chdir(questions_dir)
 
         # Convert the list of questions to a dictionary using titleSlug as the key
         questions_dict = {question['titleSlug']: question for question in all_questions}
 
-        with open(self.configquestions_url_path) as f:
+        with open(self.config.questions_url_path) as f:
             for row in csv.reader(f):
                 question_id = int(row[0])
                 question_url = row[1]
@@ -70,18 +71,18 @@ class LeetcodeQuestion:
                 else:
                     raise Exception(f"Question id {question_id}, slug {question_slug} not found")
 
-                question_file = LeetcodeUtility.question_html(question_id, question_title)
+                question_file = LeetcodeUtility.qhtml(question_id, question_title)
                 question_path = os.path.join(questions_dir, question_file)
                 
-                if self.configforce_download or not os.path.exists(question_path):            
+                if self.config.force_download or not os.path.exists(question_path):            
                     self.logger.info(f"Scraping question {question_id} url: {question_url}")
                     self.create_question_html(question_id, question_slug, question_title)
                 else:
                     self.logger.info(f"Already scraped {question_file}")
 
-            if self.configconvert_to_pdf:
+            if self.config.convert_to_pdf:
                 for row in csv.reader(f):
-                    converted = LeetcodePdfConverter.convert_file(question_id, question_title, overwrite=self.configforce_download)
+                    converted = LeetcodePdfConverter.convert_file(question_id, question_title, overwrite=self.config.force_download)
                     if not converted:
                         self.logger.info(f"Compressing images and retrying pdf convert")
                         self.imagehandler.recompress_images(question_id)
@@ -108,13 +109,13 @@ class LeetcodeQuestion:
         question_content, question_title = self.get_question_data(item_content)
         content += question_content
         content += """</body>"""
-        slides_json = self.solution.find_slides_json(content, question_id)
-        content = self.attach_header_in_html() + content
+        slides_json = self.solutionhandler.find_slides_json(content, question_id)
+        content = LeetcodeConstants.get_html_header + content
         content_soup = BeautifulSoup(content, 'html.parser')
-        content_soup = self.solution.place_solution_slides(content_soup, slides_json)
+        content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, question_id)
 
-        question_path = os.path.join(self.configsave_path, "questions", LeetcodeUtility.question_html(question_id, question_title))
+        question_path = os.path.join(self.config.save_path, "questions", LeetcodeUtility.qhtml(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
             f.write(content_soup.prettify())
 
@@ -155,12 +156,13 @@ class LeetcodeQuestion:
 
     def get_question_data(self, item_content):
         self.logger.info("Getting question data")
+
         if item_content['question']:
             question_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
             question_title_slug = item_content['question']['titleSlug']
             question_title = item_content['question']['title'] if item_content['question']['title'] else question_title_slug
 
-            question_content = self.lc.get_question(LeetcodeUtility.question_id_title(question_id, 'qdat'), question_title_slug)
+            question_content = self.lc.get_question(LeetcodeUtility.qbasename(question_id, 'qdat'), question_title_slug)
 
             question_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, question_content['title'])        
             question = question_content['content']
@@ -171,7 +173,7 @@ class LeetcodeQuestion:
 
             default_code = json.loads(question_content['codeDefinition'])[0]['defaultCode']
             solution = question_content['solution']
-            if solution:
+            if solution and solution['content']:
                 solution = solution['content']
                 solution = re.sub(r'\[TOC\]', '', solution) # remove [TOC]
             else:
@@ -193,7 +195,7 @@ class LeetcodeQuestion:
 
             submission_content = None
 
-            if self.configinclude_submissions_count > 0:
+            if self.config.include_submissions_count > 0:
                 item_content = {
                     "question": {
                         'titleSlug': question_title_slug,
@@ -201,12 +203,12 @@ class LeetcodeQuestion:
                         'title': question_title
                     }
                 }
-                submissions = self.solution.get_submission_data(item_content, True)
+                submissions = self.submissionhandler.get_submission_data(item_content, True)
                 if submissions and len(submissions) > 0:
                     # Sorted by timestamp in descending order
                     ordered_submissions = sorted(submissions.items(), key=lambda item: item[0], reverse=True)
                     # Take top n of submissions
-                    ordered_submissions = ordered_submissions[:self.configinclude_submissions_count]
+                    ordered_submissions = ordered_submissions[:self.config.include_submissions_count]
 
                     submission_content = ""
                     for sub_timestamp, code in ordered_submissions:
@@ -217,14 +219,14 @@ class LeetcodeQuestion:
             question = LeetcodeUtility.convert_display_math_to_inline(question)
             question = LeetcodeUtility.markdown_with_math(question)
             
-            solution = LeetcodeUtility.convert_display_math_to_inline(solution)
             if solution:
-                solution = self.solution.markdown_with_iframe(solution)
-                solution = self.solution.replace_iframes_with_codes(solution, question_id)
-                solution = self.solution.wrap_slides_with_p_tags(solution)
+                solution = LeetcodeUtility.convert_display_math_to_inline(solution)
+                solution = self.solutionhandler.markdown_with_iframe(solution)
+                solution = self.solutionhandler.replace_iframes_with_codes(solution, question_id)
+                solution = self.solutionhandler.wrap_slides_with_p_tags(solution)
 
             default_code_html = """"""
-            if self.configinclude_default_code:
+            if self.config.include_default_code:
                 default_code_html = f"""
                             <div><h3>Default Code</h3>
                             <pre class="question__default_code">{default_code}</pre></div>
@@ -263,58 +265,3 @@ class LeetcodeQuestion:
                     """, question_title
         return """""", ""
 
-    def scrape_question_data(self, company_slug):
-        self.logger.info("Scraping question data")
-
-        questions_dir = os.path.join(self.configsave_path, "questions")
-        questions_pdf_dir = os.path.join(self.configsave_path, "questions_pdf")
-        company_root_dir = os.path.join(self.configsave_path, "all_company_questions", company_slug)
-        data_dir = os.path.join(self.configsave_path, "cache", "companies")
-        os.makedirs(questions_dir, exist_ok=True)
-        os.makedirs(questions_pdf_dir, exist_ok=True)
-        os.makedirs(company_root_dir, exist_ok=True)
-
-        questions_seen = set()
-        
-        categoriesToSlug = self.company.get_categories_slugs_for_company(company_slug)
-        if not categoriesToSlug:
-            return
-
-        favoriteSlugs = [item["favoriteSlug"] for item in categoriesToSlug['generatedFavoritesInfo']['categoriesToSlugs']]
-
-        for favoriteSlug in favoriteSlugs:
-            data_path = os.path.join(data_dir, f"{favoriteSlug}.json")
-
-            if not os.path.exists(data_path):
-                raise Exception(f"Company data not found {data_path}")
-
-            with open(data_path, 'r') as f:
-                questions = json.loads(f.read())
-
-            company_fav_dir  = os.path.join(company_root_dir, favoriteSlug)
-            os.makedirs(company_fav_dir, exist_ok=True)
-
-            # sort by frequency, high frequency first
-            questions = sorted(questions, key=lambda x: x['frequency'], reverse=True)
-            
-            for question in questions:
-                question_id = int(question['questionFrontendId'])
-
-                # skip already processed questions
-                if question_id in questions_seen:
-                    continue
-                questions_seen.add(question_id)
-                
-                question_title = question['title']
-                question_slug = question['titleSlug']
-        
-                if self.configforce_download:
-                    self.create_question_html(question_id, question_slug, question_title)
-                
-                copied = LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, question_id, question_title, company_fav_dir)
-
-                # if copy failed retry
-                if not copied:
-                    self.logger.warning("Copy failed downloading again and retrying copy")
-                    self.create_question_html(question_id, question_slug, question_title)
-                    LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, question_id, question_title, company_fav_dir)

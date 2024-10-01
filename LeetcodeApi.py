@@ -2,14 +2,17 @@ import os
 import json
 import requests
 
+from LeetcodeConstants import LeetcodeConstants
+
 class LeetcodeApi:
-    def __init__(self, config, logger, default_headers, leetcode_headers):
+    def __init__(self, config, logger, default_headers = None, leetcode_headers = None):
         self.config = config
         self.logger = logger
-        self.default_headers = default_headers
-        self.leetcode_headers = leetcode_headers
+        self.default_headers = default_headers or LeetcodeConstants.DEFAULT_HEADERS
+        self.leetcode_headers = leetcode_headers or LeetcodeConstants.LEETCODE_HEADERS
         self.session = requests.Session()
 
+    #region basic method
     def get_cache_path(self, category, filename):
         data_dir = os.path.join(self.config.save_path, "cache", category)
         os.makedirs(data_dir, exist_ok=True)
@@ -43,7 +46,7 @@ class LeetcodeApi:
 
         return data
 
-    def cached_query(self, data_path, method="post", query=None, selector=None, url=LEETCODE_GRAPHQL_URL, headers=LEETCODE_HEADERS):
+    def cached_query(self, data_path, method="post", query=None, selector=None, url=LeetcodeConstants.LEETCODE_GRAPHQL_URL, headers=LeetcodeConstants.LEETCODE_HEADERS):
         """
         This function caches and performs a query if data is not already cached.
         Optionally uses a selector to filter out the required part of the response.
@@ -104,6 +107,9 @@ class LeetcodeApi:
 
         return data
     
+    #endregion
+
+    #region cards api
     def get_categories(self):
         data_path = self.get_cache_path("cards", "allcards.json")
 
@@ -134,43 +140,6 @@ class LeetcodeApi:
         }
 
         selector = ['data', 'card']
-
-        data = self.cached_query(
-            data_path=data_path,
-            query=query,
-            selector=selector)
-        
-        return data
-
-    def get_questions_count(self):
-        data_path = self.get_cache_path("qdata", "allquestioncount.json")
-
-        query = {
-            "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "
-        }
-        selector = ['data', 'allQuestionsCount', 0,'count']
-
-        data = self.cached_query(
-            data_path=data_path,
-            query=query,
-            selector=selector)
-        
-        return data
-    
-    def get_all_questions(self, all_questions_count):
-        data_path = self.get_cache_path("qdata", "allquestions.json")
-
-        query = {
-            "query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ",
-            "variables": {
-                "categorySlug": "",
-                "skip": 0,
-                "limit": all_questions_count,
-                "filters": {}
-            }
-        }
-
-        selector = ['data', 'problemsetQuestionList', 'questions']
 
         data = self.cached_query(
             data_path=data_path,
@@ -216,6 +185,69 @@ class LeetcodeApi:
             selector=selector)
         
         return data
+
+    #endregion cards api
+
+    #region questions api
+    def get_questions_count(self):
+        data_path = self.get_cache_path("qdata", "allquestioncount.json")
+
+        query = {
+            "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "
+        }
+        selector = ['data', 'allQuestionsCount', 0,'count']
+
+        data = self.cached_query(
+            data_path=data_path,
+            query=query,
+            selector=selector)
+        
+        return data
+    
+    def get_all_questions(self, all_questions_count):
+        data_path = self.get_cache_path("qdata", "allquestions.json")
+
+        query = {
+            "query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ",
+            "variables": {
+                "categorySlug": "",
+                "skip": 0,
+                "limit": all_questions_count,
+                "filters": {}
+            }
+        }
+
+        selector = ['data', 'problemsetQuestionList', 'questions']
+
+        data = self.cached_query(
+            data_path=data_path,
+            query=query,
+            selector=selector)
+        
+        return data
+
+    def get_question(self, basename, question_title_slug):
+        data_path = self.get_cache_path("qdata", f"{basename}.json")
+
+        query = {
+            "operationName": "GetQuestion",
+            "variables": {
+                "titleSlug": question_title_slug
+            },
+            "query": "query GetQuestion($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n title\n submitUrl\n similarQuestions\n difficulty\n  companyTagStats\n codeDefinition\n    content\n    hints\n    solution {\n      content\n   }\n   }\n }\n"
+        }
+
+        selector = ['data', 'question']
+
+        data = self.cached_query(
+            data_path=data_path,
+            query=query,
+            selector=selector)
+        return data
+   
+    #endregion questions api
+
+    #region playground codes api
 
     def get_all_playground_codes(self, basename, uuid):
         data_path = self.get_cache_path("code", f"{basename}.json")
@@ -278,6 +310,9 @@ class LeetcodeApi:
 
         return data
 
+    #endregion playground codes api
+    
+    #region articles api
     def get_article(self, basename, article_id):
         data_path = self.get_cache_path("articles", f"{basename}.json")
 
@@ -315,7 +350,10 @@ class LeetcodeApi:
             selector=selector)
         
         return data
-    
+
+    #endregion articles api 
+
+    #region submissions api
     def get_submission_list(self, basename, question_title_slug):
         data_path = self.get_cache_path("submissions", f"{basename}.json")
 
@@ -361,6 +399,9 @@ class LeetcodeApi:
 
         return data
 
+    #endregion submissions api
+
+    #region solutions api
     def get_official_solution(self, basename, question_title_slug):
         data_path = self.get_cache_path("soldata", f"{basename}.json")
 
@@ -380,25 +421,9 @@ class LeetcodeApi:
         
         return data
 
-    def get_question(self, basename, question_title_slug):
-        data_path = self.get_cache_path("qdata", f"{basename}.json")
-
-        query = {
-            "operationName": "GetQuestion",
-            "variables": {
-                "titleSlug": question_title_slug
-            },
-            "query": "query GetQuestion($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n title\n submitUrl\n similarQuestions\n difficulty\n  companyTagStats\n codeDefinition\n    content\n    hints\n    solution {\n      content\n   }\n   }\n }\n"
-        }
-
-        selector = ['data', 'question']
-
-        data = self.cached_query(
-            data_path=data_path,
-            query=query,
-            selector=selector)
-        return data
+    #endregion solutions api
     
+    #region company api
     def get_question_company_tags(self):
         data_path = self.get_cache_path("companies", "allcompanyquestions.json")
         query = {
@@ -459,3 +484,4 @@ class LeetcodeApi:
             query=query,
             selector=selector)
         return data
+    #endregion company api

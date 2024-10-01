@@ -3,6 +3,7 @@ import re
 
 from bs4 import BeautifulSoup
 from LeetcodeArticle import LeetcodeArticle
+from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
 
 class LeetcodeCards:
@@ -20,13 +21,12 @@ class LeetcodeCards:
 
         cards = self.lc.get_categories()
 
-        with open(self.config.cards_url_path, "w") as f:
+        with open(self.config.cards_url_path, "w") as file:
             for category_card in cards:
                 if category_card['slug'] != "featured":
                     for card in category_card['cards']:
-                        card_url = "https://leetcode.com/explore/" + \
-                            card['categorySlug'] + "/card/" + card['slug'] + "/\n"
-                        f.write(card_url)
+                        card_url = f"{LeetcodeConstants.LEETCODE_URL}/explore/{card['categorySlug']}/card/{card['slug']}/\n"
+                        file.write(card_url)
 
 
     def scrape_card_url(self):
@@ -71,7 +71,7 @@ class LeetcodeCards:
                             item_id = item['id']
                             item_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, item['title'])
 
-                            filename = LeetcodeUtility.question_html(item_id, item_title)
+                            filename = LeetcodeUtility.qhtml(item_id, item_title)
                             
                             cards_filepath = os.path.join(cards_dir, filename)
 
@@ -96,12 +96,12 @@ class LeetcodeCards:
         content += self.article.get_html_article_data(item_content, item_title)
         content += """</body>"""
         slides_json = self.solution.find_slides_json(content, item_id)
-        content = LeetcodeUtility.get_header() + content
+        content = LeetcodeConstants.get_html_header + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solution.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, item_id)
 
-        with open(LeetcodeUtility.question_html(item_id, item_title), "w", encoding="utf-8") as f:
+        with open(LeetcodeUtility.qhtml(item_id, item_title), "w", encoding="utf-8") as f:
             f.write(content_soup.prettify())
 
     def create_card_index_html(self, chapters, card_slug):
@@ -119,12 +119,12 @@ class LeetcodeCards:
             """
             for item in chapter['items']:
                 item['title'] = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, item['title'])
-                item_fname = LeetcodeUtility.question_html(item['id'], item['title'])
+                item_fname = LeetcodeUtility.qhtml(item['id'], item['title'])
                 body += f"""<a href="{item_fname}">{item['id']}-{item['title']}</a><br>"""
         with open("index.html", 'w') as f:
             f.write(f"""<!DOCTYPE html>
                     <html lang="en">
-                    {LeetcodeUtility.get_header()}
+                    {LeetcodeConstants.get_html_header}
                     <body>
                         <div class="mode">
                         Dark mode:  <span class="change">OFF</span>

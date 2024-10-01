@@ -22,6 +22,11 @@ class LeetcodeConfig:
     download_videos: bool
 
     @staticmethod
+    def from_json_file(json_file: str) -> 'LeetcodeConfig':
+        with open(json_file, "r") as file:
+            return LeetcodeConfig.from_json(file.read())
+
+    @staticmethod
     def from_json(json_str: str) -> 'LeetcodeConfig':
         data = json.loads(json_str)
         return LeetcodeConfig(
@@ -45,7 +50,11 @@ class LeetcodeConfig:
 
     def to_json(self) -> str:
         return json.dumps(self.__dict__, indent=4)
-    
+
+    def to_json_file(self, json_file):
+        with open(json_file, "w") as file:
+            file.write(self.to_json())
+
     @staticmethod
     def prompt_from_dataclass():
         # Default prompts based on the fields of the LeetCodeConfig class

@@ -1,6 +1,4 @@
-from dataclasses import fields
 import os
-import json
 
 from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
@@ -16,24 +14,12 @@ class LeetcodeConfigLoader:
         os.makedirs(base_config_path, exist_ok=True)
         return base_config_path
 
-    @staticmethod
-    def select_config():
-        base_config_path = LeetcodeConfigLoader.create_base_config_dir()
-        print("\nIf you are creating a new config, Please select 1 in Main Menu to setup the new config\n")
-
-        if len(os.listdir(base_config_path)) > 0:
-            for configs in os.listdir(base_config_path):
-                if ".json" in configs:
-                    print(configs)
-            selected_config = input(
-                "\nSelect a config or Enter a number to create a new config: ") or "0"
-        return int(selected_config)
 
     @staticmethod
-    def generate_config(selected_config):
+    def generate_config():
         LeetcodeUtility.clear()
         base_config_path = LeetcodeConfigLoader.create_base_config_dir()
-        config_file_path = os.path.join(base_config_path, f"config_{selected_config}.json")
+        config_file_path = os.path.join(base_config_path, "config.json")
 
         print(f'''
             Leave Blank and press Enter if you don't want to overwrite Previous Values
@@ -70,12 +56,12 @@ class LeetcodeConfigLoader:
                     setattr(config, key, new_value)
 
         # Save the updated configuration to a JSON file
-        config.to_json(config_file_path)
+        config.to_json_file(config_file_path)
         print(f"Configuration saved to {config_file_path}")
 
     @property
     def DEFAULT_CONFIG():
-        config_path = os.path.join(LeetcodeConstants.get_script_dir(), "defaultconfig.json")
+        config_path = os.path.join(LeetcodeConstants.ROOT_DIR, "defaultconfig.json")
 
         # Check if config file exists
         if not os.path.exists(config_path):
@@ -84,12 +70,12 @@ class LeetcodeConfigLoader:
         return LeetcodeConfig.from_json(config_path)
 
     @staticmethod
-    def load_config(selected_config):
+    def load_config():
         config_dir = os.path.join(LeetcodeConstants.OS_ROOT, ".leetcode-scraper")
-        config_path = os.path.join(config_dir, f"config_{selected_config}.json")
+        config_path = os.path.join(config_dir, "config.json")
 
         # Check if config file exists
         if not os.path.exists(config_path):
             raise Exception("No config found, please create one")
 
-        return LeetcodeConfig.from_json(config_path)
+        return LeetcodeConfig.from_json_file(config_path)

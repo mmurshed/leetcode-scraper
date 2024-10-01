@@ -133,8 +133,8 @@ class LeetcodeCompany:
 
                     frequency = round(float(question['frequency']), 1)            
                     frequency_label = '{:.1f}'.format(frequency)
-                    question_title_format = LeetcodeUtility.question_id_title(questionFrontEndId, question['title'])
-                    question_fname = LeetcodeUtility.question_html(questionFrontEndId, question['title'])
+                    question_title_format = LeetcodeUtility.qbasename(questionFrontEndId, question['title'])
+                    question_fname = LeetcodeUtility.qhtml(questionFrontEndId, question['title'])
                     html += f'''<tr>
                                 <td><a slug="{question['titleSlug']}" title="{question_title_format}" href="{question_fname}">{question_title_format}</a></td>
                                 <td>Difficulty: {question['difficulty']} </td><td>Frequency: {frequency_label}</td>
@@ -163,3 +163,58 @@ class LeetcodeCompany:
                     </html>""")
             os.chdir("..")
 
+    def scrape_question_data(self, company_slug):
+        self.logger.info("Scraping question data")
+
+        questions_dir = os.path.join(self.configsave_path, "questions")
+        questions_pdf_dir = os.path.join(self.configsave_path, "questions_pdf")
+        company_root_dir = os.path.join(self.configsave_path, "all_company_questions", company_slug)
+        data_dir = os.path.join(self.configsave_path, "cache", "companies")
+        os.makedirs(questions_dir, exist_ok=True)
+        os.makedirs(questions_pdf_dir, exist_ok=True)
+        os.makedirs(company_root_dir, exist_ok=True)
+
+        questions_seen = set()
+        
+        categoriesToSlug = self.get_categories_slugs_for_company(company_slug)
+        if not categoriesToSlug:
+            return
+
+        favoriteSlugs = [item["favoriteSlug"] for item in categoriesToSlug['generatedFavoritesInfo']['categoriesToSlugs']]
+
+        for favoriteSlug in favoriteSlugs:
+            data_path = os.path.join(data_dir, f"{favoriteSlug}.json")
+
+            if not os.path.exists(data_path):
+                raise Exception(f"Company data not found {data_path}")
+
+            with open(data_path, 'r') as f:
+                questions = json.loads(f.read())
+
+            company_fav_dir  = os.path.join(company_root_dir, favoriteSlug)
+            os.makedirs(company_fav_dir, exist_ok=True)
+
+            # sort by frequency, high frequency first
+            questions = sorted(questions, key=lambda x: x['frequency'], reverse=True)
+            
+            for question in questions:
+                question_id = int(question['questionFrontendId'])
+
+                # skip already processed questions
+                if question_id in questions_seen:
+                    continue
+                questions_seen.add(question_id)
+                
+                question_title = question['title']
+                question_slug = question['titleSlug']
+        
+                if self.configforce_download:
+                    self.create_question_html(question_id, question_slug, question_title)
+                
+                copied = LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, question_id, question_title, company_fav_dir)
+
+                # if copy failed retry
+                if not copied:
+                    self.logger.warning("Copy failed downloading again and retrying copy")
+                    self.create_question_html(question_id, question_slug, question_title)
+                    LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, question_id, question_title, company_fav_dir)

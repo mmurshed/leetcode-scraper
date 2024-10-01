@@ -7,8 +7,14 @@ from logging.handlers import RotatingFileHandler
 import requests
 
 from LeetcodeApi import LeetcodeApi
+from LeetcodeCards import LeetcodeCards
+from LeetcodeCompany import LeetcodeCompany
+from LeetcodeConstants import LeetcodeConstants
 from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeImage import LeetcodeImage
+from LeetcodeQuestion import LeetcodeQuestion
+from LeetcodeSolution import LeetcodeSolution
+from LeetcodeSubmission import LeetcodeSubmission
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeConfigLoader import LeetcodeConfigLoader
 
@@ -24,8 +30,6 @@ if __name__ == '__main__':
     logger.addHandler(handler)
 
     selected_config = 0
-
-    CONFIG = LeetcodeConfigLoader.DEFAULT_CONFIG
 
     parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
     parser.add_argument('--non-stop', type=bool,
@@ -49,20 +53,24 @@ if __name__ == '__main__':
         # logger.info("Proxy set", SESSION.get(
         #     "https://httpbin.org/ip").content)
         try:
-            print("""Leetcode-Scraper v1.5-stable
+            print("""Leetcode-Scraper v2.0-beta
 1: Setup config
-2: Select config[Default: 0]
-3: Get all cards url
+
+2: Get all cards url
+3: Scrape card url
+
 4: Get all question url
-5: Scrape card url
-6: Scrape question url
+5: Scrape question url
+6: Scrape a single question with frontend id
+
 7: Scrape all company questions indexes
 8: Scrape all company questions
+
 9: Scrape selected company questions indexes
 10: Scrape selected company questions
-11: Convert images to base64 using os.walk
-12: Save submissions in files
-13: Scrape a single question with frontend id
+
+11: Save all your submissions in files
+12: Convert all questions to pdf
                   
 Press any to quit
                 """)
@@ -76,34 +84,72 @@ Press any to quit
             except Exception:
                 break
 
-            if choice > 2:
-                LeetcodeConfigLoader.load_config(selected_config)
-                LEETCODE_HEADERS = create_headers(CONFIG.leetcode_cookie)
-                LEETAPI = LeetcodeApi(CONFIG, logger, DEFAULT_HEADERS, LEETCODE_HEADERS)
+            if choice > 1:
+                config = LeetcodeConfigLoader.load_config()
+                LeetcodeConstants.LEETCODE_HEADERS = LeetcodeConstants.create_headers(config.leetcode_cookie)
+                leetapi = LeetcodeApi(
+                    config=config,
+                    logger=logger)
+                imagehandler = LeetcodeImage(
+                    config=config,
+                    logger=logger)
+                solution = LeetcodeSolution(
+                    config=config,
+                    logger=logger,
+                    leetapi=leetapi)
+                submission = LeetcodeSubmission(
+                    config=config,
+                    logger=logger,
+                    leetapi=leetapi)
+
+                question = LeetcodeQuestion(
+                    config=config,
+                    logger=logger,
+                    leetapi=leetapi,
+                    solutionhandler=solution,
+                    imagehandler=imagehandler,
+                    submissionhandler=submission)
+                
+                cards = LeetcodeCards(
+                    config=config,
+                    logger=logger,
+                    leetapi=leetapi,
+                    question=question,
+                    solution=solution,
+                    imagehandler=imagehandler
+                )
+
+                company = LeetcodeCompany(
+                    config=config,
+                    logger=logger,
+                    leetapi=leetapi,
+                    question=question)
+
+
 
             if choice == 1:
-                generate_config()
+                LeetcodeConfigLoader.generate_config()
             elif choice == 2:
-                select_config()
+                cards.get_all_cards_url()
             elif choice == 3:
-                get_all_cards_url()
+                cards.scrape_card_url()
+
             elif choice == 4:
-                get_all_questions_url(force_download=True)
+                question.get_all_questions_url(force_download=True)
             elif choice == 5:
-                scrape_card_url()
+                question.scrape_question_url()
             elif choice == 6:
-                scrape_question_url()
-            elif choice == 7 or choice == 8:
-                scrape_all_company_questions(choice)
-            elif choice == 9 or choice == 10:
-                scrape_selected_company_questions(choice)
-            elif choice == 11:
-                manual_convert_images_to_base64()
-            elif choice == 12:
-                get_all_submissions()
-            elif choice == 13:
                 question_id = input("Enter question frontend id: ")
-                scrape_question_url(int(question_id))
+                question.scrape_question_url(int(question_id))
+
+            elif choice == 7 or choice == 8:
+                company.scrape_all_company_questions(choice)
+            elif choice == 9 or choice == 10:
+                company.scrape_selected_company_questions(choice)
+
+            elif choice == 11:
+                submission.get_all_submissions(question=question)
+            elif choice == 12:
                 pass
             else:
                 break

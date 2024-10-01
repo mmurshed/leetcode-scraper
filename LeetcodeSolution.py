@@ -7,11 +7,10 @@ import yt_dlp
 from LeetcodeUtility import LeetcodeUtility
 
 class LeetcodeSolution:
-    def __init__(self, config, logger, leetapi, question):
+    def __init__(self, config, logger, leetapi):
         self.config = config
         self.logger = logger
         self.lc = leetapi
-        self.question = question
 
     def place_solution_slides(self, content_soup, slides_json):
             self.logger.debug("Placing solution slides")
@@ -106,7 +105,7 @@ class LeetcodeSolution:
                 self.logger.debug(f"Playground uuid: {uuid} url: {src_url}")
                 
                 playground_content = self.lc.get_all_playground_codes(
-                    LeetcodeUtility.question_id_title(question_id, uuid), uuid)
+                    LeetcodeUtility.qbasename(question_id, uuid), uuid)
 
                 if not playground_content:
                     self.logger.error(f"Error in getting code data from source url {src_url}")
@@ -142,7 +141,7 @@ class LeetcodeSolution:
 
                 video_id = src_url.split("/")[-1]
                 video_extension = "mp4"
-                video_basename = f"{LeetcodeUtility.question_id_title(question_id, video_id)}.{video_extension}"
+                video_basename = f"{LeetcodeUtility.qbasename(question_id, video_id)}.{video_extension}"
 
                 if self.config.download_videos:
                     ydl_opts = {
@@ -216,7 +215,7 @@ class LeetcodeSolution:
         
             file_hash = hashlib.md5(filename_var1.encode()).hexdigest()
 
-            slide_content = self.lc.get_slide_content(LeetcodeUtility.question_id_title(question_id, file_hash), filename_var1, filename_var2)
+            slide_content = self.lc.get_slide_content(LeetcodeUtility.qbasename(question_id, file_hash), filename_var1, filename_var2)
             if not slide_content:    
                 slide_content = []
 
@@ -224,56 +223,8 @@ class LeetcodeSolution:
 
         return slide_contents
 
-    def get_all_submissions(self):
-        all_questions = self.question.get_all_questions_url(force_download=self.config.force_download)
-
-        for question in all_questions:
-            item_content = {
-                "question": {
-                    'titleSlug': question['titleSlug'],
-                    'frontendQuestionId': question['frontendQuestionId'],
-                    'title': question['title']
-                }
-            }
-            self.get_submission_data(item_content, False)
-
-    def get_submission_data(self, item_content, save_submission_as_file):
-
-        list_of_submissions = {}
-
-        if item_content['question']:
-            question_frontend_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
-            question_title_slug = item_content['question']['titleSlug']
-
-            submission_content = self.lc.get_submission_list(LeetcodeUtility.question_id_title(question_frontend_id, 'subm'), question_title_slug)
-            if not submission_content or len(submission_content) == 0:
-                return
-
-            for i, submission in enumerate(submission_content):
-                submission_id = submission['id']
-                if submission["statusDisplay"] != "Accepted":
-                    continue
-
-                submission_detail_content = self.lc.get_submission_details(LeetcodeUtility.question_id_title(question_frontend_id, submission_id), submission_id)
-                if not submission_detail_content:
-                    continue
-                
-                if save_submission_as_file:
-                    list_of_submissions[int(submission["timestamp"])] = submission_detail_content['code']
-                else:
-                    submissions_download_dir = os.path.join(self.config.save_path, "questions", "submissions")
-                    os.makedirs(submissions_download_dir, exist_ok=True)
-
-                    file_extension = LeetcodeUtility.FILE_EXTENSIONS[submission["lang"]]
-                    submission_file_name = f"{question_frontend_id:04}-{i+1:02}-{submission_id}.{file_extension}"
-                    submission_file_path = os.path.join(submissions_download_dir, submission_file_name)
-
-                    with open(submission_file_path, "w") as outfile:
-                        outfile.write(submission_detail_content['code'])
-        return list_of_submissions
-
     def get_solution_content(self, question_id, question_title_slug):
         self.logger.info("Getting solution data")
 
-        solution = self.lc.get_official_solution(LeetcodeUtility.question_id_title(question_id, 'sol'), question_title_slug)
+        solution = self.lc.get_official_solution(LeetcodeUtility.qbasename(question_id, 'sol'), question_title_slug)
         return solution

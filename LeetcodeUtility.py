@@ -22,7 +22,7 @@ class LeetcodeUtility:
     @staticmethod
     def copy_question_file(save_path, question_id, question_title, dest_dir, copy_pdf = True, copy_videos = False):
         questions_dir = os.path.join(save_path, "questions")
-        question_filename = LeetcodeUtility.question_html(question_id, question_title)
+        question_filename = LeetcodeUtility.qhtml(question_id, question_title)
         question_filepath = os.path.join(questions_dir, question_filename)
 
         # logger.info(f"Copying {question_filepath} to {dest_dir}")
@@ -54,7 +54,7 @@ class LeetcodeUtility:
 
         # Copy pdf
         if copy_pdf:
-            question_basename = LeetcodeUtility.question_id_title(question_id, question_title)
+            question_basename = LeetcodeUtility.qbasename(question_id, question_title)
             pdf_dir = os.path.join(save_path, "questions_pdf")
             dest_pdf_dir = os.path.join(dest_dir, "questions_pdf")
 
@@ -79,7 +79,7 @@ class LeetcodeUtility:
         return True
 
     @staticmethod
-    def html_toquestion(filename):
+    def html_to_question(filename):
         filename = os.path.basename(filename)
 
         # Remove the file extension
@@ -100,11 +100,11 @@ class LeetcodeUtility:
         return f"{question_id:04}"
 
     @staticmethod
-    def question_html(question_id, queston_title):
-        return f"{LeetcodeUtility.question_id_title(question_id, queston_title)}.html"
+    def qhtml(question_id, queston_title):
+        return f"{LeetcodeUtility.qbasename(question_id, queston_title)}.html"
 
     @staticmethod
-    def question_id_title(question_id, queston_title):
+    def qbasename(question_id, queston_title):
         return f"{LeetcodeUtility.qstr(question_id)}-{queston_title}"
 
 
@@ -144,7 +144,11 @@ class LeetcodeUtility:
         return data_path
     
     @staticmethod
-    def create_headers(leetcode_cookie=""):
-        headers = LeetcodeConstants.DEFAULT_HEADERS
-        headers["cookie"] = f"LEETCODE_SESSION={leetcode_cookie}"
-        return headers
+    def get_html_header():
+        filepath = os.path.join(LeetcodeConstants.ROOT_DIR, "leetheader.txt")
+        if os.path.exists(filepath):
+            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+        with open(filepath, "r") as file:
+            data = file.read()
+
+        return data

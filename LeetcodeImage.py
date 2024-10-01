@@ -105,7 +105,7 @@ class LeetcodeImage:
         img_ext = str.lower(basename.split('.')[-1])
 
         url_hash = hashlib.md5(img_url.encode()).hexdigest()
-        image_path = os.path.join(images_dir, f"{LeetcodeUtility.question_id_title(question_id, url_hash)}.{img_ext}")
+        image_path = os.path.join(images_dir, f"{LeetcodeUtility.qbasename(question_id, url_hash)}.{img_ext}")
 
         if not self.config.cache_data or not os.path.exists(image_path):
             try:
@@ -242,7 +242,7 @@ class LeetcodeImage:
                 if file.endswith('.html'):
                     with open(os.path.join(root, file), "r") as f:
                         soup = BeautifulSoup(f.read(), 'html.parser')
-                        question_id, _ = LeetcodeUtility.html_toquestion(file)
+                        question_id, _ = LeetcodeUtility.html_to_question(file)
                         res_soup = self.fix_image_urls(soup, question_id)
                     with open(os.path.join(root, file), "w") as f:
                         f.write(res_soup.prettify())
