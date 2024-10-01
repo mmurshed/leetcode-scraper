@@ -75,46 +75,55 @@ class LeetcodeQuestion:
         os.chdir(questions_dir)
 
         # Convert the list of questions to a dictionary using titleSlug as the key
-        questions_dict = {question['titleSlug']: question for question in all_questions}
+        question_slug_to_question = {question['titleSlug']: question for question in all_questions}
 
-        with open(self.config.questions_url_path) as f:
-            for row in csv.reader(f):
+        question_id_to_title = {}
+
+        with open(self.config.questions_url_path) as file:
+            csvcontent = csv.reader(file)
+            for row in csvcontent:
                 question_id = int(row[0])
-                question_url = row[1]
-                question_url = question_url.strip()
+                question_url = row[1].strip()
                 question_slug = question_url.split("/")[-2]
+
+                if question_slug in question_slug_to_question:
+                    question = question_slug_to_question[question_slug]
+                    question_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, question['title'])
+                else:
+                    raise Exception(f"Question id {question_id}, slug {question_slug} not found")
+                
+                question_id_to_title[question_id] = [question_slug, question_title]
+        
+        for question_id, (question_slug, question_title) in question_id_to_title.items():
+
+            if selected_question_id and question_id != selected_question_id:
+                continue
+
+            question_path = self.get_question_file(question_id, question_title)                
+            
+            if self.config.force_download or not os.path.exists(question_path):            
+                self.logger.info(f"Scraping question {question_id}")
+                self.create_question_html(question_id, question_slug, question_title)
+            else:
+                self.logger.info(f"Already scraped {question_path}")
+
+        if self.config.convert_to_pdf:
+            converter = LeetcodePdfConverter(
+                config=self.config,
+                logger=self.logger,
+                images_dir=self.imagehandler.get_images_dir())
+
+            for question_id, (question_slug, question_title) in question_id_to_title.items():
 
                 if selected_question_id and question_id != selected_question_id:
                     continue
 
-                if question_slug in questions_dict:
-                    question = questions_dict[question_slug]
-                    question_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, question['title'])
-                else:
-                    raise Exception(f"Question id {question_id}, slug {question_slug} not found")
-
-                question_file = LeetcodeUtility.qhtml(question_id, question_title)
-                question_path = os.path.join(questions_dir, question_file)
-                
-                if self.config.force_download or not os.path.exists(question_path):            
-                    self.logger.info(f"Scraping question {question_id} url: {question_url}")
-                    self.create_question_html(question_id, question_slug, question_title)
-                else:
-                    self.logger.info(f"Already scraped {question_file}")
-
-            if self.config.convert_to_pdf:
-                converter = LeetcodePdfConverter(
-                    config=self.config,
-                    logger=self.logger,
-                    images_dir=self.imagehandler.get_images_dir())
-
-                for row in csv.reader(f):
-                    question_path = self.get_question_file(question_id, question_title)
+                question_path = self.get_question_file(question_id, question_title)
+                converted = converter.convert_single_file(question_path)
+                if not converted:
+                    self.logger.info(f"Compressing images and retrying pdf convert")
+                    self.imagehandler.recompress_images(question_id)
                     converted = converter.convert_single_file(question_path)
-                    if not converted:
-                        self.logger.info(f"Compressing images and retrying pdf convert")
-                        self.imagehandler.recompress_images(question_id)
-                        converted = converter.convert_single_file(question_path)
                 
         with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
             main_index_html = ""
