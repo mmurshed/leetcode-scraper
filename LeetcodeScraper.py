@@ -15,6 +15,49 @@ from LeetcodeUtility import LeetcodeUtility
 from LeetcodeConfigLoader import LeetcodeConfigLoader
 
 
+def init():
+    config = LeetcodeConfigLoader.load_config()
+    LeetcodeConstants.LEETCODE_HEADERS = LeetcodeConstants.create_headers(config.leetcode_cookie)
+    leetapi = LeetcodeApi(
+        config=config,
+        logger=logger)
+    imagehandler = LeetcodeImage(
+        config=config,
+        logger=logger)
+    solution = LeetcodeSolution(
+        config=config,
+        logger=logger,
+        leetapi=leetapi)
+    submission = LeetcodeSubmission(
+        config=config,
+        logger=logger,
+        leetapi=leetapi)
+
+    question = LeetcodeQuestion(
+        config=config,
+        logger=logger,
+        leetapi=leetapi,
+        solutionhandler=solution,
+        imagehandler=imagehandler,
+        submissionhandler=submission)
+    
+    cards = LeetcodeCards(
+        config=config,
+        logger=logger,
+        leetapi=leetapi,
+        questionhandler=question,
+        solutionhandler=solution,
+        imagehandler=imagehandler
+    )
+
+    company = LeetcodeCompany(
+        config=config,
+        logger=logger,
+        leetapi=leetapi,
+        questionhandler=question)
+
+    return config, cards, company, imagehandler, question, submission
+
 if __name__ == '__main__':
 
     logger = LeetcodeUtility.get_logger()
@@ -73,45 +116,7 @@ Press any to quit
                 break
 
             if choice > 1:
-                config = LeetcodeConfigLoader.load_config()
-                LeetcodeConstants.LEETCODE_HEADERS = LeetcodeConstants.create_headers(config.leetcode_cookie)
-                leetapi = LeetcodeApi(
-                    config=config,
-                    logger=logger)
-                imagehandler = LeetcodeImage(
-                    config=config,
-                    logger=logger)
-                solution = LeetcodeSolution(
-                    config=config,
-                    logger=logger,
-                    leetapi=leetapi)
-                submission = LeetcodeSubmission(
-                    config=config,
-                    logger=logger,
-                    leetapi=leetapi)
-
-                question = LeetcodeQuestion(
-                    config=config,
-                    logger=logger,
-                    leetapi=leetapi,
-                    solutionhandler=solution,
-                    imagehandler=imagehandler,
-                    submissionhandler=submission)
-                
-                cards = LeetcodeCards(
-                    config=config,
-                    logger=logger,
-                    leetapi=leetapi,
-                    questionhandler=question,
-                    solutionhandler=solution,
-                    imagehandler=imagehandler
-                )
-
-                company = LeetcodeCompany(
-                    config=config,
-                    logger=logger,
-                    leetapi=leetapi,
-                    questionhandler=question)
+                config, cards, company, imagehandler, question, submission = init()
 
 
             if choice == 1:

@@ -34,7 +34,7 @@ class LeetcodeQuestion:
         self.imagehandler = imagehandler
 
     def get_questions_dir(self):
-        dir = os.path.join(self.config.save_path, "questions")
+        dir = os.path.join(self.config.save_directory, "questions")
         os.makedirs(dir, exist_ok=True)
         return dir
     
@@ -62,7 +62,7 @@ class LeetcodeQuestion:
 
 
     def write_questions_to_file(self, all_questions):
-        with open(self.config.questions_url_path, "w") as file:
+        with open(self.config.questions_filepath, "w") as file:
             for question in all_questions:
                 frontendQuestionId = question['frontendQuestionId']
                 question_url = f"{LeetcodeConstants.LEETCODE_URL}/problems/{question['titleSlug']}/\n"
@@ -70,7 +70,7 @@ class LeetcodeQuestion:
 
 
     def scrape_question_url(self, selected_question_id = None):
-        all_questions = self.get_all_questions_url(force_download=self.config.force_download)
+        all_questions = self.get_all_questions_url(force_download=self.config.overwrite)
         questions_dir = self.get_questions_dir()
         os.chdir(questions_dir)
 
@@ -79,7 +79,7 @@ class LeetcodeQuestion:
 
         question_id_to_title = {}
 
-        with open(self.config.questions_url_path) as file:
+        with open(self.config.questions_filepath) as file:
             csvcontent = csv.reader(file)
             for row in csvcontent:
                 question_id = int(row[0])
@@ -101,29 +101,11 @@ class LeetcodeQuestion:
 
             question_path = self.get_question_file(question_id, question_title)                
             
-            if self.config.force_download or not os.path.exists(question_path):            
+            if self.config.overwrite or not os.path.exists(question_path):            
                 self.logger.info(f"Scraping question {question_id}")
                 self.create_question_html(question_id, question_slug, question_title)
             else:
                 self.logger.info(f"Already scraped {question_path}")
-
-        if self.config.convert_to_pdf:
-            converter = LeetcodePdfConverter(
-                config=self.config,
-                logger=self.logger,
-                images_dir=self.imagehandler.get_images_dir())
-
-            for question_id, (question_slug, question_title) in question_id_to_title.items():
-
-                if selected_question_id and question_id != selected_question_id:
-                    continue
-
-                question_path = self.get_question_file(question_id, question_title)
-                converted = converter.convert_single_file(question_path)
-                if not converted:
-                    self.logger.info(f"Compressing images and retrying pdf convert")
-                    self.imagehandler.recompress_images(question_id)
-                    converted = converter.convert_single_file(question_path)
                 
         with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
             main_index_html = ""
@@ -199,7 +181,7 @@ class LeetcodeQuestion:
             question_title_slug = item_content['question']['titleSlug']
             question_title = item_content['question']['title'] if item_content['question']['title'] else question_title_slug
 
-            question_content = self.lc.get_question(LeetcodeUtility.qbasename(question_id, 'qdat'), question_title_slug)
+            question_content = self.lc.get_question(question_id, question_title_slug)
 
             question_title = re.sub(r'[:?|></\\]', LeetcodeUtility.replace_filename, question_content['title'])        
             question = question_content['content']

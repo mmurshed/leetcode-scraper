@@ -23,7 +23,7 @@ class LeetcodeArticle:
         if item_content['article']:
             article_id = item_content['article']['id']
 
-            article_content = self.lc.get_article(LeetcodeUtility.qbasename(question_id, article_id), article_id)
+            article_content = self.lc.get_article(question_id, article_id)
 
             article_data = f"""<h3>{item_title}</h3>
                         <md-block class="article__content">{article_content}</md-block>

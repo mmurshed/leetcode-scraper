@@ -32,7 +32,7 @@ class LeetcodeCards:
         self.imagehandler = imagehandler
 
     def get_cards_dir(self):
-        dir = os.path.join(self.config.save_path, "cards")
+        dir = os.path.join(self.config.save_directory, "cards")
         os.makedirs(dir, exist_ok=True)
         return dir
 
@@ -41,7 +41,7 @@ class LeetcodeCards:
 
         cards = self.lc.get_categories()
 
-        with open(self.config.cards_url_path, "w") as file:
+        with open(self.config.cards_filepath, "w") as file:
             for category_card in cards:
                 if category_card['slug'] != "featured":
                     for card in category_card['cards']:
@@ -56,7 +56,7 @@ class LeetcodeCards:
         # Creating Index for Card Folder
         with open(os.path.join(cards_dir, "index.html"), 'w') as main_index:
             main_index_html = ""
-            with open(self.config.cards_url_path, "r") as file:
+            with open(self.config.cards_filepath, "r") as file:
                 card_urls = file.readlines()
                 for card_url in card_urls:
                     card_url = card_url.strip()
@@ -65,7 +65,7 @@ class LeetcodeCards:
             main_index.write(main_index_html)
 
         # Creating HTML for each cards topics
-        with open(self.config.cards_url_path, "r") as file:
+        with open(self.config.cards_filepath, "r") as file:
             card_urls = file.readlines()
             for card_url in card_urls:
                 card_url = card_url.strip()
@@ -94,11 +94,11 @@ class LeetcodeCards:
                             
                             cards_filepath = os.path.join(cards_dir, filename)
 
-                            if not self.config.force_download and os.path.exists(cards_filepath):
+                            if not self.config.overwrite and os.path.exists(cards_filepath):
                                 self.logger.info(f"Already scraped {cards_filepath}")
                                 continue
 
-                            if self.config.force_download or not LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, item_id, item_title, cards_dir):
+                            if self.config.overwrite or not LeetcodeUtility.copy_question_file(self.config.SAVE_PATH, item_id, item_title, cards_dir):
                                 item_content = self.lc.get_chapter_items(card_slug, item_id)
 
                                 if item_content:

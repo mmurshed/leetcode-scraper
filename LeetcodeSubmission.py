@@ -19,7 +19,7 @@ class LeetcodeSubmission:
         self.lc = leetapi
 
     def get_all_submissions(self, question):
-        all_questions = question.get_all_questions_url(force_download=self.config.force_download)
+        all_questions = question.get_all_questions_url(force_download=self.config.overwrite)
 
         for question in all_questions:
             item_content = {
@@ -39,7 +39,7 @@ class LeetcodeSubmission:
             question_frontend_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
             question_title_slug = item_content['question']['titleSlug']
 
-            submission_content = self.lc.get_submission_list(LeetcodeUtility.qbasename(question_frontend_id, 'subm'), question_title_slug)
+            submission_content = self.lc.get_submission_list(question_frontend_id, question_title_slug)
             if not submission_content or len(submission_content) == 0:
                 return
 
@@ -48,14 +48,14 @@ class LeetcodeSubmission:
                 if submission["statusDisplay"] != "Accepted":
                     continue
 
-                submission_detail_content = self.lc.get_submission_details(LeetcodeUtility.qbasename(question_frontend_id, submission_id), submission_id)
+                submission_detail_content = self.lc.get_submission_details(question_frontend_id, submission_id)
                 if not submission_detail_content:
                     continue
                 
                 if save_submission_as_file:
                     list_of_submissions[int(submission["timestamp"])] = submission_detail_content['code']
                 else:
-                    submissions_download_dir = os.path.join(self.config.save_path, "questions", "submissions")
+                    submissions_download_dir = os.path.join(self.config.save_directory, "questions", "submissions")
                     os.makedirs(submissions_download_dir, exist_ok=True)
 
                     file_extension = LeetcodeConstants.FILE_EXTENSIONS[submission["lang"]]

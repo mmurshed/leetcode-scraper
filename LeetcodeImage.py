@@ -23,7 +23,7 @@ class LeetcodeImage:
         self.cloudscaper = cloudscraper.create_scraper()
 
     def get_images_dir(self):
-        dir = os.path.join(self.config.save_path, "questions", "images")
+        dir = os.path.join(self.config.save_directory, "questions", "images")
         os.makedirs(dir, exist_ok=True)
         return dir
 
@@ -118,7 +118,7 @@ class LeetcodeImage:
         url_hash = hashlib.md5(img_url.encode()).hexdigest()
         image_path = os.path.join(images_dir, f"{LeetcodeUtility.qbasename(question_id, url_hash)}.{img_ext}")
 
-        if not self.config.cache_data or not os.path.exists(image_path):
+        if not self.config.cache_api_calls or not os.path.exists(image_path):
             try:
                 img_data = self.cloudscaper.get(url=img_url).content
 
@@ -149,7 +149,7 @@ class LeetcodeImage:
         return files
 
     def load_image_local(self, files):
-        questions_dir = os.path.join(self.config.save_path, "questions")
+        questions_dir = os.path.join(self.config.save_directory, "questions")
         relframes = [os.path.relpath(frame, questions_dir) for frame in files]
 
         return relframes

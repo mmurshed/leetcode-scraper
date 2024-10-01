@@ -98,7 +98,7 @@ class LeetcodeSolution:
     def replace_iframes_with_codes(self, content, question_id):
         self.logger.debug("Replacing iframe with code")
 
-        videos_dir = os.path.join(self.config.save_path, "questions", "videos")
+        videos_dir = os.path.join(self.config.save_directory, "questions", "videos")
         os.makedirs(videos_dir, exist_ok=True)
 
         content_soup = BeautifulSoup(content, 'html.parser')
@@ -113,8 +113,7 @@ class LeetcodeSolution:
                 uuid = src_url.split('/')[-2]
                 self.logger.debug(f"Playground uuid: {uuid} url: {src_url}")
                 
-                playground_content = self.lc.get_all_playground_codes(
-                    LeetcodeUtility.qbasename(question_id, uuid), uuid)
+                playground_content = self.lc.get_all_playground_codes(question_id, uuid)
 
                 if not playground_content:
                     self.logger.error(f"Error in getting code data from source url {src_url}")
@@ -224,7 +223,7 @@ class LeetcodeSolution:
         
             file_hash = hashlib.md5(filename_var1.encode()).hexdigest()
 
-            slide_content = self.lc.get_slide_content(LeetcodeUtility.qbasename(question_id, file_hash), filename_var1, filename_var2)
+            slide_content = self.lc.get_slide_content(question_id, file_hash, filename_var1, filename_var2)
             if not slide_content:    
                 slide_content = []
 
@@ -235,5 +234,5 @@ class LeetcodeSolution:
     def get_solution_content(self, question_id, question_title_slug):
         self.logger.info("Getting solution data")
 
-        solution = self.lc.get_official_solution(LeetcodeUtility.qbasename(question_id, 'sol'), question_title_slug)
+        solution = self.lc.get_official_solution(question_id, question_title_slug)
         return solution

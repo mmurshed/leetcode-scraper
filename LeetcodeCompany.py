@@ -25,13 +25,13 @@ class LeetcodeCompany:
         self.questionhandler = questionhandler
 
     def scrape_selected_company_questions(self, choice):
-        all_comp_dir = os.path.join(self.config.save_path, "all_company_questions")
+        all_comp_dir = os.path.join(self.config.save_directory, "all_company_questions")
         os.makedirs(all_comp_dir, exist_ok=True)
         os.chdir(all_comp_dir)
         
         final_company_tags = []
 
-        with open(self.config.company_tag_save_path, 'r') as file:
+        with open(self.config.company_filepath, 'r') as file:
             company_tags = file.readlines()
             for company_tag in company_tags:
                 company_tag = company_tag.replace("\n", "").split("/")[-2]
@@ -50,29 +50,12 @@ class LeetcodeCompany:
                 os.chdir("..")
         os.chdir("..")
 
-    def get_next_data_id(self):
-        data_path = LeetcodeUtility.get_cache_path("company", "nextdataid.html")
-
-        next_data = self.lc.cached_query(
-            data_path=data_path,
-            method="get",
-            url=f"{LeetcodeConstants.LEETCODE_URL}/problemset/",
-            headers=LeetcodeConstants.DEFAULT_HEADERS)
-
-        if next_data:
-            next_data_soup = BeautifulSoup(next_data, "html.parser")
-            next_data_tag = next_data_soup.find('script', {'id': '__NEXT_DATA__'})
-            next_data_json = json.loads(next_data_tag.text)
-            next_data_id = next_data_json['props']['buildId']
-
-        return next_data_id
-
     def scrape_all_company_questions(self, choice):
         self.logger.info("Scraping all company questions")
 
         company_tags = self.lc.get_question_company_tags()
 
-        all_comp_dir = os.path.join(self.config.save_path, "all_company_questions")
+        all_comp_dir = os.path.join(self.config.save_directory, "all_company_questions")
         os.makedirs(all_comp_dir, exist_ok=True)  
         os.chdir(all_comp_dir)
 
@@ -95,18 +78,18 @@ class LeetcodeCompany:
         rows = len(company_tags)//10 + 1
         html = ''
         company_idx = 0
-        with open(self.config.company_tag_save_path, 'w') as f:
+        with open(self.config.company_filepath, 'w') as file:
             for _ in range(rows):
                 html += '<tr>'
                 for _ in range(cols):
                     if company_idx < len(company_tags):
                         html += f'''<td><a href="{company_tags[company_idx]['slug']}/index.html">{company_tags[company_idx]['slug']}</a></td>'''
-                        f.write(f"{LeetcodeConstants.LEETCODE_URL}/company/{company_tags[company_idx]['slug']}/\n")
+                        file.write(f"{LeetcodeConstants.LEETCODE_URL}/company/{company_tags[company_idx]['slug']}/\n")
                         company_idx += 1
                 html += '</tr>'
 
-        with open(os.path.join(self.config.save_path, "all_company_questions", "index.html"), 'w') as f:
-            f.write(f"""<!DOCTYPE html>
+        with open(os.path.join(self.config.save_directory, "all_company_questions", "index.html"), 'w') as file:
+            file.write(f"""<!DOCTYPE html>
                     <html lang="en">
                     <head> </head>
                     <body>
@@ -123,15 +106,15 @@ class LeetcodeCompany:
             favoriteSlugs = {item["favoriteSlug"]: item["displayName"] for item in favoriteDetails['generatedFavoritesInfo']['categoriesToSlugs']}
             total_questions = favoriteDetails['questionNumber']
 
-            company_root_dir = os.path.join(self.config.save_path, "all_company_questions", company_slug)
+            company_root_dir = os.path.join(self.config.save_directory, "all_company_questions", company_slug)
             os.makedirs(company_root_dir, exist_ok=True)
 
-            if not self.config.force_download and "index.html" in os.listdir(company_root_dir):
+            if not self.config.overwrite and "index.html" in os.listdir(company_root_dir):
                 self.logger.info(f"Already Scraped {company_slug}")
                 continue
             self.logger.info(f"Scrapping Index for {company_slug}")
 
-            data_dir = os.path.join(self.config.save_path, "cache", "companies")
+            data_dir = os.path.join(self.config.save_directory, "cache", "companies")
             os.makedirs(data_dir, exist_ok=True)
 
             overall_html = ''
@@ -154,8 +137,8 @@ class LeetcodeCompany:
                                 <td><a target="_blank" href="{LeetcodeConstants.LEETCODE_URL}/problems/{question['titleSlug']}">Leet</a></td>
                                 </tr>'''
                 # Write each favorite slug
-                with open(os.path.join(company_root_dir, f"{favoriteSlug}.html"), 'w') as f:
-                    f.write(f"""<!DOCTYPE html>
+                with open(os.path.join(company_root_dir, f"{favoriteSlug}.html"), 'w') as file:
+                    file.write(f"""<!DOCTYPE html>
                         <html lang="en">
                         <head> </head>
                         <body>
@@ -168,8 +151,8 @@ class LeetcodeCompany:
                     <table>{html}</table>"""
 
             # Write index html
-            with open(os.path.join(company_root_dir, "index.html"), 'w') as f:
-                f.write(f"""<!DOCTYPE html>
+            with open(os.path.join(company_root_dir, "index.html"), 'w') as file:
+                file.write(f"""<!DOCTYPE html>
                     <html lang="en">
                     <head> </head>
                     <body>{overall_html}</body>
@@ -179,9 +162,9 @@ class LeetcodeCompany:
     def scrape_question_data(self, company_slug):
         self.logger.info("Scraping question data")
 
-        questions_dir = os.path.join(self.config.save_path, "questions")
-        questions_pdf_dir = os.path.join(self.config.save_path, "questions_pdf")
-        company_root_dir = os.path.join(self.config.save_path, "all_company_questions", company_slug)
+        questions_dir = os.path.join(self.config.save_directory, "questions")
+        questions_pdf_dir = os.path.join(self.config.save_directory, "questions_pdf")
+        company_root_dir = os.path.join(self.config.save_directory, "all_company_questions", company_slug)
         os.makedirs(questions_dir, exist_ok=True)
         os.makedirs(questions_pdf_dir, exist_ok=True)
         os.makedirs(company_root_dir, exist_ok=True)
@@ -215,10 +198,10 @@ class LeetcodeCompany:
                 question_title = question['title']
                 question_slug = question['titleSlug']
         
-                if self.config.force_download:
+                if self.config.overwrite:
                     self.questionhandler.create_question_html(question_id, question_slug, question_title)
                 
-                copied = LeetcodeUtility.copy_question_file(self.config.save_path, question_id, question_title, company_fav_dir)
+                copied = LeetcodeUtility.copy_question_file(self.config.save_directory, question_id, question_title, company_fav_dir)
 
                 # if copy failed retry
                 if not copied:

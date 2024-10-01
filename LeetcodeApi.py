@@ -1,7 +1,9 @@
 import os
 import json
+from bs4 import BeautifulSoup
 import requests
 
+from diskcache import Cache
 from logging import Logger
 
 from LeetcodeConfig import LeetcodeConfig
@@ -19,17 +21,15 @@ class LeetcodeApi:
         self.logger = logger
         self.default_headers = default_headers or LeetcodeConstants.DEFAULT_HEADERS
         self.leetcode_headers = leetcode_headers or LeetcodeConstants.LEETCODE_HEADERS
+        
         self.session = requests.Session()
+        self.cache = Cache(self.config.cache_directory)
 
+    def cache_key(*args):
+        # Convert all arguments to strings and join them with '-'
+        return '-'.join(map(str, args))
+    
     #region basic method
-    def get_cache_path(self, category, filename):
-        data_dir = os.path.join(self.config.save_path, "cache", category)
-        os.makedirs(data_dir, exist_ok=True)
-
-        data_path = os.path.join(data_dir, filename)
-
-        return data_path
-
     def extract_by_selector(self, response_content, selector):
         """
         Navigate through the response_content using the keys and/or indices in the selector.
@@ -55,65 +55,61 @@ class LeetcodeApi:
 
         return data
 
-    def cached_query(self, data_path, method="post", query=None, selector=None, url=LeetcodeConstants.LEETCODE_GRAPHQL_URL, headers=None):
+
+    def query(self, method="post", query=None, selector=None, url=None, headers=None):
+        headers = headers or self.leetcode_headers
+        url = url or LeetcodeConstants.LEETCODE_GRAPHQL_URL
+
+        response = self.session.request(
+            method=method,
+            url=url,
+            headers=headers,
+            json=query
+        )
+
+        response.raise_for_status()
+
+        content_type = response.headers.get('Content-Type', '').lower()
+        is_json = 'application/json' in content_type
+
+        if is_json:
+            response_content = json.loads(response.content)
+            data = response_content
+
+            # Check if the selector is callable (a method) or a list of keys
+            if callable(selector):
+                # Apply the selector function to the response content
+                data = selector(response_content)
+            elif isinstance(selector, list):
+                # Use the selector as a list of keys
+                data = self.extract_by_selector(response_content, selector)
+        else:
+            data = response.text
+
+        return data
+    
+    def cached_query(self, cache_key, method="post", query=None, selector=None, url=None, headers=None):
         """
         This function caches and performs a query if data is not already cached.
         Optionally uses a selector to filter out the required part of the response.
-        The file_type is inferred based on the response's Content-Type header.
         """
         headers = headers or self.leetcode_headers
-        data = None
+        url = url or LeetcodeConstants.LEETCODE_GRAPHQL_URL
 
-        # Check if data exists in the cache and try to read it
-        if self.config.cache_data and os.path.exists(data_path):
-            with open(data_path, "r") as file:
-                try:
-                    data = json.load(file)  # Try reading the cached data as JSON
-                except json.JSONDecodeError:
-                    data = file.read()  # If not JSON, read as plain text
-        else:
-            response = self.session.request(
+        # Check if data exists in the cache and retrieve it
+        data = self.cache.get(cache_key)
+
+        if data is None:
+            # If cache miss, make the request
+            data = self.query(
                 method=method,
+                query=query,
+                selector=selector,
                 url=url,
-                headers=headers,
-                json=query
-            )
+                headers=headers)
 
-            response.raise_for_status()
-
-            # Infer the file_type from the Content-Type header
-            content_type = response.headers.get('Content-Type', '').lower()
-            is_json = 'application/json' in content_type
-
-            try:
-                if is_json:
-                    # Parse the JSON response
-                    response_content = json.loads(response.content)
-                    data = response_content
-                    # Use the selector to get the desired data if applicable
-                    if selector:
-                        data = self.extract_by_selector(response_content, selector)
-                else:
-                    # Treat the response as raw text if it's not JSON
-                    data = response.text
-            except Exception as e:
-                raise Exception(f"Error in getting data: {e}\n"
-                                f"data_path: {data_path}\n"
-                                f"method: {method}\n"
-                                f"url: {url}\n"
-                                f"query: {query}\n"
-                                f"selector: {selector}")
-
-            # Cache the data to the file if available
-            if data:
-                try:
-                    with open(data_path, 'w') as f:
-                        if is_json:
-                            json.dump(data, f)
-                        else:
-                            f.write(data)
-                except IOError as e:
-                    raise Exception(f"Error writing to file: {data_path}. Exception: {e}")
+            # Store data in the cache
+            self.cache.set(cache_key, data)
 
         return data
     
@@ -121,7 +117,7 @@ class LeetcodeApi:
 
     #region cards api
     def get_categories(self):
-        data_path = self.get_cache_path("cards", "allcards.json")
+        cache_key = "allcards"
 
         query = {
             "operationName": "GetCategories",
@@ -133,14 +129,13 @@ class LeetcodeApi:
         selector = ['data', 'categories']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
 
     def get_card_details(self, card_slug):
-        data_path = self.get_cache_path("cards", f"{card_slug}.json")
         query = {
             "operationName": "GetExtendedCardDetail",
             "variables": {
@@ -152,14 +147,14 @@ class LeetcodeApi:
         selector = ['data', 'card']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=card_slug,
             query=query,
             selector=selector)
         
         return data
 
     def get_chapter_with_items(self, card_slug):
-        data_path = self.get_cache_path("cards", f"{card_slug}-detail.json")
+        cache_key = self.cache_key(card_slug, "detail")
 
         query = {
             "operationName": "GetChaptersWithItems",
@@ -171,14 +166,14 @@ class LeetcodeApi:
         selector = ['data', 'chapters']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
 
     def get_chapter_items(self, card_slug, item_id):
-        data_path = self.get_cache_path("cards", f"{card_slug}-{item_id}.json")
+        cache_key = self.cache_key(card_slug, item_id)
 
         query = {
             "operationName": "GetItem",
@@ -190,7 +185,7 @@ class LeetcodeApi:
         selector = ['data', 'item']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
@@ -200,7 +195,7 @@ class LeetcodeApi:
 
     #region questions api
     def get_questions_count(self):
-        data_path = self.get_cache_path("qdata", "allquestioncount.json")
+        cache_key = "allquestioncount"
 
         query = {
             "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "
@@ -208,14 +203,14 @@ class LeetcodeApi:
         selector = ['data', 'allQuestionsCount', 0,'count']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
     
     def get_all_questions(self, all_questions_count):
-        data_path = self.get_cache_path("qdata", "allquestions.json")
+        cache_key = "allquestions"
 
         query = {
             "query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ",
@@ -230,14 +225,14 @@ class LeetcodeApi:
         selector = ['data', 'problemsetQuestionList', 'questions']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
 
-    def get_question(self, basename, question_title_slug):
-        data_path = self.get_cache_path("qdata", f"{basename}.json")
+    def get_question(self, question_id, question_title_slug):
+        cache_key = self.cache_key(question_id, "qdat")
 
         query = {
             "operationName": "GetQuestion",
@@ -250,7 +245,7 @@ class LeetcodeApi:
         selector = ['data', 'question']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         return data
@@ -259,8 +254,8 @@ class LeetcodeApi:
 
     #region playground codes api
 
-    def get_all_playground_codes(self, basename, uuid):
-        data_path = self.get_cache_path("code", f"{basename}.json")
+    def get_all_playground_codes(self, question_id, uuid):
+        cache_key = self.cache_key(question_id, uuid)
 
         query = {
             "operationName": "allPlaygroundCodes",
@@ -269,18 +264,18 @@ class LeetcodeApi:
         selector = ['data', 'allPlaygroundCodes']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
     
-    def get_slides_json(self, basename, slide_url):
-        data_path = self.get_cache_path("slides", f"{basename}.json")
+    def get_slides_json(self, hash, slide_url):
+        cache_key = hash
         selector = ['timeline']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             method="get",
             selector=selector,
             url=slide_url,
@@ -288,8 +283,8 @@ class LeetcodeApi:
         
         return data
 
-    def get_slide_content(self, basename, filename_var1, filename_var2):
-        data_path = self.get_cache_path("slides", f"{basename}.json")
+    def get_slide_content(self, question_id, file_hash, filename_var1, filename_var2):
+        cache_key = self.cache_key(question_id, file_hash)
 
         slide_url1 = f"https://assets.leetcode.com/static_assets/media/{filename_var1}.json"
         slide_url2 = f"https://assets.leetcode.com/static_assets/media/{filename_var2}.json"
@@ -298,7 +293,7 @@ class LeetcodeApi:
         try:
             self.logger.debug(f"Slide url1: {slide_url1}")
             data = self.cached_query(
-                data_path=data_path,
+                cache_key=cache_key,
                 method="get",
                 url=slide_url1,
                 selector=selector,
@@ -309,7 +304,7 @@ class LeetcodeApi:
 
             try:
                 data = self.cached_query(
-                    data_path=data_path,
+                    cache_key=cache_key,
                     method="get",
                     url=slide_url2,
                     selector=selector,
@@ -323,8 +318,8 @@ class LeetcodeApi:
     #endregion playground codes api
     
     #region articles api
-    def get_article(self, basename, article_id):
-        data_path = self.get_cache_path("articles", f"{basename}.json")
+    def get_article(self, question_id, article_id):
+        cache_key = self.cache_key(question_id, article_id)
 
         query = {
             "operationName": "GetArticle",
@@ -336,14 +331,14 @@ class LeetcodeApi:
         selector = ['data', 'article', 'body']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
 
     def get_html_article(self, html_article_id):
-        data_path = self.get_cache_path("articles", f"{html_article_id}-data.html")
+        cache_key = self.cache_key(html_article_id, "data")
 
         query = {
             "operationName": "GetHtmlArticle",
@@ -355,7 +350,7 @@ class LeetcodeApi:
         selector = ['data', 'htmlArticle', 'html']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
@@ -364,8 +359,8 @@ class LeetcodeApi:
     #endregion articles api 
 
     #region submissions api
-    def get_submission_list(self, basename, question_title_slug):
-        data_path = self.get_cache_path("submissions", f"{basename}.json")
+    def get_submission_list(self, question_id, question_title_slug):
+        cache_key = self.cache_key(question_id, "subm")
 
         query = {
             "operationName": "submissionList",
@@ -380,14 +375,14 @@ class LeetcodeApi:
         selector = ['data', 'questionSubmissionList', 'submissions']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
 
-    def get_submission_details(self, basename, submission_id):
-        data_path = self.get_cache_path("submissions", f"{basename}-detail.json")
+    def get_submission_details(self, question_id, submission_id):
+        cache_key = self.cache_key(question_id, "detail")
 
         query = {
             "operationName": "submissionDetails",
@@ -401,7 +396,7 @@ class LeetcodeApi:
         data = None
         try:
             data = self.cached_query(
-                data_path=data_path,
+                cache_key=cache_key,
                 query=query,
                 selector=selector)
         except:
@@ -412,8 +407,8 @@ class LeetcodeApi:
     #endregion submissions api
 
     #region solutions api
-    def get_official_solution(self, basename, question_title_slug):
-        data_path = self.get_cache_path("soldata", f"{basename}.json")
+    def get_official_solution(self, question_id, question_title_slug):
+        cache_key = self.cache_key(question_id, "sol")
 
         query = {
             "operationName": "officialSolution",
@@ -425,7 +420,7 @@ class LeetcodeApi:
         selector = ['data', 'question', 'solution', 'content']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
@@ -435,7 +430,8 @@ class LeetcodeApi:
     
     #region company api
     def get_question_company_tags(self):
-        data_path = self.get_cache_path("companies", "allcompanyquestions.json")
+        cache_key = "allcompanyquestions"
+
         query = {
             "operationName": "questionCompanyTags",
             "variables": {},
@@ -445,14 +441,14 @@ class LeetcodeApi:
         selector = ['data', 'companyTags']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
 
     def get_favorite_details_for_company(self, company_slug):
-        data_path = self.get_cache_path("companies", f"{company_slug}-favdetails.json")
+        cache_key = self.cache_key(company_slug, "favdetails")
 
         query = {
             "operationName": "favoriteDetailV2ForCompany",
@@ -465,14 +461,14 @@ class LeetcodeApi:
         selector = ['data', 'favoriteDetailV2']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         
         return data
     
     def get_favorite_question_list_for_company(self, favoriteSlug, total_questions):
-        data_path = self.get_cache_path("companies", f"{favoriteSlug}.json")
+        cache_key = favoriteSlug
 
         query = {
             "operationName": "favoriteQuestionList",
@@ -490,8 +486,29 @@ class LeetcodeApi:
         selector = ['data', 'favoriteQuestionList', 'questions']
 
         data = self.cached_query(
-            data_path=data_path,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         return data
+    
+
+    def get_next_data_id(self):
+        cache_key = "companynextdataid"
+
+        def selector(data):
+            next_data_soup = BeautifulSoup(data, "html.parser")
+            next_data_tag = next_data_soup.find('script', {'id': '__NEXT_DATA__'})
+            next_data_json = json.loads(next_data_tag.text)
+            next_data_id = next_data_json['props']['buildId']
+            return next_data_id
+
+        data = self.cached_query(
+            cache_key=cache_key,
+            selector=selector,
+            method="get",
+            url=f"{LeetcodeConstants.LEETCODE_URL}/problemset/",
+            headers=self.default_headers)
+
+        return data
+
     #endregion company api

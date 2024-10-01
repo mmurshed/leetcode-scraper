@@ -21,39 +21,48 @@ class LeetcodeConfigLoader:
         base_config_path = LeetcodeConfigLoader.create_base_config_dir()
         config_file_path = os.path.join(base_config_path, "config.json")
 
+        config_found = False
+        # Load existing config if available
+        if os.path.exists(config_file_path):
+            config = LeetcodeConfig.from_json_file(config_file_path)
+            config_found = True
+        else:
+            config = LeetcodeConstants.DEFAULT_CONFIG
+
+        # Prompt user for new config values
         print(f'''
             Leave Blank and press Enter if you don't want to overwrite Previous Values
             Config Save Folder: {config_file_path}
         ''')
 
-        # Load existing config if available
-        if os.path.exists(config_file_path):
-            config = LeetcodeConfig.from_json(config_file_path)
-        else:
-            config = LeetcodeConfigLoader.DEFAULT_CONFIG
-
-        # Prompt user for new config values
         config_prompts = LeetcodeConfig.prompt_from_dataclass()
 
         # Prompt user for values and retain existing config if no new input is provided
         for key, prompt in config_prompts.items():
             current_value = getattr(config, key, None)
 
+            newprompt = f"Current value: {current_value}\n{prompt}"
+
             if "T/F" in prompt:
                 # For boolean values, use a case-insensitive check for 'T'
-                new_value = input(prompt).strip().upper()
+                new_value = input(newprompt).strip().upper()
                 if new_value:
                     setattr(config, key, new_value == 'T')
             elif "Enter order" in prompt:
                 # For preferred_language_order, allow comma-separated values
-                new_value = input(prompt).strip()
+                new_value = input(newprompt).strip()
                 if new_value:
                     setattr(config, key, new_value.split(','))
             else:
                 # For other fields, check if a new value was entered
-                new_value = input(prompt).strip()
+                new_value = input(newprompt).strip()
                 if new_value:
                     setattr(config, key, new_value)
+
+        if not config_found:
+            # setting derived values
+            config.set_derivative_values()
+
 
         # Save the updated configuration to a JSON file
         config.to_json_file(config_file_path)
