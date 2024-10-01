@@ -232,7 +232,7 @@ class LeetcodeQuestion:
             
             if solution:
                 solution = LeetcodeUtility.convert_display_math_to_inline(solution)
-                solution = self.solutionhandler.markdown_with_iframe(solution)
+                solution = LeetcodeUtility.markdown_with_math(solution)
                 solution = self.solutionhandler.replace_iframes_with_codes(solution, question_id)
                 solution = self.solutionhandler.wrap_slides_with_p_tags(solution)
 

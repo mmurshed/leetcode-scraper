@@ -55,12 +55,13 @@ class LeetcodeApi:
 
         return data
 
-    def cached_query(self, data_path, method="post", query=None, selector=None, url=LeetcodeConstants.LEETCODE_GRAPHQL_URL, headers=LeetcodeConstants.LEETCODE_HEADERS):
+    def cached_query(self, data_path, method="post", query=None, selector=None, url=LeetcodeConstants.LEETCODE_GRAPHQL_URL, headers=None):
         """
         This function caches and performs a query if data is not already cached.
         Optionally uses a selector to filter out the required part of the response.
         The file_type is inferred based on the response's Content-Type header.
         """
+        headers = headers or self.leetcode_headers
         data = None
 
         # Check if data exists in the cache and try to read it
@@ -283,7 +284,7 @@ class LeetcodeApi:
             method="get",
             selector=selector,
             url=slide_url,
-            headers=self.config.DEFAULT_HEADERS)
+            headers=self.default_headers)
         
         return data
 
@@ -301,7 +302,7 @@ class LeetcodeApi:
                 method="get",
                 url=slide_url1,
                 selector=selector,
-                headers=self.config.DEFAULT_HEADERS)
+                headers=self.default_headers)
         except:
             self.logger.error(f"Slide url1 failed: {slide_url1}")
             self.logger.debug(f"Slide url2: {slide_url2}")
@@ -312,7 +313,7 @@ class LeetcodeApi:
                     method="get",
                     url=slide_url2,
                     selector=selector,
-                    headers=self.config.DEFAULT_HEADERS)
+                    headers=self.default_headers)
             except:
                 self.logger.error(f"Slide url2 failed: {slide_url2}")
                 pass
