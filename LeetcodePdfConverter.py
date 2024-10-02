@@ -55,6 +55,7 @@ class LeetcodePdfConverter:
 
 
     def convert_folder(self, source_folder):
+        curdir = os.curdir()
         os.chdir(source_folder)
 
         pdf_output_folder = os.path.join(source_folder, 'pdf')
@@ -90,8 +91,11 @@ class LeetcodePdfConverter:
         for worker in workers:
             worker.join()
 
+        os.chdir(curdir)
+
     def convert_single_file(self, file_path):
         # Set the PDF output folder one level up from the file's directory and rename to 'questions_pdf'
+        curdir = os.curdir()
         source_folder = os.path.dirname(file_path)
         os.chdir(source_folder)
 
@@ -103,6 +107,8 @@ class LeetcodePdfConverter:
 
         # Convert the single file
         converted = self.convert_file(file_path, docx_output_path, pdf_output_path, self.docxArgs, self.pdfArgs)
+
+        os.chdir(curdir)
 
         return converted
 
