@@ -22,11 +22,6 @@ class LeetcodeImage:
         self.logger = logger
         self.cloudscaper = cloudscraper.create_scraper()
 
-    def get_images_dir(self, dir):
-        dir = os.path.join(dir, "images")
-        os.makedirs(dir, exist_ok=True)
-        return dir
-
     def is_valid_image(self, image_path):
         # SVG file is allowed by default
         if image_path.lower().endswith('.svg'):
@@ -71,9 +66,7 @@ class LeetcodeImage:
             self.logger.error(f"Error reading file {img_path}\n{e}")
             return None
 
-    def recompress_images(self, question_id):
-        images_dir = self.get_images_dir()
-
+    def recompress_images(self, question_id, images_dir):
         # Convert the question_id to a zero-padded 4-digit string
         question_id_str = LeetcodeUtility.qstr(question_id)
 
@@ -101,7 +94,7 @@ class LeetcodeImage:
             self.logger.error(f"Error recompressing {img_path}: {e}")
             return
 
-    def download_image(self, question_id, img_url, root_dir):
+    def download_image(self, question_id, img_url, images_dir):
         self.logger.debug(f"Downloading image: {img_url}")
 
         if not validators.url(img_url):
@@ -114,7 +107,7 @@ class LeetcodeImage:
         img_ext = str.lower(basename.split('.')[-1])
 
         url_hash = hashlib.md5(img_url.encode()).hexdigest()
-        images_dir = self.get_images_dir(dir=root_dir)
+
         image_path = os.path.join(images_dir, f"{LeetcodeUtility.qbasename(question_id, url_hash)}.{img_ext}")
 
         if not self.config.cache_api_calls or not os.path.exists(image_path):
@@ -152,7 +145,7 @@ class LeetcodeImage:
 
         return relframes
 
-    def load_image_in_b64(self, files, img_url):
+    def load_image_in_base64(self, files, img_url):
         self.logger.debug(f"Loading image: {img_url}")
 
         parsed_url = urlsplit(img_url)
@@ -188,6 +181,10 @@ class LeetcodeImage:
 
         images = content_soup.select('img')
 
+        images_dir = os.path.join(root_dir, "images")
+        if self.config.download_images:
+            os.makedirs(dir, exist_ok=True)
+
         for image in images:
             self.logger.debug(f"img[src]: {image['src']}")
             if image.has_attr('src') and "base64" not in image['src']:
@@ -218,10 +215,10 @@ class LeetcodeImage:
                     image['src'] = img_url
 
                 if self.config.download_images and img_url:
-                    files = self.download_image(question_id, img_url, root_dir)
+                    files = self.download_image(question_id, img_url, images_dir)
                     if files:
                         if self.config.base64_encode_image:
-                            frames = self.load_image_in_b64(files, img_url)
+                            frames = self.load_image_in_base64(files, img_url)
                         else:
                             frames = self.load_image_local(files, root_dir)
 

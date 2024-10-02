@@ -99,6 +99,8 @@ class LeetcodeSolution:
         self.logger.debug("Replacing iframe with code")
 
         videos_dir = os.path.join(root_dir, "videos")
+        if self.config.download_videos:
+            os.makedirs(videos_dir, exist_ok=True)
 
         content_soup = BeautifulSoup(content, 'html.parser')
         iframes = content_soup.find_all('iframe')
@@ -151,8 +153,6 @@ class LeetcodeSolution:
                 video_basename = f"{LeetcodeUtility.qbasename(question_id, video_id)}.{video_extension}"
 
                 if self.config.download_videos:
-                    os.makedirs(videos_dir, exist_ok=True)
-
                     ydl_opts = {
                         'outtmpl': f'{videos_dir}/{LeetcodeUtility.qstr(question_id)}-%(id)s.%(ext)s',
                         'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
