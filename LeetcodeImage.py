@@ -101,7 +101,7 @@ class LeetcodeImage:
             self.logger.error(f"Error recompressing {img_path}: {e}")
             return
 
-    def download_image(self, question_id, img_url, images_dir):
+    def download_image(self, question_id, img_url, root_dir):
         self.logger.debug(f"Downloading image: {img_url}")
 
         if not validators.url(img_url):
@@ -114,6 +114,7 @@ class LeetcodeImage:
         img_ext = str.lower(basename.split('.')[-1])
 
         url_hash = hashlib.md5(img_url.encode()).hexdigest()
+        images_dir = self.get_images_dir(dir=root_dir)
         image_path = os.path.join(images_dir, f"{LeetcodeUtility.qbasename(question_id, url_hash)}.{img_ext}")
 
         if not self.config.cache_api_calls or not os.path.exists(image_path):
@@ -146,9 +147,8 @@ class LeetcodeImage:
 
         return files
 
-    def load_image_local(self, files):
-        questions_dir = os.path.join(self.config.save_directory, "questions")
-        relframes = [os.path.relpath(frame, questions_dir) for frame in files]
+    def load_image_local(self, files, directory):
+        relframes = [os.path.relpath(frame, directory) for frame in files]
 
         return relframes
 
@@ -183,7 +183,7 @@ class LeetcodeImage:
 
         return imgs_decoded
 
-    def fix_image_urls(self, content_soup, question_id, images_dir):
+    def fix_image_urls(self, content_soup, question_id, root_dir):
         self.logger.info("Fixing image urls")
 
         images = content_soup.select('img')
@@ -209,19 +209,19 @@ class LeetcodeImage:
                     if hostname == "127.0.0.1" or hostname == "localhost":
                         self.logger.warning(f"localhost detected: {img_url}")
                         # Remove leading `/` from the path before appending, or directly append the path
-                        img_url = f"https://leetcode.com/explore{img_url_parsed.path}"                    
+                        # img_url = f"https://leetcode.com/explore{img_url_parsed.path}"                    
 
                 self.logger.debug(f"img_url: {img_url}")
 
                 image['src'] = img_url
 
                 if self.config.download_images:
-                    files = self.download_image(question_id, img_url, images_dir)
+                    files = self.download_image(question_id, img_url, root_dir)
                     if files:
                         if self.config.base64_encode_image:
                             frames = self.load_image_in_b64(files, img_url)
                         else:
-                            frames = self.load_image_local(files)
+                            frames = self.load_image_local(files, root_dir)
 
                         if frames and len(frames) > 0:
                             if len(frames) == 1:

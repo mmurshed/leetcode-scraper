@@ -154,8 +154,7 @@ class LeetcodeCards:
         content = LeetcodeConstants.HTML_HEADER + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solution.place_solution_slides(content_soup, slides_json)
-        images_dir = self.imagehandler.get_images_dir(dir=cards_chapter_dir)
-        content_soup = self.imagehandler.fix_image_urls(content_soup, item_id, images_dir)
+        content_soup = self.imagehandler.fix_image_urls(content_soup, item_id, cards_chapter_dir)
 
         card_path = os.path.join(cards_chapter_dir, LeetcodeUtility.qhtml(item_id, item_title))
         with open(card_path, "w", encoding="utf-8") as f:
@@ -220,6 +219,8 @@ class LeetcodeCards:
             html_article_id = item_content['htmlArticle']['id']
 
             html_article = self.lc.get_html_article(html_article_id)
+
+            html_article = LeetcodeUtility.markdown_with_math(html_article)
 
             html_article_data = f"""<h3>{item_title}</h3>
                         <md-block class="html_article__content">{html_article}</md-block>

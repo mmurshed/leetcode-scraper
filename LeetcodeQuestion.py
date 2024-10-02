@@ -126,8 +126,7 @@ class LeetcodeQuestion:
         content = LeetcodeConstants.HTML_HEADER + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
-        images_dir = self.imagehandler.get_images_dir(dir=self.config.questions_directory)
-        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id, images_dir)
+        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id, self.config.questions_directory)
 
         question_path = os.path.join(self.config.questions_directory, LeetcodeUtility.qhtml(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
@@ -199,7 +198,6 @@ class LeetcodeQuestion:
             if hints:
                 hint_content = ""
                 for hint in hints:
-                    hint = LeetcodeUtility.convert_display_math_to_inline(hint)
                     hint = str.strip(hint)
                     hint = LeetcodeUtility.markdown_with_math(hint)
                     hint = str.strip(hint)
@@ -230,11 +228,9 @@ class LeetcodeQuestion:
                         submission_content += f"""<div><h4>Submission Time: {submission_time}</h4>
                         <pre class="question__default_code">{code}</pre></div>"""
 
-            question = LeetcodeUtility.convert_display_math_to_inline(question)
             question = LeetcodeUtility.markdown_with_math(question)
             
             if solution:
-                solution = LeetcodeUtility.convert_display_math_to_inline(solution)
                 solution = LeetcodeUtility.markdown_with_math(solution)
                 solution = self.solutionhandler.replace_iframes_with_codes(solution, question_id)
                 solution = self.solutionhandler.wrap_slides_with_p_tags(solution)

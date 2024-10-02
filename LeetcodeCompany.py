@@ -158,12 +158,8 @@ class LeetcodeCompany:
     def scrape_question_data(self, company_slug):
         self.logger.info("Scraping question data")
 
-        questions_dir = os.path.join(self.config.save_directory, "questions")
-        questions_pdf_dir = os.path.join(self.config.save_directory, "questions_pdf")
-        company_root_dir = os.path.join(self.config.companies_directory, company_slug)
-        os.makedirs(questions_dir, exist_ok=True)
-        os.makedirs(questions_pdf_dir, exist_ok=True)
-        os.makedirs(company_root_dir, exist_ok=True)
+        os.makedirs(self.config.questions_directory, exist_ok=True)
+        os.makedirs(self.config.companies_directory, exist_ok=True)
 
         questions_seen = set()
         
@@ -177,7 +173,7 @@ class LeetcodeCompany:
         for favoriteSlug in favoriteSlugs:
             questions = self.lc.get_favorite_question_list_for_company(favoriteSlug, total_questions)
 
-            company_fav_dir  = os.path.join(company_root_dir, favoriteSlug)
+            company_fav_dir  = os.path.join(self.config.companies_directory, favoriteSlug)
             os.makedirs(company_fav_dir, exist_ok=True)
 
             # sort by frequency, high frequency first
