@@ -23,7 +23,7 @@ class LeetcodeCompany:
         self.questionhandler = questionhandler
         
     def get_company_slugs(self):
-        if not os.path.exists(self.config.company_filepath):
+        if self.config.overwrite or not os.path.exists(self.config.company_filepath):
             company_tags = self.lc.get_question_company_tags()
             if company_tags is None:
                 self.logger.error(f"Company tags null")
@@ -205,4 +205,5 @@ class LeetcodeCompany:
 
                 # if copy failed retry
                 if not copied:
-                    self.logger.error(f"Copy failed {question_id} {question_title}")
+                    self.logger.info(f"Copy failed {question_id} {question_title}")
+                    self.questionhandler.create_question_html(question_id, question_slug, question_title, company_fav_dir)

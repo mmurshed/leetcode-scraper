@@ -43,7 +43,7 @@ class LeetcodeQuestion:
 
         all_questions = self.lc.get_all_questions(all_questions_count)
 
-        if self.config.overwrite:
+        if self.config.overwrite or not os.path.exists(self.config.questions_filepath):
             self.write_questions_to_file(all_questions)
 
         return all_questions
@@ -88,9 +88,9 @@ class LeetcodeQuestion:
             filename = LeetcodeUtility.qhtml(question_id, question_title)
             filepath = os.path.join(self.config.questions_directory, filename)
             
-            if self.config.overwrite or not os.path.exists(filepath):  
+            if self.config.overwrite or not os.path.exists(filepath):
                 self.logger.info(f"Scraping question {question_id}")
-                self.create_question_html(question_id, question_slug, question_title, filepath)
+                self.create_question_html(question_id, question_slug, question_title, self.config.questions_directory)
             else:
                 self.logger.info(f"Already scraped {filepath}")
                 

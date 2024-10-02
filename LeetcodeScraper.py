@@ -64,33 +64,14 @@ def init(logger):
 
     return config, cache, cards, company, imagehandler, question, submission
 
-if __name__ == '__main__':
-
-    logger = LeetcodeUtility.get_logger()
-
-    parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
-    parser.add_argument('--non-stop', type=bool,
-                        help='True/False - Will run non stop, will retry if any error occurs',
-                        required=False)
-    parser.add_argument('--proxy', type=str,
-                        help='Add rotating or static proxy username:password@ip:port',
-                        required=False)
-    
+def main(logger):
     LeetcodeUtility.clear()
-
-    args = parser.parse_args()
     previous_choice = 0
-    if args.proxy:
-        os.environ['http_proxy'] = "http://"+args.proxy
-        os.environ['https_proxy'] = "http://"+args.proxy
-        response = requests.get("https://httpbin.org/ip")
-        logger.info("Proxy set", response.content)
 
     while True:
-        # logger.info("Proxy set", SESSION.get(
-        #     "https://httpbin.org/ip").content)
         try:
-            print("""Leetcode-Scraper v2.0-beta
+            print(
+"""Leetcode-Scraper v2.0-beta
 1: Setup config
 
 2: Download a card by name
@@ -188,3 +169,25 @@ Press any to quit
             """)
             lineNumber = e.__traceback__.tb_lineno
             raise Exception(f"Exception on line {lineNumber}: {e}")
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
+    parser.add_argument('--non-stop', type=bool,
+                        help='True/False - Will run non stop, will retry if any error occurs',
+                        required=False)
+    parser.add_argument('--proxy', type=str,
+                        help='Add rotating or static proxy username:password@ip:port',
+                        required=False)
+    
+
+    args = parser.parse_args()
+
+    logger = LeetcodeUtility.get_logger()
+    if args.proxy:
+        os.environ['http_proxy'] = "http://"+args.proxy
+        os.environ['https_proxy'] = "http://"+args.proxy
+        response = requests.get("https://httpbin.org/ip")
+        logger.info("Proxy set", response.content)
+
+    main(logger)

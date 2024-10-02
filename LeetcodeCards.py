@@ -30,7 +30,7 @@ class LeetcodeCards:
         self.imagehandler = imagehandler
 
     def get_card_urls(self):
-        if not os.path.exists(self.config.cards_filepath):
+        if self.config.overwrite or not os.path.exists(self.config.cards_filepath):
             cards = self.lc.get_categories()
             self.save_card_urls(cards)
 
@@ -57,6 +57,7 @@ class LeetcodeCards:
 
 
     def create_cards_top_index(self, cards):
+        os.makedirs(self.config.cards_directory, exist_ok=True)
         # Creating Index for Card Folder
         filepath = os.path.join(self.config.cards_directory, "index.html")
         with open(filepath, 'w') as main_index:

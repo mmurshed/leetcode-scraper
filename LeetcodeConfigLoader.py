@@ -53,6 +53,10 @@ class LeetcodeConfigLoader:
                 new_value = input(newprompt).strip()
                 if new_value:
                     setattr(config, key, new_value.split(','))
+            elif "count" in prompt:
+                new_value = input(newprompt).strip()
+                if new_value:
+                    setattr(config, key, int(new_value))
             else:
                 # For other fields, check if a new value was entered
                 new_value = input(newprompt).strip()

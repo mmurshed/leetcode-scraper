@@ -27,7 +27,7 @@ class LeetcodeConfig:
         self.base64_encode_image: bool = False
         self.download_images: bool = True
         self.download_videos: bool = False
-        self.number_of_threads_for_pdf_conversion: int = 8
+        self.threads_count_for_pdf_conversion: int = 8
 
         # Dynamically update the attributes from kwargs
         for key, value in kwargs.items():

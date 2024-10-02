@@ -183,7 +183,7 @@ class LeetcodeImage:
 
         images_dir = os.path.join(root_dir, "images")
         if self.config.download_images:
-            os.makedirs(dir, exist_ok=True)
+            os.makedirs(images_dir, exist_ok=True)
 
         for image in images:
             self.logger.debug(f"img[src]: {image['src']}")
