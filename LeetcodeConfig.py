@@ -12,7 +12,9 @@ class LeetcodeConfig:
     cards_directory: str
     companies_directory: str
     questions_directory: str
+    submissions_directory: str
     cache_api_calls: bool
+    cache_expiration_minutes: int
     overwrite: bool
     company_filepath: str
     preferred_language_order: str
@@ -24,35 +26,44 @@ class LeetcodeConfig:
     download_images: bool
     download_videos: bool
 
-    @staticmethod
-    def from_json_file(json_file: str) -> 'LeetcodeConfig':
-        with open(json_file, "r") as file:
-            return LeetcodeConfig.from_json(file.read())
+    def __init__(self, **kwargs):
+        # Initialize default values for all attributes
+        self.leetcode_cookie = ""
+        self.cards_filepath = ""
+        self.questions_filepath = ""
+        self.company_filepath = ""
+        self.save_directory = ""
+        self.cache_directory = ""
+        self.cards_directory = ""
+        self.companies_directory = ""
+        self.questions_directory = ""
+        self.submissions_directory = ""
+        self.cache_api_calls = True
+        self.cache_expiration_minutes = 60
+        self.overwrite = False
+        self.preferred_language_order = ""
+        self.include_submissions_count = 0
+        self.include_default_code = False
+        self.extract_gif_frames = False
+        self.recompress_image = False
+        self.base64_encode_image = False
+        self.download_images = True
+        self.download_videos = False
+
+        # Dynamically update the attributes from kwargs
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
 
     @staticmethod
     def from_json(json_str: str) -> 'LeetcodeConfig':
         data = json.loads(json_str)
-        return LeetcodeConfig(
-            leetcode_cookie=data.get("leetcode_cookie", ""),
-            cards_filepath=data.get("cards_filepath", ""),
-            questions_filepath=data.get("questions_filepath", ""),
-            company_filepath=data.get("company_filepath", ""),
-            save_directory=data.get("save_directory", ""),
-            cache_directory=data.get("cache_directory", ""),
-            cards_directory=data.get("cards_directory", ""),
-            companies_directory=data.get("companies_directory", ""),
-            questions_directory=data.get("questions_directory", ""),
-            cache_api_calls=data.get("cache_api_calls", True),
-            overwrite=data.get("overwrite", False),
-            preferred_language_order=data.get("preferred_language_order", ""),
-            include_submissions_count=data.get("include_submissions_count", 0),
-            include_default_code=data.get("include_default_code", False),
-            extract_gif_frames=data.get("extract_gif_frames", False),
-            recompress_image=data.get("recompress_image", False),
-            base64_encode_image=data.get("base64_encode_image", False),
-            download_images=data.get("download_images", True),
-            download_videos=data.get("download_videos", False),
-        )
+        return LeetcodeConfig(**data)
+
+    @staticmethod
+    def from_json_file(json_file: str) -> 'LeetcodeConfig':
+        with open(json_file, "r") as file:
+            return LeetcodeConfig.from_json(file.read())
 
     def to_json(self) -> str:
         return json.dumps(self.__dict__, indent=4)
@@ -69,6 +80,7 @@ class LeetcodeConfig:
         self.cards_directory = os.path.join(self.save_directory, "cards")
         self.companies_directory = os.path.join(self.save_directory, "companies")
         self.questions_directory = os.path.join(self.save_directory, "questions")
+        self.submissions_directory = os.path.join(self.save_directory, "submissions")
 
     @staticmethod
     def prompt_from_dataclass():

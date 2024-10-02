@@ -1,5 +1,6 @@
 import os
 import argparse
+from diskcache import Cache
 import requests
 
 from LeetcodeApi import LeetcodeApi
@@ -18,9 +19,13 @@ from LeetcodeConfigLoader import LeetcodeConfigLoader
 def init():
     config = LeetcodeConfigLoader.load_config()
     LeetcodeConstants.LEETCODE_HEADERS = LeetcodeConstants.create_headers(config.leetcode_cookie)
+    cache = Cache(
+        directory=config.cache_directory)
+
     leetapi = LeetcodeApi(
         config=config,
-        logger=logger)
+        logger=logger,
+        cache=cache)
     imagehandler = LeetcodeImage(
         config=config,
         logger=logger)
@@ -56,7 +61,7 @@ def init():
         leetapi=leetapi,
         questionhandler=question)
 
-    return config, cards, company, imagehandler, question, submission
+    return config, cache, cards, company, imagehandler, question, submission
 
 if __name__ == '__main__':
 
@@ -100,6 +105,7 @@ if __name__ == '__main__':
 9: Download all your submissions
 
 10: Convert all files from a directory to pdf
+11: Clear cache
                   
 Press any to quit
                 """)
@@ -114,7 +120,7 @@ Press any to quit
                 break
 
             if choice > 1:
-                config, cards, company, imagehandler, questionhandler, submission = init()
+                config, cache, cards, company, imagehandler, questionhandler, submission = init()
 
 
             if choice == 1:
@@ -144,7 +150,7 @@ Press any to quit
             elif choice == 9:
                 submission.get_all_submissions(questionhandler=questionhandler)
 
-            elif choice == 9:
+            elif choice == 10:
                 directory = input("Enter directory: ")
 
                 if not os.path.exists(directory) or not os.path.isdir(directory):
@@ -155,6 +161,8 @@ Press any to quit
                     logger=logger,
                     images_dir=imagehandler.get_images_dir(directory))
                 converter.convert_folder(directory)
+            elif choice == 11:
+                cache.clear()
             else:
                 break
 

@@ -19,7 +19,7 @@ class LeetcodeSubmission:
         self.lc = leetapi
 
     def get_selected_submissions(self, questionhandler, question_id):
-        all_questions = questionhandler.get_all_questions_url(force_download=self.config.overwrite)
+        all_questions = questionhandler.get_all_questions_url()
         
         selected_question = None
         for question in all_questions:
@@ -43,7 +43,7 @@ class LeetcodeSubmission:
 
 
     def get_all_submissions(self, questionhandler):
-        all_questions = questionhandler.get_all_questions_url(force_download=self.config.overwrite)
+        all_questions = questionhandler.get_all_questions_url()
 
         for question in all_questions:
             item_content = {
@@ -79,12 +79,11 @@ class LeetcodeSubmission:
                 if save_submission_as_file:
                     list_of_submissions[int(submission["timestamp"])] = submission_detail_content['code']
                 else:
-                    submissions_download_dir = os.path.join(self.config.save_directory, "questions", "submissions")
-                    os.makedirs(submissions_download_dir, exist_ok=True)
+                    os.makedirs(self.config.submissions_directory, exist_ok=True)
 
                     file_extension = LeetcodeConstants.FILE_EXTENSIONS[submission["lang"]]
-                    submission_file_name = f"{question_frontend_id:04}-{i+1:02}-{submission_id}.{file_extension}"
-                    submission_file_path = os.path.join(submissions_download_dir, submission_file_name)
+                    submission_file_name = f"{LeetcodeUtility.qstr(question_frontend_id)}-{i+1:02}-{submission_id}.{file_extension}"
+                    submission_file_path = os.path.join(self.config.submissions_directory, submission_file_name)
 
                     with open(submission_file_path, "w") as outfile:
                         outfile.write(submission_detail_content['code'])

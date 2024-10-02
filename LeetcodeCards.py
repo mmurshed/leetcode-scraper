@@ -126,21 +126,11 @@ class LeetcodeCards:
                 if not self.config.overwrite and os.path.exists(cards_filepath):
                     self.logger.info(f"Already scraped {cards_filepath}")
                     continue
-                
-                copied = False
-                if not self.config.overwrite:
-                    copied = LeetcodeUtility.copy_question_file(
-                        save_path=self.config.save_directory,
-                        question_id=item_id,
-                        question_title=item_title,
-                        dest_dir=cards_chapter_dir,
-                        questions_dir=self.config.questions_directory)
-                
-                if self.config.overwrite or not copied:
-                    item_content = self.lc.get_chapter_items(card_slug, item_id)
 
-                    if item_content:
-                        self.create_card_html(item_content, item_title, item_id, cards_chapter_dir)
+                item_content = self.lc.get_chapter_items(card_slug, item_id)
+
+                if item_content:
+                    self.create_card_html(item_content, item_title, item_id, cards_chapter_dir)
 
 
     def create_card_html(self, item_content, item_title, item_id, cards_chapter_dir):

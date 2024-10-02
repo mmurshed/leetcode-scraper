@@ -14,16 +14,15 @@ class LeetcodeApi:
         self,
         config: LeetcodeConfig,
         logger: Logger,
-        default_headers:str = None,
+        cache: Cache,
         leetcode_headers:str = None):
         
         self.config = config
         self.logger = logger
-        self.default_headers = default_headers or LeetcodeConstants.DEFAULT_HEADERS
         self.leetcode_headers = leetcode_headers or LeetcodeConstants.LEETCODE_HEADERS
         
         self.session = requests.Session()
-        self.cache = Cache(self.config.cache_directory)
+        self.cache = cache
 
     def cache_key(*args):
         # Convert all arguments to strings and join them with '-'
@@ -107,7 +106,7 @@ class LeetcodeApi:
             return data
 
         # Check if data exists in the cache and retrieve it
-        data = self.cache.get(cache_key)
+        data = self.cache.get(key=cache_key)
 
         if data is None:
             # If cache miss, make the request
@@ -119,7 +118,10 @@ class LeetcodeApi:
                 headers=headers)
 
             # Store data in the cache
-            self.cache.set(cache_key, data)
+            self.cache.set(
+                key=cache_key,
+                value=data,
+                expire=self.config.cache_expiration_minutes * 60)
 
         return data
     
@@ -290,7 +292,7 @@ class LeetcodeApi:
             method="get",
             selector=selector,
             url=slide_url,
-            headers=self.default_headers)
+            headers=LeetcodeConstants.DEFAULT_HEADERS)
         
         return data
 
@@ -308,7 +310,7 @@ class LeetcodeApi:
                 method="get",
                 url=slide_url1,
                 selector=selector,
-                headers=self.default_headers)
+                headers=LeetcodeConstants.DEFAULT_HEADERS)
         except:
             self.logger.error(f"Slide url1 failed: {slide_url1}")
             self.logger.debug(f"Slide url2: {slide_url2}")
@@ -319,7 +321,7 @@ class LeetcodeApi:
                     method="get",
                     url=slide_url2,
                     selector=selector,
-                    headers=self.default_headers)
+                    headers=LeetcodeConstants.DEFAULT_HEADERS)
             except:
                 self.logger.error(f"Slide url2 failed: {slide_url2}")
                 pass
@@ -518,7 +520,7 @@ class LeetcodeApi:
             selector=selector,
             method="get",
             url=f"{LeetcodeConstants.LEETCODE_URL}/problemset/",
-            headers=self.default_headers)
+            headers=LeetcodeConstants.DEFAULT_HEADERS)
 
         return data
 

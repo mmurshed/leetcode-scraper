@@ -202,4 +202,4 @@ class LeetcodeCompany:
 
                 # if copy failed retry
                 if not copied:
-                    self.logger.error("Copy failed")
+                    self.logger.error(f"Copy failed {question_id} {question_title}")

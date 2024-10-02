@@ -49,7 +49,7 @@ class LeetcodeQuestion:
 
         all_questions = self.lc.get_all_questions(all_questions_count)
 
-        if self.config.force_download:
+        if self.config.overwrite:
             self.write_questions_to_file(all_questions)
 
         return all_questions
