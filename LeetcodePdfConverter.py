@@ -18,8 +18,7 @@ class LeetcodePdfConverter:
         
         self.config = config
         self.logger = logger
-        self.num_threads = self.config.number_of_threads_for_pdf_conversion
-        self.num_threads = self.valid_num_threads(self.num_threads)
+        self.num_threads = self.valid_num_threads(self.config.number_of_threads_for_pdf_conversion)
         
         self.docxArgs = [
             '--resource-path', images_dir
