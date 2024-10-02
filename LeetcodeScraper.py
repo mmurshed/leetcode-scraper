@@ -16,8 +16,9 @@ from LeetcodeUtility import LeetcodeUtility
 from LeetcodeConfigLoader import LeetcodeConfigLoader
 
 
-def init():
+def init(logger):
     config = LeetcodeConfigLoader.load_config()
+
     LeetcodeConstants.LEETCODE_HEADERS = LeetcodeConstants.create_headers(config.leetcode_cookie)
     cache = Cache(
         directory=config.cache_directory)
@@ -120,7 +121,11 @@ Press any to quit
                 break
 
             if choice > 1:
-                config, cache, cards, company, imagehandler, questionhandler, submission = init()
+                try:
+                    config, cache, cards, company, imagehandler, questionhandler, submission = init(logger)
+                except Exception as e:
+                    logger.error(f"Initilization error {e}")
+                    continue
 
 
             if choice == 1:

@@ -27,7 +27,7 @@ class LeetcodeConfigLoader:
             config = LeetcodeConfig.from_json_file(config_file_path)
             config_found = True
         else:
-            config = LeetcodeConstants.DEFAULT_CONFIG
+            config = LeetcodeConfig()
 
         # Prompt user for new config values
         print(f'''
@@ -67,16 +67,6 @@ class LeetcodeConfigLoader:
         # Save the updated configuration to a JSON file
         config.to_json_file(config_file_path)
         print(f"Configuration saved to {config_file_path}")
-
-    @property
-    def DEFAULT_CONFIG():
-        config_path = os.path.join(LeetcodeConstants.ROOT_DIR, "defaultconfig.json")
-
-        # Check if config file exists
-        if not os.path.exists(config_path):
-            raise Exception(f"Config file not found {config_path}")
-
-        return LeetcodeConfig.from_json(config_path)
 
     @staticmethod
     def load_config():

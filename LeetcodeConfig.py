@@ -4,35 +4,37 @@ import os
 
 @dataclass
 class LeetcodeConfig:
-    leetcode_cookie: str = ""
-    cards_filepath: str = ""
-    questions_filepath: str = ""
-    save_directory: str = ""
-    cache_directory: str = ""
-    cards_directory: str = ""
-    companies_directory: str = ""
-    questions_directory: str = ""
-    submissions_directory: str = ""
-    cache_api_calls: bool = True
-    cache_expiration_days: int = 7
-    cache_expiration_seconds: int = 7 * 24 * 60 * 60
-    overwrite: bool = True
-    company_filepath: str = ""
-    preferred_language_order: str = "all"
-    include_submissions_count: int = 0
-    include_default_code: bool = False
-    extract_gif_frames: bool = False
-    recompress_image: bool = False
-    base64_encode_image: bool = False
-    download_images: bool = True
-    download_videos: bool = False
-    number_of_threads_for_pdf_conversion: int = 8
-
     def __init__(self, **kwargs):
+        self.leetcode_cookie = ""
+        self.cards_filepath = ""
+        self.questions_filepath = ""
+        self.save_directory: str = ""
+        self.cache_directory: str = ""
+        self.cards_directory: str = ""
+        self.companies_directory: str = ""
+        self.questions_directory: str = ""
+        self.submissions_directory: str = ""
+        self.cache_api_calls: bool = True
+        self.cache_expiration_days: int = 7
+        self.cache_expiration_seconds: int = 7 * 24 * 60 * 60
+        self.overwrite: bool = True
+        self.company_filepath: str = ""
+        self.preferred_language_order: list = ["all"]
+        self.include_submissions_count: int = 0
+        self.include_default_code: bool = False
+        self.extract_gif_frames: bool = False
+        self.recompress_image: bool = False
+        self.base64_encode_image: bool = False
+        self.download_images: bool = True
+        self.download_videos: bool = False
+        self.number_of_threads_for_pdf_conversion: int = 8
+
         # Dynamically update the attributes from kwargs
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+
+        self.set_derivative_values()
 
     @staticmethod
     def from_json(json_str: str) -> 'LeetcodeConfig':

@@ -125,12 +125,10 @@ class LeetcodeSolution:
                 lang_to_include = "all"
                 languages = set(item.get("langSlug") for item in playground_content)
 
-                if self.config.preferred_language_order == "all":
-                    lang_to_include = self.config.preferred_language
+                if "all" in self.config.preferred_language_order:
+                    lang_to_include == "all"
                 else:
-                    preferred_languages = self.config.preferred_language_order.split(",")
-                    for preferred_language in preferred_languages:
-                        preferred_language = preferred_language.strip()
+                    for preferred_language in self.config.preferred_language_order:
                         if preferred_language in languages:
                             lang_to_include = preferred_language
                             break
