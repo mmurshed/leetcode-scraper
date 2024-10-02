@@ -69,9 +69,6 @@ class LeetcodeCards:
             main_index.write(main_index_html)
 
     def scrape_selected_card(self, card_slug):
-        os.makedirs(self.config.cards_directory, exist_ok=True)
-        os.chdir(self.config.cards_directory)
-
         cards = self.get_all_cards_urls()
         self.create_cards_top_index(cards)
 
@@ -85,13 +82,8 @@ class LeetcodeCards:
 
         if chapters:
             self.create_chapters(card_slug, chapters)
-            os.chdir("..")
-        os.chdir('..')
 
     def scrape_card_url(self):
-        os.makedirs(self.config.cards_directory, exist_ok=True)
-        os.chdir(self.config.cards_directory)
-
         cards = self.get_all_cards_urls()
         self.create_cards_top_index(cards)
 
@@ -102,8 +94,6 @@ class LeetcodeCards:
 
             if chapters:
                 self.create_chapters(card_slug, chapters)
-                os.chdir("..")
-        os.chdir('..')
 
     def create_chapters(self, card_slug, chapters):
         cards_chapter_dir = os.path.join(self.config.cards_directory, card_slug)

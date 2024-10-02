@@ -32,11 +32,6 @@ class LeetcodeQuestion:
         self.solutionhandler = solutionhandler
         self.imagehandler = imagehandler
     
-    def get_question_file(self, question_id, question_title):
-        filename = LeetcodeUtility.qhtml(question_id, question_title)
-        filepath = os.path.join(self.config.questions_directory, filename)
-
-        return filepath
     
     def get_all_questions_url(self):
         self.logger.info("Getting all questions url")
@@ -64,8 +59,6 @@ class LeetcodeQuestion:
 
     def scrape_question_url(self, selected_question_id = None):
         all_questions = self.get_all_questions_url()
-        questions_dir = self.config.questions_directory
-        os.chdir(questions_dir)
 
         # Convert the list of questions to a dictionary using titleSlug as the key
         question_slug_to_question = {question['titleSlug']: question for question in all_questions}
@@ -92,24 +85,24 @@ class LeetcodeQuestion:
                 question_id_to_title[question_id] = [question_slug, question_title]
         
         for question_id, (question_slug, question_title) in question_id_to_title.items():
-            question_path = self.get_question_file(question_id, question_title)                
+            filename = LeetcodeUtility.qhtml(question_id, question_title)
+            filepath = os.path.join(self.config.questions_directory, filename)
             
-            if self.config.overwrite or not os.path.exists(question_path):            
+            if self.config.overwrite or not os.path.exists(filepath):  
                 self.logger.info(f"Scraping question {question_id}")
-                self.create_question_html(question_id, question_slug, question_title)
+                self.create_question_html(question_id, question_slug, question_title, filepath)
             else:
-                self.logger.info(f"Already scraped {question_path}")
+                self.logger.info(f"Already scraped {filepath}")
                 
-        with open(os.path.join(questions_dir, "index.html"), 'w') as main_index:
+        with open(os.path.join(self.config.questions_directory, "index.html"), 'w') as main_index:
             main_index_html = ""
-            for idx, files in enumerate(os.listdir(questions_dir),start=1):
+            for idx, files in enumerate(os.listdir(self.config.questions_directory),start=1):
                 if "index.html" not in files:
                     main_index_html += f"""<a href="{files}">{idx}-{files}</a><br>"""
             main_index.write(main_index_html)
-        os.chdir('..')
 
 
-    def create_question_html(self, question_id, question_slug, question_title):
+    def create_question_html(self, question_id, question_slug, question_title, question_path):
         item_content = {
             "question": {
                 'titleSlug': question_slug,
@@ -127,7 +120,6 @@ class LeetcodeQuestion:
         content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
         content_soup = self.imagehandler.fix_image_urls(content_soup, question_id, self.config.questions_directory)
 
-        question_path = os.path.join(self.config.questions_directory, LeetcodeUtility.qhtml(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
             f.write(content_soup.prettify())
 

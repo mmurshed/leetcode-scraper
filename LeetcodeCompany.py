@@ -1,9 +1,7 @@
 import os
-import json
 import re
 
 from logging import Logger
-from bs4 import BeautifulSoup
 
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeConstants import LeetcodeConstants
@@ -37,34 +35,25 @@ class LeetcodeCompany:
         return company_slug in companys_slugs
 
     def scrape_selected_company_questions(self, company_slug):
-        os.makedirs(self.config.companies_directory, exist_ok=True)
-        os.chdir(self.config.companies_directory)
-
         if not self.is_valid_company_slug(company_slug):
             self.logger.error(f"Company not valid {company_slug}")
         
-        self.create_all_company_index_html([company_slug])
+        company_tags = self.lc.get_question_company_tags()
+        self.create_all_company_index_html(company_tags)
         self.scrape_question_data([{
             'name': company_slug,
             'slug': company_slug
         }])
-            
-        os.chdir("..")
+
 
     def scrape_all_company_questions(self):
         self.logger.info("Scraping all company questions")
 
         company_tags = self.lc.get_question_company_tags()
-
-        os.makedirs(self.config.companies_directory, exist_ok=True)  
-        os.chdir(self.config.companies_directory)
-
         self.create_all_company_index_html(company_tags)
         for company in company_tags:
             company_slug = company['slug']
             self.scrape_question_data(company_slug)
-            os.chdir("..")
-        os.chdir('..')
 
     def get_categories_slugs_for_company(self, company_slug):
         favoriteDetails = self.lc.get_favorite_details_for_company(company_slug)
@@ -153,13 +142,9 @@ class LeetcodeCompany:
                     <head> </head>
                     <body>{overall_html}</body>
                     </html>""")
-            os.chdir("..")
 
     def scrape_question_data(self, company_slug):
         self.logger.info("Scraping question data")
-
-        os.makedirs(self.config.questions_directory, exist_ok=True)
-        os.makedirs(self.config.companies_directory, exist_ok=True)
 
         questions_seen = set()
         
@@ -191,7 +176,10 @@ class LeetcodeCompany:
                 question_slug = question['titleSlug']
         
                 if self.config.overwrite:
-                    self.questionhandler.create_question_html(question_id, question_slug, question_title)
+                    filename = LeetcodeUtility.qhtml(question_id, question_title)
+                    filepath = os.path.join(company_fav_dir, filename)
+
+                    self.questionhandler.create_question_html(question_id, question_slug, question_title, filepath)
                 
                 copied = LeetcodeUtility.copy_question_file(
                     save_path=self.config.save_directory,

@@ -209,13 +209,15 @@ class LeetcodeImage:
                     if hostname == "127.0.0.1" or hostname == "localhost":
                         self.logger.warning(f"localhost detected: {img_url}")
                         # Remove leading `/` from the path before appending, or directly append the path
-                        # img_url = f"https://leetcode.com/explore{img_url_parsed.path}"                    
+                        # img_url = f"https://leetcode.com/explore{img_url_parsed.path}"
+                        img_url = None
 
                 self.logger.debug(f"img_url: {img_url}")
 
-                image['src'] = img_url
+                if img_url:
+                    image['src'] = img_url
 
-                if self.config.download_images:
+                if self.config.download_images and img_url:
                     files = self.download_image(question_id, img_url, root_dir)
                     if files:
                         if self.config.base64_encode_image:

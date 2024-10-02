@@ -67,9 +67,6 @@ class LeetcodeSubmission:
             if not submission_content or len(submission_content) == 0:
                 return
             
-            submissions_dir = os.path.join(self.config.submissions_directory, LeetcodeUtility.qstr(question_id))
-            os.makedirs(submissions_dir, exist_ok=True)
-
             for i, submission in enumerate(submission_content):
                 submission_id = submission['id']
                 if submission["statusDisplay"] != "Accepted":
@@ -82,6 +79,9 @@ class LeetcodeSubmission:
                 if save_submission_as_file:
                     list_of_submissions[int(submission["timestamp"])] = submission_detail_content['code']
                 else:
+                    submissions_dir = os.path.join(self.config.submissions_directory, LeetcodeUtility.qstr(question_id))
+                    os.makedirs(submissions_dir, exist_ok=True)
+
                     file_extension = LeetcodeConstants.FILE_EXTENSIONS[submission["lang"]]
                     submission_file_name = f"{i+1:02}-{submission_id}.{file_extension}"
                     submission_file_path = os.path.join(submissions_dir, submission_file_name)

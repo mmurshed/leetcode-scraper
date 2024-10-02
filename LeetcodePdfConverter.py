@@ -57,8 +57,7 @@ class LeetcodePdfConverter:
     def convert_folder(self, source_folder):
         os.chdir(source_folder)
 
-        # Set the PDF output folder one level up from the source folder and rename to 'questions_pdf'
-        pdf_output_folder = os.path.join(os.path.dirname(source_folder), 'questions_pdf')
+        pdf_output_folder = os.path.join(source_folder, 'pdf')
         os.makedirs(pdf_output_folder, exist_ok=True)
 
         # Create the task queue
