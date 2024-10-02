@@ -18,8 +18,32 @@ class LeetcodeSubmission:
         self.logger = logger
         self.lc = leetapi
 
-    def get_all_submissions(self, question):
-        all_questions = question.get_all_questions_url(force_download=self.config.overwrite)
+    def get_selected_submissions(self, questionhandler, question_id):
+        all_questions = questionhandler.get_all_questions_url(force_download=self.config.overwrite)
+        
+        selected_question = None
+        for question in all_questions:
+            if question['frontendQuestionId'] == question_id:
+                selected_question = question
+                break
+
+        if selected_question is None:
+            self.logger.error(f"Question id not found {question_id}")
+            return
+
+        item_content = {
+            "question": {
+                'titleSlug': selected_question['titleSlug'],
+                'frontendQuestionId': selected_question['frontendQuestionId'],
+                'title': selected_question['title']
+            }
+        }
+
+        self.get_submission_data(item_content, False)
+
+
+    def get_all_submissions(self, questionhandler):
+        all_questions = questionhandler.get_all_questions_url(force_download=self.config.overwrite)
 
         for question in all_questions:
             item_content = {

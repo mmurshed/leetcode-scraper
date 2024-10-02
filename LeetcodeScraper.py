@@ -87,18 +87,19 @@ if __name__ == '__main__':
             print("""Leetcode-Scraper v2.0-beta
 1: Setup config
 
-2: Download all cards
-3: Download a card by name
+2: Download a card by name
+3: Download all cards
                   
-4: Download all questions
-5: Download a question by id
+4: Download a question by id
+5: Download all questions
                   
-6: Download all company questions
-7: Download a company by name
+6: Download a company by name
+7: Download all company questions
 
-8: Download all your submissions
+8: Download submissions by question id
+9: Download all your submissions
 
-9: Convert all files to pdf
+10: Convert all files from a directory to pdf
                   
 Press any to quit
                 """)
@@ -113,31 +114,35 @@ Press any to quit
                 break
 
             if choice > 1:
-                config, cards, company, imagehandler, question, submission = init()
+                config, cards, company, imagehandler, questionhandler, submission = init()
 
 
             if choice == 1:
                 LeetcodeConfigLoader.generate_config()
+
             elif choice == 2:
-                cards.scrape_card_url()
-            elif choice == 3:
                 card_slug = input("Enter card slug: ")
                 cards.scrape_selected_card(card_slug)
+            elif choice == 3:
+                cards.scrape_card_url()
 
             elif choice == 4:
-                question.scrape_question_url()
-            elif choice == 5:
                 question_id = input("Enter question id: ")
-                question.scrape_question_url(int(question_id))
+                questionhandler.scrape_question_url(int(question_id))
+            elif choice == 5:
+                questionhandler.scrape_question_url()
 
             elif choice == 6:
-                company.scrape_all_company_questions()
-            elif choice == 7:
                 company_slug = input("Enter company slug: ")
                 company.scrape_selected_company_questions(company_slug)
+            elif choice == 7:
+                company.scrape_all_company_questions()
 
             elif choice == 8:
-                submission.get_all_submissions(question=question)
+                question_id = input("Enter question id: ")
+                submission.get_selected_submissions(questionhandler=questionhandler, question_id=question_id)
+            elif choice == 9:
+                submission.get_all_submissions(questionhandler=questionhandler)
 
             elif choice == 9:
                 directory = input("Enter directory: ")
