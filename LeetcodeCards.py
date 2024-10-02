@@ -29,13 +29,14 @@ class LeetcodeCards:
         self.solution = solutionhandler
         self.imagehandler = imagehandler
 
-    def get_all_cards_urls(self):
+    def get_card_urls(self):
         if not os.path.exists(self.config.cards_filepath):
-            self.download_all_cards_urls()
+            cards = self.lc.get_categories()
+            self.save_card_urls(cards)
 
-        return self.load_all_cards_urls()
+        return self.load_card_urls()
 
-    def load_all_cards_urls(self):
+    def load_card_urls(self):
         cards = {}
         if os.path.exists(self.config.cards_filepath):
             with open(self.config.cards_filepath, "r") as file:
@@ -46,11 +47,7 @@ class LeetcodeCards:
                     cards[card_slug] = card_url
         return cards
 
-    def download_all_cards_urls(self):
-        self.logger.info("Getting all cards url")
-
-        cards = self.lc.get_categories()
-
+    def save_card_urls(self, cards):
         with open(self.config.cards_filepath, "w") as file:
             for category_card in cards:
                 if category_card['slug'] != "featured":
@@ -69,7 +66,7 @@ class LeetcodeCards:
             main_index.write(main_index_html)
 
     def scrape_selected_card(self, card_slug):
-        cards = self.get_all_cards_urls()
+        cards = self.get_card_urls()
         self.create_cards_top_index(cards)
 
         if card_slug not in cards.keys():
@@ -84,7 +81,7 @@ class LeetcodeCards:
             self.create_chapters(card_slug, chapters)
 
     def scrape_card_url(self):
-        cards = self.get_all_cards_urls()
+        cards = self.get_card_urls()
         self.create_cards_top_index(cards)
 
         # Creating HTML for each cards topics

@@ -102,7 +102,7 @@ class LeetcodeQuestion:
             main_index.write(main_index_html)
 
 
-    def create_question_html(self, question_id, question_slug, question_title, question_path):
+    def create_question_html(self, question_id, question_slug, question_title, root_dir):
         item_content = {
             "question": {
                 'titleSlug': question_slug,
@@ -111,15 +111,16 @@ class LeetcodeQuestion:
             }
         }
         content = """<body>"""
-        question_content, question_title = self.get_question_data(item_content, self.config.questions_directory)
+        question_content, question_title = self.get_question_data(item_content, root_dir)
         content += question_content
         content += """</body>"""
         slides_json = self.solutionhandler.find_slides_json(content, question_id)
         content = LeetcodeConstants.HTML_HEADER + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
-        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id, self.config.questions_directory)
+        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id, root_dir)
 
+        question_path = os.path.join(root_dir, LeetcodeUtility.qhtml(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
             f.write(content_soup.prettify())
 
