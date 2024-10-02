@@ -96,6 +96,16 @@ class LeetcodeApi:
         headers = headers or self.leetcode_headers
         url = url or LeetcodeConstants.LEETCODE_GRAPHQL_URL
 
+        if not self.config.cache_api_calls:
+            # make direct calls
+            data = self.query(
+                method=method,
+                query=query,
+                selector=selector,
+                url=url,
+                headers=headers)
+            return data
+
         # Check if data exists in the cache and retrieve it
         data = self.cache.get(cache_key)
 
@@ -116,6 +126,7 @@ class LeetcodeApi:
     #endregion
 
     #region cards api
+
     def get_categories(self):
         cache_key = "allcards"
 
@@ -153,7 +164,7 @@ class LeetcodeApi:
         
         return data
 
-    def get_chapter_with_items(self, card_slug):
+    def get_chapters_with_items(self, card_slug):
         cache_key = self.cache_key(card_slug, "detail")
 
         query = {

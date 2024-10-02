@@ -22,8 +22,8 @@ class LeetcodeImage:
         self.logger = logger
         self.cloudscaper = cloudscraper.create_scraper()
 
-    def get_images_dir(self):
-        dir = os.path.join(self.config.save_directory, "questions", "images")
+    def get_images_dir(self, dir):
+        dir = os.path.join(dir, "images")
         os.makedirs(dir, exist_ok=True)
         return dir
 
@@ -101,14 +101,12 @@ class LeetcodeImage:
             self.logger.error(f"Error recompressing {img_path}: {e}")
             return
 
-    def download_image(self, question_id, img_url):
+    def download_image(self, question_id, img_url, images_dir):
         self.logger.debug(f"Downloading image: {img_url}")
 
         if not validators.url(img_url):
             self.logger.error(f"Invalid image url: {img_url}")
             return
-        
-        images_dir = self.get_images_dir()
         
         parsed_url = urlsplit(img_url)
         basename = os.path.basename(parsed_url.path)
@@ -185,7 +183,7 @@ class LeetcodeImage:
 
         return imgs_decoded
 
-    def fix_image_urls(self, content_soup, question_id):
+    def fix_image_urls(self, content_soup, question_id, images_dir):
         self.logger.info("Fixing image urls")
 
         images = content_soup.select('img')
@@ -218,7 +216,7 @@ class LeetcodeImage:
                 image['src'] = img_url
 
                 if self.config.download_images:
-                    files = self.download_image(question_id, img_url)
+                    files = self.download_image(question_id, img_url, images_dir)
                     if files:
                         if self.config.base64_encode_image:
                             frames = self.load_image_in_b64(files, img_url)

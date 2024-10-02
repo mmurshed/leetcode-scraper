@@ -87,21 +87,18 @@ if __name__ == '__main__':
             print("""Leetcode-Scraper v2.0-beta
 1: Setup config
 
-2: Get all cards url
-3: Scrape card url
+2: Download all cards
+3: Download a card by name
+                  
+4: Download all questions
+5: Download a question by id
+                  
+6: Download all company questions
+7: Download a company by name
 
-4: Get all question url
-5: Scrape question url
-6: Scrape a single question with frontend id
+8: Download all your submissions
 
-7: Scrape all company questions indexes
-8: Scrape all company questions
-
-9: Scrape selected company questions indexes
-10: Scrape selected company questions
-
-11: Save all your submissions in files
-12: Convert all questions to pdf
+9: Convert all files to pdf
                   
 Press any to quit
                 """)
@@ -122,31 +119,37 @@ Press any to quit
             if choice == 1:
                 LeetcodeConfigLoader.generate_config()
             elif choice == 2:
-                cards.get_all_cards_url()
-            elif choice == 3:
                 cards.scrape_card_url()
+            elif choice == 3:
+                card_slug = input("Enter card slug: ")
+                cards.scrape_selected_card(card_slug)
 
             elif choice == 4:
-                question.get_all_questions_url(force_download=True)
-            elif choice == 5:
                 question.scrape_question_url()
-            elif choice == 6:
-                question_id = input("Enter question frontend id: ")
+            elif choice == 5:
+                question_id = input("Enter question id: ")
                 question.scrape_question_url(int(question_id))
 
-            elif choice == 7 or choice == 8:
-                company.scrape_all_company_questions(choice)
-            elif choice == 9 or choice == 10:
-                company.scrape_selected_company_questions(choice)
+            elif choice == 6:
+                company.scrape_all_company_questions()
+            elif choice == 7:
+                company_slug = input("Enter company slug: ")
+                company.scrape_selected_company_questions(company_slug)
 
-            elif choice == 11:
+            elif choice == 8:
                 submission.get_all_submissions(question=question)
-            elif choice == 12:
+
+            elif choice == 9:
+                directory = input("Enter directory: ")
+
+                if not os.path.exists(directory) or not os.path.isdir(directory):
+                    logger.error("Diectory doesn't exists or not valid")
+
                 converter = LeetcodePdfConverter(
                     config=config,
                     logger=logger,
-                    images_dir=imagehandler.get_images_dir())
-                converter.convert_folder(question.get_questions_dir())
+                    images_dir=imagehandler.get_images_dir(directory))
+                converter.convert_folder(directory)
             else:
                 break
 
@@ -167,8 +170,3 @@ Press any to quit
             """)
             lineNumber = e.__traceback__.tb_lineno
             raise Exception(f"Exception on line {lineNumber}: {e}")
-            if args.non_stop:
-                print("Retrying")
-                previous_choice = choice
-                continue
-            input("Press Enter to continue")

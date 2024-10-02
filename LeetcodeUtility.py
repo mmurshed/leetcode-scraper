@@ -21,8 +21,7 @@ class LeetcodeUtility:
 
 
     @staticmethod
-    def copy_question_file(save_path, question_id, question_title, dest_dir, copy_pdf = True, copy_videos = False):
-        questions_dir = os.path.join(save_path, "questions")
+    def copy_question_file(save_path, question_id, question_title, dest_dir, questions_dir, copy_pdf = True, copy_videos = False):
         question_filename = LeetcodeUtility.qhtml(question_id, question_title)
         question_filepath = os.path.join(questions_dir, question_filename)
 

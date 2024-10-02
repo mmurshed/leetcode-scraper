@@ -9,6 +9,9 @@ class LeetcodeConfig:
     questions_filepath: str
     save_directory: str
     cache_directory: str
+    cards_directory: str
+    companies_directory: str
+    questions_directory: str
     cache_api_calls: bool
     overwrite: bool
     company_filepath: str
@@ -36,6 +39,9 @@ class LeetcodeConfig:
             company_filepath=data.get("company_filepath", ""),
             save_directory=data.get("save_directory", ""),
             cache_directory=data.get("cache_directory", ""),
+            cards_directory=data.get("cards_directory", ""),
+            companies_directory=data.get("companies_directory", ""),
+            questions_directory=data.get("questions_directory", ""),
             cache_api_calls=data.get("cache_api_calls", True),
             overwrite=data.get("overwrite", False),
             preferred_language_order=data.get("preferred_language_order", ""),
@@ -60,6 +66,9 @@ class LeetcodeConfig:
         self.questions_filepath = os.path.join(self.save_directory, "questions.csv")
         self.company_filepath = os.path.join(self.save_directory, "company.csv")
         self.cache_directory = os.path.join(self.save_directory, "cache")
+        self.cards_directory = os.path.join(self.save_directory, "cards")
+        self.companies_directory = os.path.join(self.save_directory, "companies")
+        self.questions_directory = os.path.join(self.save_directory, "questions")
 
     @staticmethod
     def prompt_from_dataclass():

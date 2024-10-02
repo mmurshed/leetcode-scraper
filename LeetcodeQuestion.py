@@ -32,20 +32,14 @@ class LeetcodeQuestion:
         self.submissionhandler = submissionhandler
         self.solutionhandler = solutionhandler
         self.imagehandler = imagehandler
-
-    def get_questions_dir(self):
-        dir = os.path.join(self.config.save_directory, "questions")
-        os.makedirs(dir, exist_ok=True)
-        return dir
     
     def get_question_file(self, question_id, question_title):
-        dir = self.get_questions_dir()
         filename = LeetcodeUtility.qhtml(question_id, question_title)
-        filepath = os.path.join(dir, filename)
+        filepath = os.path.join(self.config.questions_directory, filename)
 
         return filepath
     
-    def get_all_questions_url(self, force_download):
+    def get_all_questions_url(self):
         self.logger.info("Getting all questions url")
 
         all_questions_count = self.lc.get_questions_count()
@@ -55,7 +49,7 @@ class LeetcodeQuestion:
 
         all_questions = self.lc.get_all_questions(all_questions_count)
 
-        if force_download:
+        if self.config.force_download:
             self.write_questions_to_file(all_questions)
 
         return all_questions
@@ -70,8 +64,8 @@ class LeetcodeQuestion:
 
 
     def scrape_question_url(self, selected_question_id = None):
-        all_questions = self.get_all_questions_url(force_download=self.config.overwrite)
-        questions_dir = self.get_questions_dir()
+        all_questions = self.get_all_questions_url()
+        questions_dir = self.config.questions_directory
         os.chdir(questions_dir)
 
         # Convert the list of questions to a dictionary using titleSlug as the key
@@ -83,6 +77,10 @@ class LeetcodeQuestion:
             csvcontent = csv.reader(file)
             for row in csvcontent:
                 question_id = int(row[0])
+
+                if selected_question_id and question_id != selected_question_id:
+                    continue
+
                 question_url = row[1].strip()
                 question_slug = question_url.split("/")[-2]
 
@@ -95,10 +93,6 @@ class LeetcodeQuestion:
                 question_id_to_title[question_id] = [question_slug, question_title]
         
         for question_id, (question_slug, question_title) in question_id_to_title.items():
-
-            if selected_question_id and question_id != selected_question_id:
-                continue
-
             question_path = self.get_question_file(question_id, question_title)                
             
             if self.config.overwrite or not os.path.exists(question_path):            
@@ -132,9 +126,10 @@ class LeetcodeQuestion:
         content = LeetcodeConstants.HTML_HEADER + content
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.solutionhandler.place_solution_slides(content_soup, slides_json)
-        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id)
+        images_dir = self.imagehandler.get_images_dir(dir=self.config.questions_directory)
+        content_soup = self.imagehandler.fix_image_urls(content_soup, question_id, images_dir)
 
-        question_path = os.path.join(self.get_questions_dir(), LeetcodeUtility.qhtml(question_id, question_title))
+        question_path = os.path.join(self.config.questions_directory, LeetcodeUtility.qhtml(question_id, question_title))
         with open(question_path, 'w', encoding="utf-8") as f:
             f.write(content_soup.prettify())
 
