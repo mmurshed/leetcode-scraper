@@ -60,31 +60,33 @@ class LeetcodeSubmission:
         list_of_submissions = {}
 
         if item_content['question']:
-            question_frontend_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
+            question_id = int(item_content['question']['frontendQuestionId']) if item_content['question']['frontendQuestionId'] else 0
             question_title_slug = item_content['question']['titleSlug']
 
-            submission_content = self.lc.get_submission_list(question_frontend_id, question_title_slug)
+            submission_content = self.lc.get_submission_list(question_id, question_title_slug)
             if not submission_content or len(submission_content) == 0:
                 return
+            
+            submissions_dir = os.path.join(self.config.submissions_directory, LeetcodeUtility.qstr(question_id))
+            os.makedirs(submissions_dir, exist_ok=True)
 
             for i, submission in enumerate(submission_content):
                 submission_id = submission['id']
                 if submission["statusDisplay"] != "Accepted":
                     continue
 
-                submission_detail_content = self.lc.get_submission_details(question_frontend_id, submission_id)
+                submission_detail_content = self.lc.get_submission_details(question_id, submission_id)
                 if not submission_detail_content:
                     continue
                 
                 if save_submission_as_file:
                     list_of_submissions[int(submission["timestamp"])] = submission_detail_content['code']
                 else:
-                    os.makedirs(self.config.submissions_directory, exist_ok=True)
-
                     file_extension = LeetcodeConstants.FILE_EXTENSIONS[submission["lang"]]
-                    submission_file_name = f"{LeetcodeUtility.qstr(question_frontend_id)}-{i+1:02}-{submission_id}.{file_extension}"
-                    submission_file_path = os.path.join(self.config.submissions_directory, submission_file_name)
+                    submission_file_name = f"{i+1:02}-{submission_id}.{file_extension}"
+                    submission_file_path = os.path.join(submissions_dir, submission_file_name)
 
-                    with open(submission_file_path, "w") as outfile:
-                        outfile.write(submission_detail_content['code'])
+                    if not os.path.exists(submission_file_path):
+                        with open(submission_file_path, "w") as outfile:
+                            outfile.write(submission_detail_content['code'])
         return list_of_submissions

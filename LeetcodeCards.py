@@ -135,7 +135,7 @@ class LeetcodeCards:
 
     def create_card_html(self, item_content, item_title, item_id, cards_chapter_dir):
         content = """<body>"""
-        question_content, _ = self.question.get_question_data(item_content)
+        question_content, _ = self.question.get_question_data(item_content, cards_chapter_dir)
         content += question_content
         content += self.get_article_data(item_content, item_title, item_id)
         content += self.get_html_article_data(item_content, item_title)

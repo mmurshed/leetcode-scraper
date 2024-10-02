@@ -121,7 +121,7 @@ class LeetcodeApi:
             self.cache.set(
                 key=cache_key,
                 value=data,
-                expire=self.config.cache_expiration_minutes * 60)
+                expire=self.config.cache_expiration_seconds)
 
         return data
     
@@ -149,6 +149,8 @@ class LeetcodeApi:
         return data
 
     def get_card_details(self, card_slug):
+        cache_key = card_slug
+
         query = {
             "operationName": "GetExtendedCardDetail",
             "variables": {
@@ -160,7 +162,7 @@ class LeetcodeApi:
         selector = ['data', 'card']
 
         data = self.cached_query(
-            cache_key=card_slug,
+            cache_key=cache_key,
             query=query,
             selector=selector)
         

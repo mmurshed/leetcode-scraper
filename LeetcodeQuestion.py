@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 from LeetcodeConstants import LeetcodeConstants
 from LeetcodeUtility import LeetcodeUtility
 from LeetcodeImage import LeetcodeImage
-from LeetcodePdfConverter import LeetcodePdfConverter
 from LeetcodeSolution import LeetcodeSolution
 from LeetcodeConfig import LeetcodeConfig
 from LeetcodeApi import LeetcodeApi
@@ -119,7 +118,7 @@ class LeetcodeQuestion:
             }
         }
         content = """<body>"""
-        question_content, question_title = self.get_question_data(item_content)
+        question_content, question_title = self.get_question_data(item_content, self.config.questions_directory)
         content += question_content
         content += """</body>"""
         slides_json = self.solutionhandler.find_slides_json(content, question_id)
@@ -167,7 +166,7 @@ class LeetcodeQuestion:
         return company_tag_stats_html
 
 
-    def get_question_data(self, item_content):
+    def get_question_data(self, item_content, root_dir):
         self.logger.info("Getting question data")
 
         if item_content['question']:
@@ -232,7 +231,7 @@ class LeetcodeQuestion:
             
             if solution:
                 solution = LeetcodeUtility.markdown_with_math(solution)
-                solution = self.solutionhandler.replace_iframes_with_codes(solution, question_id)
+                solution = self.solutionhandler.replace_iframes_with_content(solution, question_id, root_dir)
                 solution = self.solutionhandler.wrap_slides_with_p_tags(solution)
 
             default_code_html = """"""

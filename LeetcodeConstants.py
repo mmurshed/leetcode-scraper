@@ -5,12 +5,8 @@ from LeetcodeUtility import LeetcodeUtility
 
 class LeetcodeConstants:
     SUBMISSIONS_API_URL = "https://leetcode.com/api/submissions/?offset={}&limit={}"
-    
     LEETCODE_URL = "https://leetcode.com"
     LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
-
-    # Define default config with all necessary keys
-    DEFAULT_CONFIG = {}
 
     OS_ROOT = os.path.expanduser('~')
     ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
