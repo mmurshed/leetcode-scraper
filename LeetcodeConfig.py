@@ -26,6 +26,7 @@ class LeetcodeConfig:
     base64_encode_image: bool = False
     download_images: bool = True
     download_videos: bool = False
+    number_of_threads_for_pdf_conversion: int = 8
 
     def __init__(self, **kwargs):
         # Dynamically update the attributes from kwargs

@@ -14,12 +14,12 @@ class LeetcodePdfConverter:
         self, 
         config: LeetcodeConfig,
         logger: Logger,
-        images_dir: str,
-        num_threads: int = 8):
+        images_dir: str):
         
         self.config = config
         self.logger = logger
-        self.num_threads = self.valid_num_threads(num_threads)
+        self.num_threads = self.config.number_of_threads_for_pdf_conversion
+        self.num_threads = self.valid_num_threads(self.num_threads)
         
         self.docxArgs = [
             '--resource-path', images_dir
@@ -49,9 +49,10 @@ class LeetcodePdfConverter:
             if 1 <= ivalue <= 128:
                 return ivalue
             else:
-                raise argparse.ArgumentTypeError("Number of threads must be between 1 and 128")
+                self.logger.warning("Number of threads must be between 1 and 128. Defaulting to 8.")
         except ValueError:
-            raise argparse.ArgumentTypeError("Invalid number of threads")
+            self.logger.warning("Invalid number of threads. Default to 8.")
+        return 8
 
 
     def convert_folder(self, source_folder):
