@@ -9,7 +9,8 @@ from logging import Logger
 from utils.Constants import Constants
 from utils.Util import Util
 from utils.Config import Config
-from utils.ApiManager import ApiManager
+
+from api.ApiManager import ApiManager
 
 class SolutionDownloader:
     def __init__(

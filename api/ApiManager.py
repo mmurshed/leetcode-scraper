@@ -5,6 +5,7 @@ import requests
 from diskcache import Cache
 from logging import Logger
 
+from api.QueryHandler import CircuitBreakerException, QueryHandler
 from utils.Config import Config
 from utils.Constants import Constants
 
@@ -19,91 +20,38 @@ class ApiManager:
         self.config = config
         self.logger = logger
         self.cache = cache
-        self.leetcode_headers = leetcode_headers or Constants.LEETCODE_HEADERS
         
         self.cache_expiration_seconds = self.config.cache_expiration_days * 24 * 60 * 60
         self.session = requests.Session()
+        self.query_handler = QueryHandler(
+            config=self.config,
+            logger=self.logger,
+            session=self.session,
+            leetcode_headers=leetcode_headers)
 
     def cache_key(self, *args):
         # Convert all arguments to strings and join them with '-'
         return '-'.join(map(str, args))
-    
-    #region basic method
-    def extract_by_selector(self, response_content, selector):
-        """
-        Navigate through the response_content using the keys and/or indices in the selector.
-        The selector can contain both dictionary keys (strings) and list indices (integers).
-        """
-        data = response_content
-
-        for key in selector:
-            # Check if the current element is a dictionary and the key is a string
-            if isinstance(data, dict) and isinstance(key, str):
-                if key in data:
-                    data = data[key]
-                else:
-                    raise KeyError(f"Key '{key}' not found in response_content")
-            # Check if the current element is a list and the key is an integer (index)
-            elif isinstance(data, list) and isinstance(key, int):
-                try:
-                    data = data[key]
-                except IndexError:
-                    raise IndexError(f"Index '{key}' out of range in response_content list")
-            else:
-                raise ValueError(f"Unexpected type for key: {key}. Expected str for dict or int for list.")
-
-        return data
-
-
-    def query(self, method="post", query=None, selector=None, url=None, headers=None):
-        headers = headers or self.leetcode_headers
-        url = url or Constants.LEETCODE_GRAPHQL_URL
-
-        response = self.session.request(
-            method=method,
-            url=url,
-            headers=headers,
-            json=query
-        )
-
-        response.raise_for_status()
-
-        content_type = response.headers.get('Content-Type', '').lower()
-        is_json = 'application/json' in content_type
-
-        if is_json:
-            response_content = json.loads(response.content)
-            data = response_content
-
-            # Check if the selector is callable (a method) or a list of keys
-            if callable(selector):
-                # Apply the selector function to the response content
-                data = selector(response_content)
-            elif isinstance(selector, list):
-                # Use the selector as a list of keys
-                data = self.extract_by_selector(response_content, selector)
-        else:
-            data = response.text
-
-        return data
-    
+        
     def cached_query(self, cache_key, method="post", query=None, selector=None, url=None, headers=None):
         """
         This function caches and performs a query if data is not already cached.
         Optionally uses a selector to filter out the required part of the response.
         """
-        headers = headers or self.leetcode_headers
-        url = url or Constants.LEETCODE_GRAPHQL_URL
-
         if not self.config.cache_api_calls:
             self.logger.debug(f"Cache bypass {cache_key}")
-            # make direct calls
-            data = self.query(
-                method=method,
-                query=query,
-                selector=selector,
-                url=url,
-                headers=headers)
+            try:
+                data = self.query_handler.query(
+                    method=method,
+                    query=query,
+                    selector=selector,
+                    url=url,
+                    headers=headers)
+                return data
+            except CircuitBreakerException as e:
+                self.logger.warning(f"Request blocked by circuit breaker: {e}")
+            except requests.RequestException as e:
+                print(f"Request failed after retries: {e}")
             return data
 
         # Check if data exists in the cache and retrieve it
@@ -112,12 +60,18 @@ class ApiManager:
         if data is None:
             self.logger.debug(f"Cache miss {cache_key}")
             # If cache miss, make the request
-            data = self.query(
-                method=method,
-                query=query,
-                selector=selector,
-                url=url,
-                headers=headers)
+            try:
+                data = self.query_handler.query(
+                    method=method,
+                    query=query,
+                    selector=selector,
+                    url=url,
+                    headers=headers)
+                return data
+            except CircuitBreakerException as e:
+                self.logger.warning(f"Request blocked by circuit breaker: {e}")
+            except requests.RequestException as e:
+                print(f"Request failed after retries: {e}")
 
             # Store data in the cache
             self.cache.set(

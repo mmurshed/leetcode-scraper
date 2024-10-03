@@ -11,7 +11,8 @@ from downloaders.QuestionDownloader import QuestionDownloader
 from downloaders.SolutionDownloader import SolutionDownloader
 from downloaders.SubmissionDownloader import SubmissionDownloader
 
-from utils.ApiManager import ApiManager
+from api.ApiManager import ApiManager
+
 from utils.Config import Config
 from utils.Constants import Constants
 from utils.Util import Util

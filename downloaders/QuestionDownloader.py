@@ -8,7 +8,8 @@ from bs4 import BeautifulSoup
 from utils.Constants import Constants
 from utils.Util import Util
 from utils.Config import Config
-from utils.ApiManager import ApiManager
+
+from api.ApiManager import ApiManager
 
 from models.Question import Question
 from models.QuestionContent import QuestionContent
@@ -56,8 +57,10 @@ class QuestionDownloader:
         os.makedirs(self.config.questions_directory, exist_ok=True)
         filepath = os.path.join(self.config.questions_directory, "index.html")
 
+        count = 0
         html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th></tr>"""
         for question in questions:
+            count += 1
             filename = Util.qhtml(question.id, question.title)
 
             html += f'''<tr>

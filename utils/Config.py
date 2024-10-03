@@ -24,6 +24,7 @@ class Config:
         self.download_images: bool = True
         self.download_videos: bool = False
         self.threads_count_for_pdf_conversion: int = 8
+        self.api_retry_count = 3
 
         # Dynamically update the attributes from kwargs
         for key, value in kwargs.items():

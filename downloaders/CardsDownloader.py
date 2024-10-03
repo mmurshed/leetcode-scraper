@@ -10,7 +10,8 @@ from models.Question import Question
 from utils.Constants import Constants
 from utils.Util import Util
 from utils.Config import Config
-from utils.ApiManager import ApiManager
+
+from api.ApiManager import ApiManager
 
 from downloaders.ImageDownloader import ImageDownloader
 from downloaders.SolutionDownloader import SolutionDownloader
