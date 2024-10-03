@@ -1,15 +1,3 @@
-/testv1
-/testv2
-/questions
-all_cards_links.txt
-all_questions_links.txt
-company_tag_links.txt
-/base_scripts
-/env
 /__pycache__
-/cards
-proxies.txt
-/all_company_questions
-/all_company_questions_
-/v1
-/v2
+*.log
+*.log.*
