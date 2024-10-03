@@ -3,11 +3,9 @@ from dataclasses import dataclass
 import os
 
 @dataclass
-class LeetcodeConfig:
+class Config:
     def __init__(self, **kwargs):
         self.leetcode_cookie = ""
-        self.cards_filepath = ""
-        self.questions_filepath = ""
         self.save_directory: str = ""
         self.cache_directory: str = ""
         self.cards_directory: str = ""
@@ -16,9 +14,7 @@ class LeetcodeConfig:
         self.submissions_directory: str = ""
         self.cache_api_calls: bool = True
         self.cache_expiration_days: int = 7
-        self.cache_expiration_seconds: int = 7 * 24 * 60 * 60
         self.overwrite: bool = True
-        self.company_filepath: str = ""
         self.preferred_language_order: list = ["all"]
         self.include_submissions_count: int = 0
         self.include_default_code: bool = False
@@ -34,17 +30,15 @@ class LeetcodeConfig:
             if hasattr(self, key):
                 setattr(self, key, value)
 
-        self.set_derivative_values()
-
     @staticmethod
-    def from_json(json_str: str) -> 'LeetcodeConfig':
+    def from_json(json_str: str) -> 'Config':
         data = json.loads(json_str)
-        return LeetcodeConfig(**data)
+        return Config(**data)
 
     @staticmethod
-    def from_json_file(json_file: str) -> 'LeetcodeConfig':
+    def from_json_file(json_file: str) -> 'Config':
         with open(json_file, "r") as file:
-            return LeetcodeConfig.from_json(file.read())
+            return Config.from_json(file.read())
 
     def to_json(self) -> str:
         return json.dumps(self.__dict__, indent=4)
@@ -62,7 +56,6 @@ class LeetcodeConfig:
         self.companies_directory = os.path.join(self.save_directory, "companies")
         self.questions_directory = os.path.join(self.save_directory, "questions")
         self.submissions_directory = os.path.join(self.save_directory, "submissions")
-        self.cache_expiration_seconds = self.cache_expiration_days * 24 * 60 * 60
 
     @staticmethod
     def prompt_from_dataclass():

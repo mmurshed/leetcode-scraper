@@ -7,7 +7,7 @@ import shutil
 import sys
 import markdown
 
-class LeetcodeUtility:
+class Util:
     @staticmethod
     def clear():
         current_os = sys.platform
@@ -22,24 +22,20 @@ class LeetcodeUtility:
 
     @staticmethod
     def copy_question_file(save_path, question_id, question_title, dest_dir, questions_dir, copy_pdf = True, copy_videos = False):
-        question_filename = LeetcodeUtility.qhtml(question_id, question_title)
+        question_filename = Util.qhtml(question_id, question_title)
         question_filepath = os.path.join(questions_dir, question_filename)
 
-        # logger.info(f"Copying {question_filepath} to {dest_dir}")
-
         if not os.path.exists(question_filepath):
-            # logger.error(f"File not found: {question_filepath}")
             return False
 
         if not os.path.exists(dest_dir):
-            # logger.error(f"Destination not found: {dest_dir}")
             return False
 
         # Copy html
         destination_filepath = os.path.join(dest_dir, question_filename)
         shutil.copy2(question_filepath, destination_filepath)
 
-        question_id_str = LeetcodeUtility.qstr(question_id)
+        question_id_str = Util.qstr(question_id)
 
         # Copy images
         images_dir = os.path.join(questions_dir, "images")
@@ -54,7 +50,7 @@ class LeetcodeUtility:
 
         # Copy pdf
         if copy_pdf:
-            question_basename = LeetcodeUtility.qbasename(question_id, question_title)
+            question_basename = Util.qbasename(question_id, question_title)
             pdf_dir = os.path.join(save_path, "questions_pdf")
             dest_pdf_dir = os.path.join(dest_dir, "questions_pdf")
 
@@ -101,11 +97,11 @@ class LeetcodeUtility:
 
     @staticmethod
     def qhtml(question_id, question_title):
-        return f"{LeetcodeUtility.qbasename(question_id, question_title)}.html"
+        return f"{Util.qbasename(question_id, question_title)}.html"
 
     @staticmethod
     def qbasename(question_id, queston_title):
-        return f"{LeetcodeUtility.qstr(question_id)}-{queston_title}"
+        return f"{Util.qstr(question_id)}-{queston_title}"
 
 
     @staticmethod
@@ -122,8 +118,8 @@ class LeetcodeUtility:
 
     @staticmethod
     def markdown_with_math(content):
-        content = LeetcodeUtility.convert_display_math_to_inline(content)
-        content = LeetcodeUtility.clean_tex_math(content)
+        content = Util.convert_display_math_to_inline(content)
+        content = Util.clean_tex_math(content)
 
         # Convert Markdown to HTML and ensure TeX math is not escaped
         return markdown.markdown(
@@ -147,7 +143,7 @@ class LeetcodeUtility:
     def get_logger() -> Logger:
         # Set up logging
         log_file = 'scrape_errors.log'
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger("Leet")
         handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -155,3 +151,7 @@ class LeetcodeUtility:
         logger.addHandler(handler)
 
         return logger
+
+    @staticmethod
+    def sanitize_title(title):
+        return re.sub(r'[:?|></\\]', Util.replace_filename, title)

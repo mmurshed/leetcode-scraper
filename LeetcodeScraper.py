@@ -3,43 +3,43 @@ import argparse
 from diskcache import Cache
 import requests
 
-from LeetcodeApi import LeetcodeApi
-from LeetcodeCards import LeetcodeCards
-from LeetcodeCompany import LeetcodeCompany
-from LeetcodeConstants import LeetcodeConstants
-from LeetcodeImage import LeetcodeImage
-from LeetcodePdfConverter import LeetcodePdfConverter
-from LeetcodeQuestion import LeetcodeQuestion
-from LeetcodeSolution import LeetcodeSolution
-from LeetcodeSubmission import LeetcodeSubmission
-from LeetcodeUtility import LeetcodeUtility
-from LeetcodeConfigLoader import LeetcodeConfigLoader
+from ApiManager import ApiManager
+from CardsDownloader import CardsDownloader
+from CompanyDownloader import CompanyDownloader
+from Constants import Constants
+from ImageDownloader import ImageDownloader
+from PdfConverter import PdfConverter
+from QuestionDownloader import QuestionDownloader
+from SolutionDownloader import SolutionDownloader
+from SubmissionDownloader import SubmissionDownloader
+from Util import Util
+from ConfigLoader import ConfigLoader
 
 
 def init(logger):
-    config = LeetcodeConfigLoader.load_config()
+    config = ConfigLoader.load_config()
 
-    LeetcodeConstants.LEETCODE_HEADERS = LeetcodeConstants.create_headers(config.leetcode_cookie)
+    Constants.LEETCODE_HEADERS = Constants.create_headers(config.leetcode_cookie)
     cache = Cache(
         directory=config.cache_directory)
 
-    leetapi = LeetcodeApi(
+    leetapi = ApiManager(
         config=config,
         logger=logger,
         cache=cache)
-    imagehandler = LeetcodeImage(
+    imagehandler = ImageDownloader(
         config=config,
         logger=logger)
-    solution = LeetcodeSolution(
+    solution = SolutionDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi)
-    submission = LeetcodeSubmission(
+    submission = SubmissionDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi)
 
-    question = LeetcodeQuestion(
+    question = QuestionDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi,
@@ -47,7 +47,7 @@ def init(logger):
         imagehandler=imagehandler,
         submissionhandler=submission)
     
-    cards = LeetcodeCards(
+    cards = CardsDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi,
@@ -56,7 +56,7 @@ def init(logger):
         imagehandler=imagehandler
     )
 
-    company = LeetcodeCompany(
+    company = CompanyDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi,
@@ -65,7 +65,7 @@ def init(logger):
     return config, cache, cards, company, imagehandler, question, submission
 
 def main(logger):
-    LeetcodeUtility.clear()
+    Util.clear()
     previous_choice = 0
 
     while True:
@@ -108,33 +108,34 @@ Press any to quit
                     logger.error(f"Initilization error {e}")
                     continue
 
-
             if choice == 1:
-                LeetcodeConfigLoader.generate_config()
+                ConfigLoader.generate_config()
 
             elif choice == 2:
                 card_slug = input("Enter card slug: ")
-                cards.scrape_selected_card(card_slug)
+                cards.download_selected_card(card_slug)
             elif choice == 3:
-                cards.scrape_card_url()
+                cards.download_all_cards()
 
             elif choice == 4:
                 question_id = input("Enter question id: ")
-                questionhandler.scrape_question_url(int(question_id))
+                questionhandler.download_selected_question(int(question_id))
             elif choice == 5:
-                questionhandler.scrape_question_url()
+                questionhandler.download_all_questions()
 
             elif choice == 6:
                 company_slug = input("Enter company slug: ")
-                company.scrape_selected_company_questions(company_slug)
+                company.download_selected_company_questions(company_slug)
             elif choice == 7:
-                company.scrape_all_company_questions()
+                company.download_all_company_questions()
 
             elif choice == 8:
                 question_id = input("Enter question id: ")
-                submission.get_selected_submissions(questionhandler=questionhandler, question_id=question_id)
+                submission.get_selected_submissions(
+                    questiondownloader=questionhandler,
+                    question_id=int(question_id))
             elif choice == 9:
-                submission.get_all_submissions(questionhandler=questionhandler)
+                submission.get_all_submissions(questiondownloader=questionhandler)
 
             elif choice == 10:
                 directory = input("Enter directory: ")
@@ -142,7 +143,7 @@ Press any to quit
                 if not os.path.exists(directory) or not os.path.isdir(directory):
                     logger.error("Diectory doesn't exists or not valid")
 
-                converter = LeetcodePdfConverter(
+                converter = PdfConverter(
                     config=config,
                     logger=logger,
                     images_dir=imagehandler.get_images_dir(directory))
@@ -183,7 +184,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logger = LeetcodeUtility.get_logger()
+    logger = Util.get_logger()
     if args.proxy:
         os.environ['http_proxy'] = "http://"+args.proxy
         os.environ['https_proxy'] = "http://"+args.proxy

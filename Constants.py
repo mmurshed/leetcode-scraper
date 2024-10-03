@@ -1,9 +1,7 @@
 import os
 from requests.structures import CaseInsensitiveDict
 
-from LeetcodeUtility import LeetcodeUtility
-
-class LeetcodeConstants:
+class Constants:
     SUBMISSIONS_API_URL = "https://leetcode.com/api/submissions/?offset={}&limit={}"
     LEETCODE_URL = "https://leetcode.com"
     LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
@@ -39,7 +37,7 @@ class LeetcodeConstants:
 
     @staticmethod
     def get_html_header():
-        filepath = os.path.join(LeetcodeConstants.ROOT_DIR, "leetheader.txt")
+        filepath = os.path.join(Constants.ROOT_DIR, "leetheader.txt")
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"The file '{filepath}' does not exist.")
         with open(filepath, "r") as file:
@@ -50,7 +48,7 @@ class LeetcodeConstants:
     #region headers
     @staticmethod
     def create_headers(leetcode_cookie=""):
-        headers = LeetcodeConstants.DEFAULT_HEADERS
+        headers = Constants.DEFAULT_HEADERS
         headers["cookie"] = f"LEETCODE_SESSION={leetcode_cookie}"
         return headers
     
@@ -67,4 +65,4 @@ class LeetcodeConstants:
 
     #endregion headers
 
-LeetcodeConstants.HTML_HEADER = LeetcodeConstants.get_html_header()
+Constants.HTML_HEADER = Constants.get_html_header()

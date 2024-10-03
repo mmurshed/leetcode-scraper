@@ -1,33 +1,33 @@
 import os
 
-from LeetcodeConstants import LeetcodeConstants
-from LeetcodeUtility import LeetcodeUtility
-from LeetcodeConfig import LeetcodeConfig
+from Constants import Constants
+from Util import Util
+from Config import Config
 
-class LeetcodeConfigLoader:
+class ConfigLoader:
     def __init__(self):
         pass
 
     @staticmethod
     def create_base_config_dir():
-        base_config_path = os.path.join(LeetcodeConstants.OS_ROOT, ".leetcode-scraper")
+        base_config_path = os.path.join(Constants.OS_ROOT, ".leetcode-scraper")
         os.makedirs(base_config_path, exist_ok=True)
         return base_config_path
 
 
     @staticmethod
     def generate_config():
-        LeetcodeUtility.clear()
-        base_config_path = LeetcodeConfigLoader.create_base_config_dir()
+        Util.clear()
+        base_config_path = ConfigLoader.create_base_config_dir()
         config_file_path = os.path.join(base_config_path, "config.json")
 
         config_found = False
         # Load existing config if available
         if os.path.exists(config_file_path):
-            config = LeetcodeConfig.from_json_file(config_file_path)
+            config = Config.from_json_file(config_file_path)
             config_found = True
         else:
-            config = LeetcodeConfig()
+            config = Config()
 
         # Prompt user for new config values
         print(f'''
@@ -35,7 +35,7 @@ class LeetcodeConfigLoader:
             Config Save Folder: {config_file_path}
         ''')
 
-        config_prompts = LeetcodeConfig.prompt_from_dataclass()
+        config_prompts = Config.prompt_from_dataclass()
 
         # Prompt user for values and retain existing config if no new input is provided
         for key, prompt in config_prompts.items():
@@ -74,11 +74,11 @@ class LeetcodeConfigLoader:
 
     @staticmethod
     def load_config():
-        config_dir = os.path.join(LeetcodeConstants.OS_ROOT, ".leetcode-scraper")
+        config_dir = os.path.join(Constants.OS_ROOT, ".leetcode-scraper")
         config_path = os.path.join(config_dir, "config.json")
 
         # Check if config file exists
         if not os.path.exists(config_path):
             raise Exception("No config found, please create one")
 
-        return LeetcodeConfig.from_json_file(config_path)
+        return Config.from_json_file(config_path)

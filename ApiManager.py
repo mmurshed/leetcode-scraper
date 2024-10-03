@@ -1,4 +1,3 @@
-import os
 import json
 from bs4 import BeautifulSoup
 import requests
@@ -6,25 +5,26 @@ import requests
 from diskcache import Cache
 from logging import Logger
 
-from LeetcodeConfig import LeetcodeConfig
-from LeetcodeConstants import LeetcodeConstants
+from Config import Config
+from Constants import Constants
 
-class LeetcodeApi:
+class ApiManager:
     def __init__(
         self,
-        config: LeetcodeConfig,
+        config: Config,
         logger: Logger,
         cache: Cache,
         leetcode_headers:str = None):
         
         self.config = config
         self.logger = logger
-        self.leetcode_headers = leetcode_headers or LeetcodeConstants.LEETCODE_HEADERS
-        
-        self.session = requests.Session()
         self.cache = cache
+        self.leetcode_headers = leetcode_headers or Constants.LEETCODE_HEADERS
+        
+        self.cache_expiration_seconds = self.config.cache_expiration_days * 24 * 60 * 60
+        self.session = requests.Session()
 
-    def cache_key(*args):
+    def cache_key(self, *args):
         # Convert all arguments to strings and join them with '-'
         return '-'.join(map(str, args))
     
@@ -57,7 +57,7 @@ class LeetcodeApi:
 
     def query(self, method="post", query=None, selector=None, url=None, headers=None):
         headers = headers or self.leetcode_headers
-        url = url or LeetcodeConstants.LEETCODE_GRAPHQL_URL
+        url = url or Constants.LEETCODE_GRAPHQL_URL
 
         response = self.session.request(
             method=method,
@@ -93,9 +93,10 @@ class LeetcodeApi:
         Optionally uses a selector to filter out the required part of the response.
         """
         headers = headers or self.leetcode_headers
-        url = url or LeetcodeConstants.LEETCODE_GRAPHQL_URL
+        url = url or Constants.LEETCODE_GRAPHQL_URL
 
         if not self.config.cache_api_calls:
+            self.logger.debug(f"Cache bypass {cache_key}")
             # make direct calls
             data = self.query(
                 method=method,
@@ -109,6 +110,7 @@ class LeetcodeApi:
         data = self.cache.get(key=cache_key)
 
         if data is None:
+            self.logger.info(f"Cache miss {cache_key}")
             # If cache miss, make the request
             data = self.query(
                 method=method,
@@ -121,7 +123,9 @@ class LeetcodeApi:
             self.cache.set(
                 key=cache_key,
                 value=data,
-                expire=self.config.cache_expiration_seconds)
+                expire=self.cache_expiration_seconds)
+        else:
+            self.logger.info(f"Cache hit {cache_key}")
 
         return data
     
@@ -130,7 +134,7 @@ class LeetcodeApi:
     #region cards api
 
     def get_categories(self):
-        cache_key = "allcards"
+        cache_key = self.cache_key("card", "categories")
 
         query = {
             "operationName": "GetCategories",
@@ -149,7 +153,7 @@ class LeetcodeApi:
         return data
 
     def get_card_details(self, card_slug):
-        cache_key = card_slug
+        cache_key = self.cache_key("card", "detail", card_slug)
 
         query = {
             "operationName": "GetExtendedCardDetail",
@@ -169,7 +173,7 @@ class LeetcodeApi:
         return data
 
     def get_chapters_with_items(self, card_slug):
-        cache_key = self.cache_key(card_slug, "detail")
+        cache_key = self.cache_key("card", card_slug, "chapters")
 
         query = {
             "operationName": "GetChaptersWithItems",
@@ -188,7 +192,7 @@ class LeetcodeApi:
         return data
 
     def get_chapter_items(self, card_slug, item_id):
-        cache_key = self.cache_key(card_slug, item_id)
+        cache_key = self.cache_key("card", card_slug, "item", item_id)
 
         query = {
             "operationName": "GetItem",
@@ -210,7 +214,7 @@ class LeetcodeApi:
 
     #region questions api
     def get_questions_count(self):
-        cache_key = "allquestioncount"
+        cache_key = self.cache_key("all", "questions", "count")
 
         query = {
             "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "
@@ -225,7 +229,7 @@ class LeetcodeApi:
         return data
     
     def get_all_questions(self, all_questions_count):
-        cache_key = "allquestions"
+        cache_key = self.cache_key("all", "questions", "list")
 
         query = {
             "query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ",
@@ -247,7 +251,7 @@ class LeetcodeApi:
         return data
 
     def get_question(self, question_id, question_title_slug):
-        cache_key = self.cache_key(question_id, "qdat")
+        cache_key = self.cache_key("question", question_id)
 
         query = {
             "operationName": "GetQuestion",
@@ -270,7 +274,7 @@ class LeetcodeApi:
     #region playground codes api
 
     def get_all_playground_codes(self, question_id, uuid):
-        cache_key = self.cache_key(question_id, uuid)
+        cache_key = self.cache_key("question", question_id, "uuid", uuid)
 
         query = {
             "operationName": "allPlaygroundCodes",
@@ -286,7 +290,7 @@ class LeetcodeApi:
         return data
     
     def get_slides_json(self, hash, slide_url):
-        cache_key = hash
+        cache_key = self.cache_key("slide", hash)
         selector = ['timeline']
 
         data = self.cached_query(
@@ -294,16 +298,18 @@ class LeetcodeApi:
             method="get",
             selector=selector,
             url=slide_url,
-            headers=LeetcodeConstants.DEFAULT_HEADERS)
+            headers=Constants.DEFAULT_HEADERS)
         
         return data
 
     def get_slide_content(self, question_id, file_hash, filename_var1, filename_var2):
-        cache_key = self.cache_key(question_id, file_hash)
+        cache_key = self.cache_key("question", question_id, "slide", file_hash)
 
         slide_url1 = f"https://assets.leetcode.com/static_assets/media/{filename_var1}.json"
         slide_url2 = f"https://assets.leetcode.com/static_assets/media/{filename_var2}.json"
         selector = ['timeline']
+
+        data = None
         
         try:
             self.logger.debug(f"Slide url1: {slide_url1}")
@@ -312,7 +318,7 @@ class LeetcodeApi:
                 method="get",
                 url=slide_url1,
                 selector=selector,
-                headers=LeetcodeConstants.DEFAULT_HEADERS)
+                headers=Constants.DEFAULT_HEADERS)
         except:
             self.logger.error(f"Slide url1 failed: {slide_url1}")
             self.logger.debug(f"Slide url2: {slide_url2}")
@@ -323,7 +329,7 @@ class LeetcodeApi:
                     method="get",
                     url=slide_url2,
                     selector=selector,
-                    headers=LeetcodeConstants.DEFAULT_HEADERS)
+                    headers=Constants.DEFAULT_HEADERS)
             except:
                 self.logger.error(f"Slide url2 failed: {slide_url2}")
                 pass
@@ -333,8 +339,8 @@ class LeetcodeApi:
     #endregion playground codes api
     
     #region articles api
-    def get_article(self, question_id, article_id):
-        cache_key = self.cache_key(question_id, article_id)
+    def get_article(self, item_id, article_id):
+        cache_key = self.cache_key("item", item_id, "article", article_id)
 
         query = {
             "operationName": "GetArticle",
@@ -352,8 +358,8 @@ class LeetcodeApi:
         
         return data
 
-    def get_html_article(self, html_article_id):
-        cache_key = self.cache_key(html_article_id, "data")
+    def get_html_article(self, item_id, html_article_id):
+        cache_key = self.cache_key("item", item_id, "html", "article", html_article_id)
 
         query = {
             "operationName": "GetHtmlArticle",
@@ -374,13 +380,13 @@ class LeetcodeApi:
     #endregion articles api 
 
     #region submissions api
-    def get_submission_list(self, question_id, question_title_slug):
-        cache_key = self.cache_key(question_id, "subm")
+    def get_submission_list(self, question_id, question_slug):
+        cache_key = self.cache_key("question", question_id, "submissions")
 
         query = {
             "operationName": "submissionList",
             "variables": {
-                "questionSlug": question_title_slug,
+                "questionSlug": question_slug,
                 "offset": 0,
                 "limit": 20,
                 "lastKey": None
@@ -397,7 +403,7 @@ class LeetcodeApi:
         return data
 
     def get_submission_details(self, question_id, submission_id):
-        cache_key = self.cache_key(question_id, "detail")
+        cache_key = self.cache_key("question", question_id, "submission", submission_id)
 
         query = {
             "operationName": "submissionDetails",
@@ -422,13 +428,13 @@ class LeetcodeApi:
     #endregion submissions api
 
     #region solutions api
-    def get_official_solution(self, question_id, question_title_slug):
-        cache_key = self.cache_key(question_id, "sol")
+    def get_official_solution(self, question_id, question_slug):
+        cache_key = self.cache_key("question", question_id, "solution")
 
         query = {
             "operationName": "officialSolution",
             "variables": {
-                "titleSlug": question_title_slug
+                "titleSlug": question_slug
             },
             "query": "\n    query officialSolution($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    solution {\n      id\n      title\n      content\n      contentTypeId\n      paidOnly\n      hasVideoSolution\n      paidOnlyVideo\n      canSeeDetail\n      rating {\n        count\n        average\n        userRating {\n          score\n        }\n      }\n      topic {\n        id\n        commentCount\n        topLevelCommentCount\n        viewCount\n        subscribed\n        solutionTags {\n          name\n          slug\n        }\n        post {\n          id\n          status\n          creationDate\n          author {\n            username\n            isActive\n            profile {\n              userAvatar\n              reputation\n            }\n          }\n        }\n      }\n    }\n  }\n}\n    "
         }
@@ -445,7 +451,7 @@ class LeetcodeApi:
     
     #region company api
     def get_question_company_tags(self):
-        cache_key = "allcompanyquestions"
+        cache_key = self.cache_key("company", "tags")
 
         query = {
             "operationName": "questionCompanyTags",
@@ -463,7 +469,7 @@ class LeetcodeApi:
         return data
 
     def get_favorite_details_for_company(self, company_slug):
-        cache_key = self.cache_key(company_slug, "favdetails")
+        cache_key = self.cache_key("company", company_slug, "favorite")
 
         query = {
             "operationName": "favoriteDetailV2ForCompany",
@@ -482,13 +488,13 @@ class LeetcodeApi:
         
         return data
     
-    def get_favorite_question_list_for_company(self, favoriteSlug, total_questions):
-        cache_key = favoriteSlug
+    def get_favorite_question_list_for_company(self, favorite_slug, total_questions):
+        cache_key = self.cache_key("company", "favorite", favorite_slug)
 
         query = {
             "operationName": "favoriteQuestionList",
             "variables": {
-                "favoriteSlug": favoriteSlug,
+                "favoriteSlug": favorite_slug,
                 "filter": {
                     "positionRoleTagSlug": "",
                     "skip": 0,
@@ -508,7 +514,7 @@ class LeetcodeApi:
     
 
     def get_next_data_id(self):
-        cache_key = "companynextdataid"
+        cache_key = self.cache_key("company", "nextdataid")
 
         def selector(data):
             next_data_soup = BeautifulSoup(data, "html.parser")
@@ -521,8 +527,8 @@ class LeetcodeApi:
             cache_key=cache_key,
             selector=selector,
             method="get",
-            url=f"{LeetcodeConstants.LEETCODE_URL}/problemset/",
-            headers=LeetcodeConstants.DEFAULT_HEADERS)
+            url=f"{Constants.LEETCODE_URL}/problemset/",
+            headers=Constants.DEFAULT_HEADERS)
 
         return data
 

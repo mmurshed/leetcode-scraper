@@ -6,13 +6,13 @@ from threading import Thread
 
 from logging import Logger
 
-from LeetcodeConfig import LeetcodeConfig
-from LeetcodeConstants import LeetcodeConstants
+from Config import Config
+from Constants import Constants
 
-class LeetcodePdfConverter:
+class PdfConverter:
     def __init__(
         self, 
-        config: LeetcodeConfig,
+        config: Config,
         logger: Logger,
         images_dir: str):
         
@@ -24,8 +24,8 @@ class LeetcodePdfConverter:
             '--resource-path', images_dir
         ]
 
-        template_file = os.path.join(LeetcodeConstants.ROOT_DIR, "leet-template.latex")
-        header_file = os.path.join(LeetcodeConstants.ROOT_DIR, "enumitem.tex")
+        template_file = os.path.join(Constants.ROOT_DIR, "leet-template.latex")
+        header_file = os.path.join(Constants.ROOT_DIR, "enumitem.tex")
 
         if not os.path.exists(template_file):
             raise Exception(f"Template file missing {template_file}")

@@ -9,13 +9,13 @@ import cloudscraper
 
 from logging import Logger
 
-from LeetcodeUtility import LeetcodeUtility
-from LeetcodeConfig import LeetcodeConfig
+from Util import Util
+from Config import Config
 
-class LeetcodeImage:
+class ImageDownloader:
     def __init__(
         self, 
-        config: LeetcodeConfig,
+        config: Config,
         logger: Logger):
 
         self.config = config
@@ -68,7 +68,7 @@ class LeetcodeImage:
 
     def recompress_images(self, question_id, images_dir):
         # Convert the question_id to a zero-padded 4-digit string
-        question_id_str = LeetcodeUtility.qstr(question_id)
+        question_id_str = Util.qstr(question_id)
 
         # Loop through all files in the source folder
         for filename in os.listdir(images_dir):
@@ -95,7 +95,7 @@ class LeetcodeImage:
             return
 
     def download_image(self, question_id, img_url, images_dir):
-        self.logger.debug(f"Downloading image: {img_url}")
+        self.logger.info(f"Downloading image: {img_url}")
 
         if not validators.url(img_url):
             self.logger.error(f"Invalid image url: {img_url}")
@@ -108,7 +108,7 @@ class LeetcodeImage:
 
         url_hash = hashlib.md5(img_url.encode()).hexdigest()
 
-        image_path = os.path.join(images_dir, f"{LeetcodeUtility.qbasename(question_id, url_hash)}.{img_ext}")
+        image_path = os.path.join(images_dir, f"{Util.qbasename(question_id, url_hash)}.{img_ext}")
 
         if not self.config.cache_api_calls or not os.path.exists(image_path):
             try:
@@ -145,7 +145,7 @@ class LeetcodeImage:
 
         return relframes
 
-    def load_image_in_base64(self, files, img_url):
+    def load_image_base64(self, files, img_url):
         self.logger.debug(f"Loading image: {img_url}")
 
         parsed_url = urlsplit(img_url)
@@ -218,7 +218,7 @@ class LeetcodeImage:
                     files = self.download_image(question_id, img_url, images_dir)
                     if files:
                         if self.config.base64_encode_image:
-                            frames = self.load_image_in_base64(files, img_url)
+                            frames = self.load_image_base64(files, img_url)
                         else:
                             frames = self.load_image_local(files, root_dir)
 
@@ -243,14 +243,14 @@ class LeetcodeImage:
                         image.decompose()
         return content_soup
 
-    def manual_convert_images_to_base64(self):
+    def convert_all_images_to_base64(self):
         root_dir = input("Enter path of the folder where html are located: ")
         for root, dirs, files in os.walk(root_dir):
             for file in files:
                 if file.endswith('.html'):
                     with open(os.path.join(root, file), "r") as f:
                         soup = BeautifulSoup(f.read(), 'html.parser')
-                        question_id, _ = LeetcodeUtility.html_to_question(file)
+                        question_id, _ = Util.html_to_question(file)
                         res_soup = self.fix_image_urls(soup, question_id)
                     with open(os.path.join(root, file), "w") as f:
                         f.write(res_soup.prettify())
