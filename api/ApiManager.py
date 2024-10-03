@@ -14,20 +14,17 @@ class ApiManager:
         self,
         config: Config,
         logger: Logger,
-        cache: Cache,
-        leetcode_headers:str = None):
+        cache: Cache):
         
         self.config = config
         self.logger = logger
         self.cache = cache
         
         self.cache_expiration_seconds = self.config.cache_expiration_days * 24 * 60 * 60
-        self.session = requests.Session()
         self.query_handler = QueryHandler(
             config=self.config,
             logger=self.logger,
-            session=self.session,
-            leetcode_headers=leetcode_headers)
+            session=requests.Session())
 
     def cache_key(self, *args):
         # Convert all arguments to strings and join them with '-'
@@ -38,6 +35,10 @@ class ApiManager:
         This function caches and performs a query if data is not already cached.
         Optionally uses a selector to filter out the required part of the response.
         """
+
+        headers = headers or Constants.LEETCODE_HEADERS
+        url = url or Constants.LEETCODE_GRAPHQL_URL
+
         if not self.config.cache_api_calls:
             self.logger.debug(f"Cache bypass {cache_key}")
             try:
@@ -51,7 +52,7 @@ class ApiManager:
             except CircuitBreakerException as e:
                 self.logger.warning(f"Request blocked by circuit breaker: {e}")
             except requests.RequestException as e:
-                print(f"Request failed after retries: {e}")
+                self.logger.error(f"Request failed after retries: {e}")
             return data
 
         # Check if data exists in the cache and retrieve it
@@ -71,7 +72,7 @@ class ApiManager:
             except CircuitBreakerException as e:
                 self.logger.warning(f"Request blocked by circuit breaker: {e}")
             except requests.RequestException as e:
-                print(f"Request failed after retries: {e}")
+                self.logger.error(f"Request failed after retries: {e}")
 
             # Store data in the cache
             self.cache.set(

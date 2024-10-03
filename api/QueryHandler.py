@@ -1,6 +1,5 @@
 import json
 import time
-import logging
 import requests
 
 from logging import Logger
@@ -18,12 +17,10 @@ class QueryHandler:
         self,
         config: Config,
         logger: Logger,
-        session,
-        leetcode_headers:str = None):
+        session):
 
         self.config = config
         self.logger = logger
-        self.leetcode_headers = leetcode_headers or Constants.LEETCODE_HEADERS
         self.session = session
         self.circuit_open = False
         self.circuit_reset_time = 0
@@ -46,9 +43,9 @@ class QueryHandler:
         self.circuit_reset_time = time.time() + self.circuit_timeout
         self.logger.error("Circuit breaker opened. No requests will be made for 60 seconds.")
 
-    def log_before_retry(self, retry_state):
+    def log_before_retry(retry_state):
         """Custom logger function to access self.logger before retry."""
-        self.logger.warning(f"Retrying... Attempt number: {retry_state.attempt_number}")
+        # self.logger.warning(f"Retrying... Attempt number: {retry_state.attempt_number}")
 
     @retry(
         stop=stop_after_attempt(3),  # Retry 3 times
@@ -60,9 +57,6 @@ class QueryHandler:
         # Check if the circuit is open
         if self.is_circuit_open():
             raise CircuitBreakerException("Circuit breaker is open, requests are blocked.")
-
-        headers = headers or self.leetcode_headers
-        url = url or Constants.LEETCODE_GRAPHQL_URL
 
         try:
             # Make the request
@@ -77,9 +71,8 @@ class QueryHandler:
             response.raise_for_status()
 
             content_type = response.headers.get('Content-Type', '').lower()
-            is_json = 'application/json' in content_type
 
-            if is_json:
+            if 'application/json' in content_type:
                 response_content = json.loads(response.content)
                 data = response_content
 
@@ -88,8 +81,12 @@ class QueryHandler:
                     data = selector(response_content)
                 elif isinstance(selector, list):
                     data = self.extract_by_selector(response_content, selector)
-            else:
+            elif 'text/' in content_type:
+                # Handle text data
                 data = response.text
+            else:
+                # Handle binary data
+                data = response.content  # Raw binary data
 
             # If the request is successful, reset retry count
             self.retry_count = 0

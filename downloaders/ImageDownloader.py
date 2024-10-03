@@ -4,11 +4,15 @@ import os
 from urllib.parse import urlparse, urlsplit
 from PIL import Image
 from bs4 import BeautifulSoup
+import requests
 import validators
 import cloudscraper
 
 from logging import Logger
 
+from api.QueryHandler import CircuitBreakerException, QueryHandler
+
+from utils.Constants import Constants
 from utils.Util import Util
 from utils.Config import Config
 
@@ -20,7 +24,11 @@ class ImageDownloader:
 
         self.config = config
         self.logger = logger
-        self.cloudscaper = cloudscraper.create_scraper()
+        self.query_handler = QueryHandler(
+            config=self.config,
+            logger=self.logger,
+            session=cloudscraper.create_scraper())
+
 
     def is_valid_image(self, image_path):
         # SVG file is allowed by default
@@ -111,18 +119,22 @@ class ImageDownloader:
         image_path = os.path.join(images_dir, f"{Util.qbasename(question_id, url_hash)}.{img_ext}")
 
         if not self.config.cache_api_calls or not os.path.exists(image_path):
+            data = None
             try:
-                img_data = self.cloudscaper.get(url=img_url).content
+                data = self.query_handler.query(
+                    method="get",
+                    url=img_url)
+            except CircuitBreakerException as e:
+                self.logger.warning(f"Request blocked by circuit breaker: {e}")
+            except requests.RequestException as e:
+                self.logger.error(f"Request failed after retries: {e}")
 
+            if data:
                 with open(image_path, 'wb') as file:
-                    file.write(img_data)
+                    file.write(data)
 
                 if self.config.recompress_image:
                     self.recompress_image(image_path)
-
-            except Exception as e:
-                self.logger.error(f"Error downloading image url: {img_url}")
-                return None
 
         if not os.path.exists(image_path):
             self.logger.error(f"File not found {image_path}\n{img_url}")
