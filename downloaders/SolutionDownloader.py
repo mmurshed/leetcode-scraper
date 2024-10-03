@@ -2,11 +2,10 @@ import hashlib
 import os
 import re
 from bs4 import BeautifulSoup
-import yt_dlp
 
 from logging import Logger
 
-from utils.Constants import Constants
+from downloaders.VideoDownloader import VideoDownloader
 from utils.Util import Util
 from utils.Config import Config
 
@@ -56,10 +55,6 @@ class SolutionDownloader:
         iframe.replace_with(BeautifulSoup(f""" {code_html} """, 'html.parser'))
 
     def get_video_content(self, iframe, question_id, src_url, root_dir):
-        videos_dir = os.path.join(root_dir, "videos")
-        if self.config.download_videos:
-            os.makedirs(videos_dir, exist_ok=True)
-
         width = iframe.get('width') or 640
         height = iframe.get('height') or 360
 
@@ -68,28 +63,19 @@ class SolutionDownloader:
         video_basename = f"{Util.qbasename(question_id, video_id)}.{video_extension}"
 
         if self.config.download_videos:
-            ydl_opts = {
-                'outtmpl': f'{videos_dir}/{Util.qstr(question_id)}-%(id)s.%(ext)s',
-                'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-                'http_headers': {
-                    'Referer': Constants.LEETCODE_URL,
-                }
-            }
+            videos_dir = os.path.join(root_dir, "videos")
+            os.makedirs(videos_dir, exist_ok=True)
 
-            # Download the video using yt-dlp
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(src_url, download=self.config.download_videos)
-                video_extension = info_dict.get('ext')
-                video_filename = ydl.prepare_filename(info_dict)
-                video_basename = os.path.basename(video_filename)
+            video_basename, video_extension = VideoDownloader.download_video(
+                url=src_url,
+                videos_dir=videos_dir)
 
-        if video_basename:
-            video_html = f"""
-                <video width="{width}" height="{height}" controls>
-                    <source src="videos/{video_basename}" type="video/{video_extension}">
-                </video>
-            """
-            iframe.replace_with(BeautifulSoup(video_html, 'html.parser'))
+        video_html = f"""
+            <video width="{width}" height="{height}" controls>
+                <source src="videos/{video_basename}" type="video/{video_extension}">
+            </video>
+        """
+        iframe.replace_with(BeautifulSoup(video_html, 'html.parser'))
 
 
     def replace_iframes_with_content(self, content, question_id, root_dir):
