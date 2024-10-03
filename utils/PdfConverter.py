@@ -23,12 +23,6 @@ class PdfConverter:
             '--resource-path', images_dir
         ]
 
-        if not os.path.exists(Constants.TEX_TEMPLATE_PATH):
-            raise Exception(f"Template file missing {Constants.TEX_TEMPLATE_PATH}")
-
-        if not os.path.exists(Constants.TEX_HEADER_PATH):
-            raise Exception(f"Header file missing {Constants.TEX_HEADER_PATH}")
-
         self.pdfArgs = [
             '-V', 'geometry:margin=0.5in',
             '--pdf-engine=xelatex',

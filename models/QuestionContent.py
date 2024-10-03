@@ -2,8 +2,8 @@ import json
 import re
 from typing import List, Optional
 
-from Constants import Constants
-from Util import Util
+from utils.Constants import Constants
+from utils.Util import Util
 
 class QuestionContent:
     def __init__(self, title: str, content: str, difficulty: str, company_tag_stats: str, similar_questions: str, submit_url: str, default_code: str, solution: Optional[str], hints: List[str]):

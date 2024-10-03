@@ -5,15 +5,17 @@ from logging import Logger
 from typing import List
 from bs4 import BeautifulSoup
 
-from Constants import Constants
-from Util import Util
-from ImageDownloader import ImageDownloader
-from SolutionDownloader import SolutionDownloader
-from Config import Config
-from ApiManager import ApiManager
-from SubmissionDownloader import SubmissionDownloader
-from Question import Question
-from QuestionContent import QuestionContent
+from utils.Constants import Constants
+from utils.Util import Util
+from utils.Config import Config
+from utils.ApiManager import ApiManager
+
+from models.Question import Question
+from models.QuestionContent import QuestionContent
+
+from downloaders.ImageDownloader import ImageDownloader
+from downloaders.SolutionDownloader import SolutionDownloader
+from downloaders.SubmissionDownloader import SubmissionDownloader
 
 class QuestionDownloader:
     def __init__(

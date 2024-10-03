@@ -5,8 +5,8 @@ import requests
 from diskcache import Cache
 from logging import Logger
 
-from Config import Config
-from Constants import Constants
+from utils.Config import Config
+from utils.Constants import Constants
 
 class ApiManager:
     def __init__(

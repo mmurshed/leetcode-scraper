@@ -6,10 +6,10 @@ import yt_dlp
 
 from logging import Logger
 
-from Constants import Constants
-from Util import Util
-from Config import Config
-from ApiManager import ApiManager
+from utils.Constants import Constants
+from utils.Util import Util
+from utils.Config import Config
+from utils.ApiManager import ApiManager
 
 class SolutionDownloader:
     def __init__(

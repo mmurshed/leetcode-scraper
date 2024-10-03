@@ -1,4 +1,4 @@
-from Constants import Constants
+from utils.Constants import Constants
 
 
 class Card:

@@ -3,19 +3,20 @@ import argparse
 from diskcache import Cache
 import requests
 
-from ApiManager import ApiManager
-from CardsDownloader import CardsDownloader
-from CompanyDownloader import CompanyDownloader
-from Config import Config
-from Constants import Constants
-from ImageDownloader import ImageDownloader
-from PdfConverter import PdfConverter
-from QuestionDownloader import QuestionDownloader
-from SolutionDownloader import SolutionDownloader
-from SubmissionDownloader import SubmissionDownloader
-from Util import Util
-from ConfigLoader import ConfigLoader
+from downloaders.CardsDownloader import CardsDownloader
+from downloaders.CompanyDownloader import CompanyDownloader
+from downloaders.ImageDownloader import ImageDownloader
 
+from downloaders.QuestionDownloader import QuestionDownloader
+from downloaders.SolutionDownloader import SolutionDownloader
+from downloaders.SubmissionDownloader import SubmissionDownloader
+
+from utils.ApiManager import ApiManager
+from utils.Config import Config
+from utils.Constants import Constants
+from utils.Util import Util
+from utils.ConfigLoader import ConfigLoader
+from utils.PdfConverter import PdfConverter
 
 def init(logger):
     config = ConfigLoader.load_config()

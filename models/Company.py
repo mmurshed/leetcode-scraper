@@ -1,5 +1,4 @@
-from Constants import Constants
-
+from utils.Constants import Constants
 
 class Company:
     def __init__(self, slug: str):

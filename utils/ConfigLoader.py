@@ -1,8 +1,8 @@
 import os
 
-from Constants import Constants
-from Util import Util
-from Config import Config
+from utils.Constants import Constants
+from utils.Util import Util
+from utils.Config import Config
 
 class ConfigLoader:
     def __init__(self):

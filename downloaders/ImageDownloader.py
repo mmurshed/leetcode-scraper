@@ -9,8 +9,8 @@ import cloudscraper
 
 from logging import Logger
 
-from Util import Util
-from Config import Config
+from utils.Util import Util
+from utils.Config import Config
 
 class ImageDownloader:
     def __init__(

@@ -7,7 +7,7 @@ class Constants:
     LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
 
     OS_ROOT = os.path.expanduser('~')
-    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
     FILE_EXTENSIONS = {
         "python": "py",
@@ -35,9 +35,32 @@ class Constants:
 
     HTML_HEADER = None
 
+    ASSETS_DIR = None
+
+    TEX_TEMPLATE_PATH = None
+    TEX_HEADER_PATH = None
+
+    @staticmethod
+    def get_assets_dir():
+        return os.path.join(Constants.ROOT_DIR, "assets")
+
+    @staticmethod
+    def get_tex_template_path():
+        filepath = os.path.join(Constants.ASSETS_DIR, "template.latex")
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+        return filepath
+
+    @staticmethod
+    def get_tex_header_path():
+        filepath = os.path.join(Constants.ASSETS_DIR, "enumitem.tex")
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+        return filepath
+
     @staticmethod
     def get_html_header():
-        filepath = os.path.join(Constants.ROOT_DIR, "leetheader.txt")
+        filepath = os.path.join(Constants.ASSETS_DIR, "header.txt")
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"The file '{filepath}' does not exist.")
         with open(filepath, "r") as file:
@@ -65,4 +88,7 @@ class Constants:
 
     #endregion headers
 
+Constants.ASSETS_DIR = Constants.get_assets_dir()
 Constants.HTML_HEADER = Constants.get_html_header()
+Constants.TEX_TEMPLATE_PATH = Constants.get_tex_template_path()
+Constants.TEX_HEADER_PATH = Constants.get_tex_header_path()

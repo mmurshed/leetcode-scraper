@@ -2,11 +2,12 @@ import os
 
 from logging import Logger
 
-from Constants import Constants
-from Submission import Submission
-from Util import Util
-from Config import Config
-from ApiManager import ApiManager
+from utils.Constants import Constants
+from utils.Util import Util
+from utils.Config import Config
+from utils.ApiManager import ApiManager
+
+from models.Submission import Submission
 
 class SubmissionDownloader:
     def __init__(

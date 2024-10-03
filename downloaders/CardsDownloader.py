@@ -4,15 +4,17 @@ from logging import Logger
 from typing import List
 from bs4 import BeautifulSoup
 
-from Card import Card
-from Constants import Constants
-from Question import Question
-from Util import Util
-from ImageDownloader import ImageDownloader
-from SolutionDownloader import SolutionDownloader
-from Config import Config
-from ApiManager import ApiManager
-from QuestionDownloader import QuestionDownloader
+from models.Card import Card
+from models.Question import Question
+
+from utils.Constants import Constants
+from utils.Util import Util
+from utils.Config import Config
+from utils.ApiManager import ApiManager
+
+from downloaders.ImageDownloader import ImageDownloader
+from downloaders.SolutionDownloader import SolutionDownloader
+from downloaders.QuestionDownloader import QuestionDownloader
 
 class CardsDownloader:
     def __init__(

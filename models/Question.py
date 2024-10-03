@@ -1,6 +1,5 @@
-from Constants import Constants
-from Util import Util
-
+from utils.Constants import Constants
+from utils.Util import Util
 
 class Question:
     def __init__(self, id: int, title_slug: str, title: str, frequency: float, difficulty: str):

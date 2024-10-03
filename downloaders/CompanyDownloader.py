@@ -3,13 +3,15 @@ import os
 from logging import Logger
 from typing import List
 
-from Company import Company
-from Question import Question
-from Util import Util
-from Constants import Constants
-from Config import Config
-from ApiManager import ApiManager
-from QuestionDownloader import QuestionDownloader
+from models.Company import Company
+from models.Question import Question
+
+from utils.Util import Util
+from utils.Constants import Constants
+from utils.Config import Config
+from utils.ApiManager import ApiManager
+
+from downloaders.QuestionDownloader import QuestionDownloader
 
 class CompanyDownloader:
     def __init__(

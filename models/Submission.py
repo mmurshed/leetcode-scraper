@@ -1,7 +1,3 @@
-from Constants import Constants
-from Util import Util
-
-
 class Submission:
     def __init__(self, id: int, timestamp: int, lang: str):
         self.id = id

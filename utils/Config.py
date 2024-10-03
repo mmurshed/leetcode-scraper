@@ -74,3 +74,4 @@ class Config:
     @staticmethod
     def get_images_dir(directory):
         return os.path.join(directory, "images")
+    
