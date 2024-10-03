@@ -17,12 +17,12 @@ class CompanyDownloader:
         config: Config,
         logger: Logger,
         leetapi: ApiManager,
-        questionhandler: QuestionDownloader):
+        questiondownloader: QuestionDownloader):
 
         self.config = config
         self.logger = logger
         self.lc = leetapi
-        self.questionhandler = questionhandler
+        self.questiondownloader = questiondownloader
         
     def get_company_slugs(self) -> List[Company]:
         company_data = self.lc.get_question_company_tags()
@@ -154,7 +154,7 @@ class CompanyDownloader:
         
         for favorite_slug, (_, questions) in favorite_details.items():
             company_fav_dir  = os.path.join(self.config.companies_directory, company_slug, favorite_slug)
-            not_downloaded_questions, downloaded_questions = self.questionhandler.filter_out_downloaded(questions, company_fav_dir)
+            not_downloaded_questions, downloaded_questions = self.questiondownloader.filter_out_downloaded(questions, company_fav_dir)
 
             # skip already processed questions
             questions_seen.update([question.id for question in downloaded_questions])
@@ -169,7 +169,7 @@ class CompanyDownloader:
 
     def download_company_question(self, question: Question, company_fav_dir):
         if self.config.overwrite:
-            self.questionhandler.create_question_html(question, company_fav_dir)
+            self.questiondownloader.create_question_html(question, company_fav_dir)
             return
 
         copied = Util.copy_question_file(
@@ -181,5 +181,5 @@ class CompanyDownloader:
 
         # if copy failed just download
         if not copied:
-            self.questionhandler.create_question_html(question, company_fav_dir)
+            self.questiondownloader.create_question_html(question, company_fav_dir)
 

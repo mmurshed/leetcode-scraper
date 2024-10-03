@@ -6,6 +6,7 @@ import yt_dlp
 
 from logging import Logger
 
+from Constants import Constants
 from Util import Util
 from Config import Config
 from ApiManager import ApiManager
@@ -21,84 +22,89 @@ class SolutionDownloader:
         self.logger = logger
         self.lc = leetapi
 
-    def replace_iframes_with_content(self, content, question_id, root_dir):
-        self.logger.debug("Replacing iframe with code")
+    def get_playground_content(self, iframe, question_id, src_url):
+        uuid = src_url.split('/')[-2]
+        self.logger.debug(f"Playground uuid: {uuid} url: {src_url}")
+        
+        playground_content = self.lc.get_all_playground_codes(question_id, uuid)
 
+        if not playground_content:
+            self.logger.error(f"Error in getting code data from source url {src_url}")
+            return
+
+        code_html = f"""<div>"""
+        
+        lang_to_include = "all"
+        languages = set(item.get("langSlug") for item in playground_content)
+
+        if "all" in self.config.preferred_language_order:
+            lang_to_include == "all"
+        else:
+            for preferred_language in self.config.preferred_language_order:
+                if preferred_language in languages:
+                    lang_to_include = preferred_language
+                    break
+
+        for code_idx in range(len(playground_content)):
+            lang = playground_content[code_idx]['langSlug']
+            if lang_to_include == "all" or lang_to_include == lang:
+                code_html += f"""<div style="font-weight: bold;">{lang}</div>"""
+                code_html += f"""<div><code style="color:black"><pre>{playground_content[code_idx]['code']}</pre></code></div>"""
+
+        code_html += f"""</div>"""
+        iframe.replace_with(BeautifulSoup(f""" {code_html} """, 'html.parser'))
+
+    def get_video_content(self, iframe, question_id, src_url, root_dir):
         videos_dir = os.path.join(root_dir, "videos")
         if self.config.download_videos:
             os.makedirs(videos_dir, exist_ok=True)
 
+        width = iframe.get('width') or 640
+        height = iframe.get('height') or 360
+
+        video_id = src_url.split("/")[-1]
+        video_extension = "mp4"
+        video_basename = f"{Util.qbasename(question_id, video_id)}.{video_extension}"
+
+        if self.config.download_videos:
+            ydl_opts = {
+                'outtmpl': f'{videos_dir}/{Util.qstr(question_id)}-%(id)s.%(ext)s',
+                'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+                'http_headers': {
+                    'Referer': Constants.LEETCODE_URL,
+                }
+            }
+
+            # Download the video using yt-dlp
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(src_url, download=self.config.download_videos)
+                video_extension = info_dict.get('ext')
+                video_filename = ydl.prepare_filename(info_dict)
+                video_basename = os.path.basename(video_filename)
+
+        if video_basename:
+            video_html = f"""
+                <video width="{width}" height="{height}" controls>
+                    <source src="videos/{video_basename}" type="video/{video_extension}">
+                </video>
+            """
+            iframe.replace_with(BeautifulSoup(video_html, 'html.parser'))
+
+
+    def replace_iframes_with_content(self, content, question_id, root_dir):
+        self.logger.debug("Replacing iframe with code")
+
         content_soup = BeautifulSoup(content, 'html.parser')
         iframes = content_soup.find_all('iframe')
-        for if_idx, iframe in enumerate(iframes, start=1):
-            src_url = iframe['src']
-            self.logger.debug(f"Playground url: {src_url}")
 
+        for iframe in iframes:
+            src_url = iframe['src']
             src_url_lcase = str.lower(src_url)
 
             if "playground" in src_url_lcase:
-                uuid = src_url.split('/')[-2]
-                self.logger.debug(f"Playground uuid: {uuid} url: {src_url}")
-                
-                playground_content = self.lc.get_all_playground_codes(question_id, uuid)
-
-                if not playground_content:
-                    self.logger.error(f"Error in getting code data from source url {src_url}")
-                    continue
-
-                code_html = f"""<div>"""
-                
-                lang_to_include = "all"
-                languages = set(item.get("langSlug") for item in playground_content)
-
-                if "all" in self.config.preferred_language_order:
-                    lang_to_include == "all"
-                else:
-                    for preferred_language in self.config.preferred_language_order:
-                        if preferred_language in languages:
-                            lang_to_include = preferred_language
-                            break
-
-                for code_idx in range(len(playground_content)):
-                    lang = playground_content[code_idx]['langSlug']
-                    if lang_to_include == "all" or lang_to_include == lang:
-                        code_html += f"""<div style="font-weight: bold;">{lang}</div>"""
-                        code_html += f"""<div><code style="color:black"><pre>{playground_content[code_idx]['code']}</pre></code></div>"""
-
-                code_html += f"""</div>"""
-                iframe.replace_with(BeautifulSoup(
-                    f""" {code_html} """, 'html.parser'))
+                self.get_playground_content(iframe, question_id, src_url)
             elif "vimeo" in src_url_lcase:
-                width = iframe.get('width') or 640
-                height = iframe.get('height') or 360
-
-                video_id = src_url.split("/")[-1]
-                video_extension = "mp4"
-                video_basename = f"{Util.qbasename(question_id, video_id)}.{video_extension}"
-
-                if self.config.download_videos:
-                    ydl_opts = {
-                        'outtmpl': f'{videos_dir}/{Util.qstr(question_id)}-%(id)s.%(ext)s',
-                        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-                        'http_headers': {
-                            'Referer': 'https://leetcode.com',
-                        }
-                    }
-
-                    # Download the video using yt-dlp
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info_dict = ydl.extract_info(src_url, download=self.config.download_videos)
-                        video_extension = info_dict.get('ext')
-                        video_filename = ydl.prepare_filename(info_dict)
-                        video_basename = os.path.basename(video_filename)
-
-                if video_basename:
-                    video_html = f"""
-                        <video width="{width}" height="{height}" controls>
-                            <source src="videos/{video_basename}" type="video/{video_extension}">
-                        </video>
-                    """
-                    iframe.replace_with(BeautifulSoup(video_html, 'html.parser'))
+                self.get_video_content(iframe, question_id, src_url, root_dir)
 
         return str(content_soup)
 
@@ -145,7 +151,7 @@ class SolutionDownloader:
         return slides_html
 
     def replace_slides_json(self, content, question_id):
-        self.logger.info("Finding slides json")
+        self.logger.info("Replacing slides json")
 
         slide_idx = [0]  # A list to hold the counter, because lists are mutable
 

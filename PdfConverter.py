@@ -1,5 +1,4 @@
 import os
-import argparse
 import pypandoc
 from queue import Queue
 from threading import Thread
@@ -55,7 +54,7 @@ class PdfConverter:
 
 
     def convert_folder(self, source_folder):
-        curdir = os.curdir()
+        curdir = os.curdir
         os.chdir(source_folder)
 
         pdf_output_folder = os.path.join(source_folder, 'pdf')

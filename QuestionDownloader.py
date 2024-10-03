@@ -21,16 +21,16 @@ class QuestionDownloader:
         config: Config,
         logger: Logger,
         leetapi: ApiManager,
-        solutionhandler: SolutionDownloader,
-        imagehandler: ImageDownloader,
-        submissionhandler: SubmissionDownloader):
+        solutiondownloader: SolutionDownloader,
+        imagedownloader: ImageDownloader,
+        submissiondownloader: SubmissionDownloader):
         
         self.config = config
         self.logger = logger
         self.lc = leetapi
-        self.submissionhandler = submissionhandler
-        self.solutionhandler = solutionhandler
-        self.imagehandler = imagehandler
+        self.submissiondownloader = submissiondownloader
+        self.solutiondownloader = solutiondownloader
+        self.imagedownloader = imagedownloader
     
     #region question urls
     
@@ -54,20 +54,17 @@ class QuestionDownloader:
         os.makedirs(self.config.questions_directory, exist_ok=True)
         filepath = os.path.join(self.config.questions_directory, "index.html")
 
-        count = 0
-        html = f"""<tr><th>Count</th><th>Id</th><th style="width:70%">Title</th></tr>"""
+        html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th></tr>"""
         for question in questions:
             filename = Util.qhtml(question.id, question.title)
-            qfilepath = os.path.join(self.config.questions_directory, filename)
-            if os.path.exists(qfilepath):
-                count += 1
-                html += f'''<tr>
-                            <td>{count:04}</td>
-                            <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
-                            <td><a slug="{question.slug}" title="{question.title}" href="{filename}">{question.title}</a></td>
-                            </tr>'''
 
-        html = f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>Questions</h1><p>Total questions {count}</p><table>{html}</table></body></html>"""
+            html += f'''<tr>
+                        <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
+                        <td><a slug="{question.slug}" title="{question.title}" href="{filename}">{question.title}</a></td>
+                        <td>{question.difficulty}</td>
+                        </tr>'''
+
+        html = f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>All Questions</h1><p>Total questions {count}</p><table>{html}</table></body></html>"""
         with open(filepath, 'w') as ifile:
             ifile.write(html)
 
@@ -119,15 +116,10 @@ class QuestionDownloader:
     def create_question_html(self, question: Question, root_dir):                
         self.logger.info(f"Scraping question {question.id}")
 
-        content = f"""<body>"""
         question_html = self.get_question_html(question, root_dir)
-        content += question_html
-        content += """</body>"""
-
-        content = Constants.HTML_HEADER + content
-
+        content = f"""{Constants.HTML_HEADER}<body>{question_html}</body>"""
         content_soup = BeautifulSoup(content, 'html.parser')
-        content_soup = self.imagehandler.fix_image_urls(content_soup, question.id, root_dir)
+        content_soup = self.imagedownloader.fix_image_urls(content_soup, question.id, root_dir)
 
         question_path = os.path.join(root_dir, Util.qhtml(question.id, question.title))
         with open(question_path, 'w', encoding="utf-8") as f:
@@ -135,16 +127,16 @@ class QuestionDownloader:
 
     def get_similar_questions_html(self, similar_questions):
         self.logger.info("Generating similar questions")
-        similar_questions_html = ""
+        similar_questions_html = """"""
 
         if not similar_questions or similar_questions == []:
             return similar_questions_html
 
-        similar_questions_html += f"""<div><div style="background: white;"><h3>Similar Questions</h3>"""
+        similar_questions_html += f"""<div style="background: white;"><h3>Similar Questions</h3>"""
         for idx, similar_question in enumerate(similar_questions, start=1):
             # similar_question = question_html(similar_question['title'], similar_question['title'])
             similar_questions_html += f"""<div class="similar-questions-container"><div>{idx}. <a target="_blank" href="https://leetcode.com/problems/{similar_question['titleSlug']}">{similar_question['title']}</a> ({similar_question['difficulty']}) <a target="_blank" href="./{similar_question['title']}.html">Local</a></div></div>"""
-        similar_questions_html += f"""</div></div>"""
+        similar_questions_html += f"""</div>"""
 
         return similar_questions_html
 
@@ -156,7 +148,7 @@ class QuestionDownloader:
 
         company_tag_stats =  {int(k): v for k, v in sorted(company_tag_stats.items(), key=lambda item: int(item[0]))}
 
-        company_tag_stats_html += f"""<div><div style="background: white;"><h3>Company Tag Stats</h3>"""
+        company_tag_stats_html += f"""<div style="background: white;"><h3>Company Tag Stats</h3>"""
 
         for key, value in company_tag_stats.items():
             company_tag_stats_html += f"""<h4>Years: {str(key-1)}-{str(key)}</h4><div>"""
@@ -169,7 +161,7 @@ class QuestionDownloader:
 
             company_tag_stats_html += """</div>"""
 
-        company_tag_stats_html += """</div></div>"""
+        company_tag_stats_html += """</div>"""
 
         return company_tag_stats_html
 
@@ -202,7 +194,7 @@ class QuestionDownloader:
 
         submission_html = ""
         if self.config.include_submissions_count > 0:
-            submissions = self.submissionhandler.get_submission_data(question.id, question.slug, False, self.config.include_submissions_count)
+            submissions = self.submissiondownloader.get_submission_data(question.id, question.slug, False, self.config.include_submissions_count)
             if submissions and len(submissions) > 0:
                 for timestamp, code in submissions.items():
                     submission_time = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H.%M.%S")
@@ -223,8 +215,8 @@ class QuestionDownloader:
         solution_html = """"""
         if question_content.solution:
             solution_html = Util.markdown_with_math(question_content.solution)
-            solution_html = self.solutionhandler.replace_iframes_with_content(solution_html, question.id, root_dir)
-            solution_html = self.solutionhandler.replace_slides_json(solution_html, question.id)
+            solution_html = self.solutiondownloader.replace_iframes_with_content(solution_html, question.id, root_dir)
+            solution_html = self.solutiondownloader.replace_slides_json(solution_html, question.id)
             solution_html = f"""
                 <div><h3>Solution</h3>
                 <md-block class="question__solution">{solution_html}</md-block></div>"""

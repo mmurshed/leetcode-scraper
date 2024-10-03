@@ -6,6 +6,7 @@ import requests
 from ApiManager import ApiManager
 from CardsDownloader import CardsDownloader
 from CompanyDownloader import CompanyDownloader
+from Config import Config
 from Constants import Constants
 from ImageDownloader import ImageDownloader
 from PdfConverter import PdfConverter
@@ -43,24 +44,24 @@ def init(logger):
         config=config,
         logger=logger,
         leetapi=leetapi,
-        solutionhandler=solution,
-        imagehandler=imagehandler,
-        submissionhandler=submission)
+        solutiondownloader=solution,
+        imagedownloader=imagehandler,
+        submissiondownloader=submission)
     
     cards = CardsDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi,
-        questionhandler=question,
-        solutionhandler=solution,
-        imagehandler=imagehandler
+        questiondownloader=question,
+        solutiondownloader=solution,
+        imagehdownloader=imagehandler
     )
 
     company = CompanyDownloader(
         config=config,
         logger=logger,
         leetapi=leetapi,
-        questionhandler=question)
+        questiondownloader=question)
 
     return config, cache, cards, company, imagehandler, question, submission
 
@@ -146,7 +147,7 @@ Press any to quit
                 converter = PdfConverter(
                     config=config,
                     logger=logger,
-                    images_dir=imagehandler.get_images_dir(directory))
+                    images_dir=Config.get_images_dir(directory))
                 converter.convert_folder(directory)
             elif choice == 11:
                 cache.clear()

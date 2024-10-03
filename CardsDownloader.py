@@ -20,16 +20,16 @@ class CardsDownloader:
         config: Config,
         logger: Logger,
         leetapi: ApiManager,
-        questionhandler: QuestionDownloader,
-        solutionhandler: SolutionDownloader,
-        imagehandler: ImageDownloader):
+        questiondownloader: QuestionDownloader,
+        solutiondownloader: SolutionDownloader,
+        imagehdownloader: ImageDownloader):
 
         self.config = config
         self.logger = logger
         self.lc = leetapi
-        self.question = questionhandler
-        self.solution = solutionhandler
-        self.imagehandler = imagehandler
+        self.questiondownloader = questiondownloader
+        self.solutiondownloader = solutiondownloader
+        self.imagedownloader = imagehdownloader
 
     #region card urls
     def get_cards(self) -> List[Card]:
@@ -150,7 +150,7 @@ class CardsDownloader:
 
         if item_content['question']:
             question = Question.from_json(item_content['question'])
-            question_html = self.question.get_question_html(question, cards_chapter_dir)
+            question_html = self.questiondownloader.get_question_html(question, cards_chapter_dir)
             content += question_html
 
         if item_content['article']:
@@ -161,13 +161,13 @@ class CardsDownloader:
 
         content = f"""<body>{content}</body>"""
 
-        content = self.solution.replace_slides_json(content, item_id)
+        content = self.solutiondownloader.replace_slides_json(content, item_id)
 
         content = Constants.HTML_HEADER + content
 
         content_soup = BeautifulSoup(content, 'html.parser')
 
-        content_soup = self.imagehandler.fix_image_urls(content_soup, item_id, cards_chapter_dir)
+        content_soup = self.imagedownloader.fix_image_urls(content_soup, item_id, cards_chapter_dir)
 
         card_path = os.path.join(cards_chapter_dir, Util.qhtml(item_id, item_title))
         with open(card_path, "w", encoding="utf-8") as file:

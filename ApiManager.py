@@ -110,7 +110,7 @@ class ApiManager:
         data = self.cache.get(key=cache_key)
 
         if data is None:
-            self.logger.info(f"Cache miss {cache_key}")
+            self.logger.debug(f"Cache miss {cache_key}")
             # If cache miss, make the request
             data = self.query(
                 method=method,
@@ -125,7 +125,7 @@ class ApiManager:
                 value=data,
                 expire=self.cache_expiration_seconds)
         else:
-            self.logger.info(f"Cache hit {cache_key}")
+            self.logger.debug(f"Cache hit {cache_key}")
 
         return data
     

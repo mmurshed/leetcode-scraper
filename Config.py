@@ -70,3 +70,7 @@ class Config:
             "include_submissions_count": "How many submissions to include (0 for none): ",
         }
         return prompts
+    
+    @staticmethod
+    def get_images_dir(directory):
+        return os.path.join(directory, "images")

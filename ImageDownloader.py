@@ -95,7 +95,7 @@ class ImageDownloader:
             return
 
     def download_image(self, question_id, img_url, images_dir):
-        self.logger.info(f"Downloading image: {img_url}")
+        self.logger.debug(f"Downloading: {img_url}")
 
         if not validators.url(img_url):
             self.logger.error(f"Invalid image url: {img_url}")
