@@ -2,7 +2,6 @@ import base64
 import hashlib
 import os
 from urllib.parse import urlparse, urlsplit
-from PIL import Image
 from bs4 import BeautifulSoup
 import requests
 import validators
@@ -12,7 +11,7 @@ from logging import Logger
 
 from api.QueryHandler import CircuitBreakerException, QueryHandler
 
-from utils.Constants import Constants
+from utils.ImageUtil import ImageUtil
 from utils.Util import Util
 from utils.Config import Config
 
@@ -28,79 +27,6 @@ class ImageDownloader:
             config=self.config,
             logger=self.logger,
             session=cloudscraper.create_scraper())
-
-
-    def is_valid_image(self, image_path):
-        # SVG file is allowed by default
-        if image_path.lower().endswith('.svg'):
-            return True
-
-        try:
-            with Image.open(image_path) as img:
-                img.verify()
-        except:
-            return False
-        return True
-
-    def decompose_gif(self, gif_path, filename_no_ext, output_folder):
-        # Open the GIF file
-        gif = Image.open(gif_path)
-        
-        frame_paths = []
-
-        # Iterate over each frame in the GIF
-        frame_number = 0
-        while True:
-            try:
-                # Save each frame as a separate image
-                frame_path = os.path.join(output_folder, f"{filename_no_ext}_{frame_number:03d}.png")
-                gif.seek(frame_number)
-                gif.save(frame_path, 'PNG')
-                frame_number += 1
-                frame_paths.append(frame_path)
-            except EOFError:
-                break
-        return frame_paths
-
-    def convert_to_uncompressed_png(self, img_path, img_ext):
-        # Open the PNG file
-        try:
-            if img_ext == 'png':
-                with Image.open(img_path) as img:
-                    # Save the image without compression
-                    img.save(img_path, 'PNG', compress_level=0)
-                    self.logger.debug(f"Decompressed PNG saved at {img_path}")
-        except Exception as e:
-            self.logger.error(f"Error reading file {img_path}\n{e}")
-            return None
-
-    def recompress_images(self, question_id, images_dir):
-        # Convert the question_id to a zero-padded 4-digit string
-        question_id_str = Util.qstr(question_id)
-
-        # Loop through all files in the source folder
-        for filename in os.listdir(images_dir):
-            if filename.startswith(question_id_str):
-                input_image_path = os.path.join(images_dir, filename)
-                self.recompress_image(input_image_path)
-
-
-    def recompress_image(self, img_path):
-        try:
-            img_path_lower = img_path.lower()
-            # Open the image
-            with Image.open(img_path) as img:
-                if img_path_lower.endswith('.png'):
-                    # Save the image with optimization
-                    img.save(img_path, optimize=True)
-                    self.logger.debug(f"Recompressed and overwrote: {img_path}")
-                elif img_path_lower.endswith(('.jpg', '.jpeg')):
-                    # Recompress JPEG with a quality parameter (default is 75, you can adjust)
-                    img.save(img_path, 'JPEG', quality=85, optimize=True)
-                    self.logger.debug(f"Recompressed and overwrote: {img_path}")
-        except Exception as e:
-            self.logger.error(f"Error recompressing {img_path}: {e}")
-            return
 
     def download_image(self, question_id, img_url, images_dir):
         self.logger.debug(f"Downloading: {img_url}")
@@ -140,7 +66,7 @@ class ImageDownloader:
             self.logger.error(f"File not found {image_path}\n{img_url}")
             return None
 
-        if not self.is_valid_image(image_path):
+        if not ImageUtil.is_valid_image(image_path):
             os.remove(image_path)
             self.logger.error(f"Invalid image file from url: {img_url}")
             return None
@@ -171,7 +97,7 @@ class ImageDownloader:
 
         imgs_decoded = []
         for file in files:
-            if not self.is_valid_image(file):
+            if not ImageUtil.is_valid_image(file):
                 continue
 
             with open(file, "rb") as file:

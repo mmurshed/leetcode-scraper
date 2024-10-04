@@ -75,8 +75,9 @@ class Util:
         return True
 
     @staticmethod
-    def html_to_question(filename):
-        filename = os.path.basename(filename)
+    def html_to_question(filepath):
+        # get the file name from full path
+        filename = os.path.basename(filepath)
 
         # Remove the file extension
         name, _ = os.path.splitext(filename)
