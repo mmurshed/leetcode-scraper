@@ -21,8 +21,8 @@ class SubmissionDownloader:
         self.logger = logger
         self.lc = leetapi
 
-    def get_selected_submissions(self, questiondownloader, question_id: int):
-        questions = questiondownloader.get_all_questions()
+    def get_selected_submissions(self, question_id: int):
+        questions = self.lc.get_all_questions()
         
         questions = [question for question in questions if question.id == question_id]
         if len(questions) == 0:
@@ -32,8 +32,8 @@ class SubmissionDownloader:
         self.get_submission_data(questions[0].id, questions[0].slug, True)
 
 
-    def get_all_submissions(self, questiondownloader):
-        questions = questiondownloader.get_all_questions()
+    def get_all_submissions(self):
+        questions = self.lc.get_all_questions()
 
         for question in questions:
             self.get_submission_data(question.id, question.slug, True)

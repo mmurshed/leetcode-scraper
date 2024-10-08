@@ -9,7 +9,7 @@ import cloudscraper
 
 from logging import Logger
 
-from api.QueryHandler import CircuitBreakerException, QueryHandler
+from api.RetriableRequest import CircuitBreakerException, RetriableRequest
 
 from utils.ImageUtil import ImageUtil
 from utils.Util import Util
@@ -23,7 +23,7 @@ class ImageDownloader:
 
         self.config = config
         self.logger = logger
-        self.query_handler = QueryHandler(
+        self.reqh = RetriableRequest(
             config=self.config,
             logger=self.logger,
             session=cloudscraper.create_scraper())
@@ -47,7 +47,7 @@ class ImageDownloader:
         if not self.config.cache_api_calls or not os.path.exists(image_path):
             data = None
             try:
-                data = self.query_handler.query(
+                data = self.reqh.request(
                     method="get",
                     url=img_url)
             except CircuitBreakerException as e:

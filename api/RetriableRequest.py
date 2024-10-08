@@ -12,7 +12,7 @@ class CircuitBreakerException(Exception):
     """Custom exception to raise when the circuit breaker trips."""
     pass
 
-class QueryHandler:
+class RetriableRequest:
     def __init__(
         self,
         config: Config,
@@ -24,8 +24,8 @@ class QueryHandler:
         self.session = session
         self.circuit_open = False
         self.circuit_reset_time = 0
-        self.retry_count = self.config.api_retry_count
-        self.max_failures = 3  # Number of failures before the circuit breaker trips
+        self.retry_count = 0
+        self.max_failures = self.config.api_max_failures  # Number of failures before the circuit breaker trips
         self.circuit_timeout = 60  # Timeout duration for circuit breaker (in seconds)
 
     def is_circuit_open(self):
@@ -53,7 +53,7 @@ class QueryHandler:
         before_sleep=log_before_retry,  # Use the custom logger method
         reraise=True  # Raise the final exception after retries are exhausted
     )
-    def query(self, method="post", query=None, selector=None, url=None, headers=None):
+    def request(self, method="post", request=None, selector=None, url=None, headers=None):
         # Check if the circuit is open
         if self.is_circuit_open():
             raise CircuitBreakerException("Circuit breaker is open, requests are blocked.")
@@ -64,7 +64,7 @@ class QueryHandler:
                 method=method,
                 url=url,
                 headers=headers,
-                json=query
+                json=request
             )
 
             # Raise an error if the response status is not 2xx
@@ -96,6 +96,8 @@ class QueryHandler:
             # Increment the failure counter
             self.retry_count += 1
             self.logger.error(f"Request failed: {e}. Failure count: {self.retry_count}")
+            self.logger.error(f"method: {method}")
+            self.logger.error(f"request: {request}")
 
             # If max failures are reached, open the circuit breaker
             if self.retry_count >= self.max_failures:

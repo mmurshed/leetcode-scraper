@@ -5,6 +5,7 @@ from logging import Logger
 from typing import List
 from bs4 import BeautifulSoup
 
+from ai.OpenAISolutionGenerator import OpenAISolutionGenerator
 from utils.Constants import Constants
 from utils.Util import Util
 from utils.Config import Config
@@ -26,7 +27,8 @@ class QuestionDownloader:
         leetapi: ApiManager,
         solutiondownloader: SolutionDownloader,
         imagedownloader: ImageDownloader,
-        submissiondownloader: SubmissionDownloader):
+        submissiondownloader: SubmissionDownloader,
+        ai_solution_generator: OpenAISolutionGenerator):
         
         self.config = config
         self.logger = logger
@@ -34,25 +36,8 @@ class QuestionDownloader:
         self.submissiondownloader = submissiondownloader
         self.solutiondownloader = solutiondownloader
         self.imagedownloader = imagedownloader
+        self.ai_solution_generator = ai_solution_generator
     
-    #region question urls
-    
-    def get_all_questions(self) -> List[Question]:
-        self.logger.info("Getting all questions url")
-
-        all_questions_count = self.lc.get_questions_count()
-        all_questions_count = int(all_questions_count)
-
-        self.logger.info(f"Total no of questions: {all_questions_count}")
-
-        all_questions_data = self.lc.get_all_questions(all_questions_count)
-
-        all_questions = [Question.from_json(question_data) for question_data in all_questions_data]
- 
-        return all_questions
-
-    #endregion question urls
-
     def create_question_index(self, questions):
         os.makedirs(self.config.questions_directory, exist_ok=True)
         filepath = os.path.join(self.config.questions_directory, "index.html")
@@ -73,26 +58,25 @@ class QuestionDownloader:
         with open(filepath, 'w') as ifile:
             ifile.write(html)
 
-
     def download_selected_question(self, question_id: int):
-        questions = self.get_all_questions()
+        questions = self.lc.get_all_questions()
 
         questions = [question for question in questions if question.id == question_id]
         if len(questions) == 0:
             self.logger.error(f"Question id not found {question_id}")
             return
-        self.create_question_html(questions[0], self.config.questions_directory)
+        self.create_question_html(questions[0], self.config.questions_directory, True)
 
         self.create_question_index(questions)
 
 
     def download_all_questions(self):
-        questions = self.get_all_questions()
+        questions = self.lc.get_all_questions()
 
-        not_downloaded_questions, _ = self.filter_out_downloaded(questions)
+        not_downloaded_questions, _ = self.filter_out_downloaded(questions, self.config.questions_directory)
         
         for question in not_downloaded_questions:
-            self.create_question_html(question, self.config.questions_directory)
+            self.create_question_html(question, self.config.questions_directory, False)
 
         self.create_question_index(questions)
 
@@ -118,17 +102,17 @@ class QuestionDownloader:
         return not_downloaded, downloaded
 
     #region html generation
-    def create_question_html(self, question: Question, root_dir):                
+    def create_question_html(self, question: Question, root_dir, generate_ai_solution=False):           
         self.logger.info(f"Scraping question {question.id}")
 
-        question_html = self.get_question_html(question, root_dir)
+        question_html = self.get_question_html(question, root_dir, generate_ai_solution)
         content = f"""{Constants.HTML_HEADER}<body>{question_html}</body>"""
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.imagedownloader.fix_image_urls(content_soup, question.id, root_dir)
 
         question_path = os.path.join(root_dir, Util.qhtml(question.id, question.title))
-        with open(question_path, 'w', encoding="utf-8") as f:
-            f.write(content_soup.prettify())
+        with open(question_path, 'w', encoding="utf-8") as file:
+            file.write(content_soup.prettify())
 
     def get_similar_questions_html(self, similar_questions):
         self.logger.info("Generating similar questions")
@@ -170,7 +154,7 @@ class QuestionDownloader:
 
         return company_tag_stats_html
 
-    def get_question_html(self, question: Question, root_dir):
+    def get_question_html(self, question: Question, root_dir, generate_ai_solution=False):
         self.logger.info("Getting question data")
         question_content_data = self.lc.get_question(question.id, question.slug)
         question_content = QuestionContent.from_json(question_content_data)
@@ -225,6 +209,13 @@ class QuestionDownloader:
             solution_html = f"""
                 <div><h3>Solution</h3>
                 <md-block class="question__solution">{solution_html}</md-block></div>"""
+        elif generate_ai_solution and self.config.open_ai_api_key:
+            generated_solution = self.ai_solution_generator.cached_generate(question, question_content)
+            if generated_solution:
+                solution_html = Util.markdown_with_math(generated_solution)
+                solution_html = f"""
+                    <div><h3>AI Generated Solution</h3>
+                    <md-block class="question__solution">{solution_html}</md-block></div>"""
 
         question_header_html = f"""<h2 class="question__url"><a target="_blank" href="{question_content.url}">{question.id}. {question_content.title}</a></h2>"""
         question_difficulty_html = f"""Difficulty: {question_content.difficulty}"""

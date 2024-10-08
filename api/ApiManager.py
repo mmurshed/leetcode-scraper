@@ -1,11 +1,10 @@
 import json
+from typing import List
 from bs4 import BeautifulSoup
-import requests
 
-from diskcache import Cache
 from logging import Logger
 
-from api.QueryHandler import CircuitBreakerException, QueryHandler
+from models.Question import Question
 from utils.Config import Config
 from utils.Constants import Constants
 
@@ -14,84 +13,19 @@ class ApiManager:
         self,
         config: Config,
         logger: Logger,
-        cache: Cache):
+        requesth):
         
         self.config = config
         self.logger = logger
-        self.cache = cache
-        
-        self.cache_expiration_seconds = self.config.cache_expiration_days * 24 * 60 * 60
-        self.query_handler = QueryHandler(
-            config=self.config,
-            logger=self.logger,
-            session=requests.Session())
+        self.reqh = requesth
 
-    def cache_key(self, *args):
-        # Convert all arguments to strings and join them with '-'
-        return '-'.join(map(str, args))
-        
-    def cached_query(self, cache_key, method="post", query=None, selector=None, url=None, headers=None):
-        """
-        This function caches and performs a query if data is not already cached.
-        Optionally uses a selector to filter out the required part of the response.
-        """
-
-        headers = headers or Constants.LEETCODE_HEADERS
-        url = url or Constants.LEETCODE_GRAPHQL_URL
-
-        if not self.config.cache_api_calls:
-            self.logger.debug(f"Cache bypass {cache_key}")
-            try:
-                data = self.query_handler.query(
-                    method=method,
-                    query=query,
-                    selector=selector,
-                    url=url,
-                    headers=headers)
-                return data
-            except CircuitBreakerException as e:
-                self.logger.warning(f"Request blocked by circuit breaker: {e}")
-            except requests.RequestException as e:
-                self.logger.error(f"Request failed after retries: {e}")
-            return data
-
-        # Check if data exists in the cache and retrieve it
-        data = self.cache.get(key=cache_key)
-
-        if data is None:
-            self.logger.debug(f"Cache miss {cache_key}")
-            # If cache miss, make the request
-            try:
-                data = self.query_handler.query(
-                    method=method,
-                    query=query,
-                    selector=selector,
-                    url=url,
-                    headers=headers)
-                return data
-            except CircuitBreakerException as e:
-                self.logger.warning(f"Request blocked by circuit breaker: {e}")
-            except requests.RequestException as e:
-                self.logger.error(f"Request failed after retries: {e}")
-
-            # Store data in the cache
-            self.cache.set(
-                key=cache_key,
-                value=data,
-                expire=self.cache_expiration_seconds)
-        else:
-            self.logger.debug(f"Cache hit {cache_key}")
-
-        return data
-    
-    #endregion
 
     #region cards api
 
     def get_categories(self):
-        cache_key = self.cache_key("card", "categories")
+        key = self.reqh.key("card", "categories")
 
-        query = {
+        request = {
             "operationName": "GetCategories",
             "variables": {
                 "num": 1000
@@ -100,17 +34,17 @@ class ApiManager:
         }
         selector = ['data', 'categories']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_card_details(self, card_slug):
-        cache_key = self.cache_key("card", "detail", card_slug)
+        key = self.reqh.key("card", "detail", card_slug)
 
-        query = {
+        request = {
             "operationName": "GetExtendedCardDetail",
             "variables": {
                 "cardSlug": card_slug
@@ -120,17 +54,17 @@ class ApiManager:
 
         selector = ['data', 'card']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_chapters_with_items(self, card_slug):
-        cache_key = self.cache_key("card", card_slug, "chapters")
+        key = self.reqh.key("card", card_slug, "chapters")
 
-        query = {
+        request = {
             "operationName": "GetChaptersWithItems",
             "variables": {
                 "cardSlug": card_slug
@@ -139,17 +73,17 @@ class ApiManager:
         }
         selector = ['data', 'chapters']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_chapter_items(self, card_slug, item_id):
-        cache_key = self.cache_key("card", card_slug, "item", item_id)
+        key = self.reqh.key("card", card_slug, "item", item_id)
 
-        query = {
+        request = {
             "operationName": "GetItem",
             "variables": {
                 "itemId": item_id
@@ -158,9 +92,9 @@ class ApiManager:
         }
         selector = ['data', 'item']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
@@ -169,46 +103,56 @@ class ApiManager:
 
     #region questions api
     def get_questions_count(self):
-        cache_key = self.cache_key("all", "questions", "count")
+        key = self.reqh.key("question", "count")
 
-        query = {
+        request = {
             "query": "\n query getQuestionsCount {allQuestionsCount {\n    difficulty\n    count\n }} \n    "
         }
         selector = ['data', 'allQuestionsCount', 0,'count']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
     
-    def get_all_questions(self, all_questions_count):
-        cache_key = self.cache_key("all", "questions", "list")
+    def get_all_questions(self) -> List[Question]:
+        count = self.get_questions_count()
+        count = int(count)
 
-        query = {
+        questions_data = self.get_limited_questions(count)
+
+        data = [Question.from_json(question_data) for question_data in questions_data]
+ 
+        return data
+
+    def get_limited_questions(self, limit, skip = 0):
+        key = self.reqh.key("question", "list")
+
+        request = {
             "query": "\n query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {\n  problemsetQuestionList: questionList(\n    categorySlug: $categorySlug\n    limit: $limit\n    skip: $skip\n    filters: $filters\n  ) {\n  questions: data {\n title\n titleSlug\n frontendQuestionId: questionFrontendId\n }\n  }\n}\n    ",
             "variables": {
                 "categorySlug": "",
-                "skip": 0,
-                "limit": all_questions_count,
+                "skip": skip,
+                "limit": limit,
                 "filters": {}
             }
         }
 
         selector = ['data', 'problemsetQuestionList', 'questions']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_question(self, question_id, question_title_slug):
-        cache_key = self.cache_key("question", question_id)
+        key = self.reqh.key("question", question_id)
 
-        query = {
+        request = {
             "operationName": "GetQuestion",
             "variables": {
                 "titleSlug": question_title_slug
@@ -218,9 +162,9 @@ class ApiManager:
 
         selector = ['data', 'question']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         return data
    
@@ -229,27 +173,27 @@ class ApiManager:
     #region playground codes api
 
     def get_all_playground_codes(self, question_id, uuid):
-        cache_key = self.cache_key("question", question_id, "uuid", uuid)
+        key = self.reqh.key("question", question_id, "uuid", uuid)
 
-        query = {
+        request = {
             "operationName": "allPlaygroundCodes",
             "query": f"""query allPlaygroundCodes {{\n allPlaygroundCodes(uuid: \"{uuid}\") {{\n    code\n    langSlug\n }}\n}}\n"""
         }
         selector = ['data', 'allPlaygroundCodes']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
     
     def get_slides_json(self, hash, slide_url):
-        cache_key = self.cache_key("slide", hash)
+        key = self.reqh.key("slide", hash)
         selector = ['timeline']
 
-        data = self.cached_query(
-            cache_key=cache_key,
+        data = self.reqh.request(
+            key=key,
             method="get",
             selector=selector,
             url=slide_url,
@@ -258,7 +202,7 @@ class ApiManager:
         return data
 
     def get_slide_content(self, question_id, file_hash, filename_var1, filename_var2):
-        cache_key = self.cache_key("question", question_id, "slide", file_hash)
+        key = self.reqh.key("question", question_id, "slide", file_hash)
 
         slide_url1 = f"https://assets.leetcode.com/static_assets/media/{filename_var1}.json"
         slide_url2 = f"https://assets.leetcode.com/static_assets/media/{filename_var2}.json"
@@ -268,8 +212,8 @@ class ApiManager:
         
         try:
             self.logger.debug(f"Slide url1: {slide_url1}")
-            data = self.cached_query(
-                cache_key=cache_key,
+            data = self.reqh.request(
+                key=key,
                 method="get",
                 url=slide_url1,
                 selector=selector,
@@ -279,8 +223,8 @@ class ApiManager:
             self.logger.debug(f"Slide url2: {slide_url2}")
 
             try:
-                data = self.cached_query(
-                    cache_key=cache_key,
+                data = self.reqh.request(
+                    key=key,
                     method="get",
                     url=slide_url2,
                     selector=selector,
@@ -295,9 +239,9 @@ class ApiManager:
     
     #region articles api
     def get_article(self, item_id, article_id):
-        cache_key = self.cache_key("item", item_id, "article", article_id)
+        key = self.reqh.key("item", item_id, "article", article_id)
 
-        query = {
+        request = {
             "operationName": "GetArticle",
             "variables": {
                 "articleId": article_id
@@ -306,17 +250,17 @@ class ApiManager:
         }
         selector = ['data', 'article', 'body']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_html_article(self, item_id, html_article_id):
-        cache_key = self.cache_key("item", item_id, "html", "article", html_article_id)
+        key = self.reqh.key("item", item_id, "html", "article", html_article_id)
 
-        query = {
+        request = {
             "operationName": "GetHtmlArticle",
             "variables": {
                 "htmlArticleId": html_article_id
@@ -325,9 +269,9 @@ class ApiManager:
         }
         selector = ['data', 'htmlArticle', 'html']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
@@ -336,9 +280,9 @@ class ApiManager:
 
     #region submissions api
     def get_submission_list(self, question_id, question_slug):
-        cache_key = self.cache_key("question", question_id, "submissions")
+        key = self.reqh.key("question", question_id, "submissions")
 
-        query = {
+        request = {
             "operationName": "submissionList",
             "variables": {
                 "questionSlug": question_slug,
@@ -350,17 +294,17 @@ class ApiManager:
         }
         selector = ['data', 'questionSubmissionList', 'submissions']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_submission_details(self, question_id, submission_id):
-        cache_key = self.cache_key("question", question_id, "submission", submission_id)
+        key = self.reqh.key("question", question_id, "submission", submission_id)
 
-        query = {
+        request = {
             "operationName": "submissionDetails",
             "variables": {
                 "submissionId": submission_id
@@ -371,9 +315,9 @@ class ApiManager:
 
         data = None
         try:
-            data = self.cached_query(
-                cache_key=cache_key,
-                query=query,
+            data = self.reqh.request(
+                key=key,
+                request=request,
                 selector=selector)
         except:
             pass
@@ -384,9 +328,9 @@ class ApiManager:
 
     #region solutions api
     def get_official_solution(self, question_id, question_slug):
-        cache_key = self.cache_key("question", question_id, "solution")
+        key = self.reqh.key("question", question_id, "solution")
 
-        query = {
+        request = {
             "operationName": "officialSolution",
             "variables": {
                 "titleSlug": question_slug
@@ -395,9 +339,9 @@ class ApiManager:
         }
         selector = ['data', 'question', 'solution', 'content']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
@@ -406,9 +350,9 @@ class ApiManager:
     
     #region company api
     def get_question_company_tags(self):
-        cache_key = self.cache_key("company", "tags")
+        key = self.reqh.key("company", "tags")
 
-        query = {
+        request = {
             "operationName": "questionCompanyTags",
             "variables": {},
             "query": "query questionCompanyTags {\n  companyTags {\n    name\n    slug\n    questionCount\n  }\n}\n"
@@ -416,17 +360,17 @@ class ApiManager:
 
         selector = ['data', 'companyTags']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
 
     def get_favorite_details_for_company(self, company_slug):
-        cache_key = self.cache_key("company", company_slug, "favorite")
+        key = self.reqh.key("company", company_slug, "favorite")
 
-        query = {
+        request = {
             "operationName": "favoriteDetailV2ForCompany",
             "variables": {
                 "favoriteSlug": company_slug
@@ -436,23 +380,23 @@ class ApiManager:
 
         selector = ['data', 'favoriteDetailV2']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         
         return data
     
-    def get_favorite_question_list_for_company(self, favorite_slug, total_questions):
-        cache_key = self.cache_key("company", "favorite", favorite_slug)
+    def get_favorite_question_list_for_company(self, favorite_slug, total_questions, skip=0):
+        key = self.reqh.key("company", "favorite", favorite_slug)
 
-        query = {
+        request = {
             "operationName": "favoriteQuestionList",
             "variables": {
                 "favoriteSlug": favorite_slug,
                 "filter": {
                     "positionRoleTagSlug": "",
-                    "skip": 0,
+                    "skip": skip,
                     "limit": total_questions
                 }
             },
@@ -461,15 +405,15 @@ class ApiManager:
 
         selector = ['data', 'favoriteQuestionList', 'questions']
 
-        data = self.cached_query(
-            cache_key=cache_key,
-            query=query,
+        data = self.reqh.request(
+            key=key,
+            request=request,
             selector=selector)
         return data
     
 
     def get_next_data_id(self):
-        cache_key = self.cache_key("company", "nextdataid")
+        key = self.reqh.key("company", "nextdataid")
 
         def selector(data):
             next_data_soup = BeautifulSoup(data, "html.parser")
@@ -478,8 +422,8 @@ class ApiManager:
             next_data_id = next_data_json['props']['buildId']
             return next_data_id
 
-        data = self.cached_query(
-            cache_key=cache_key,
+        data = self.reqh.request(
+            key=key,
             selector=selector,
             method="get",
             url=f"{Constants.LEETCODE_URL}/problemset/",
@@ -488,3 +432,53 @@ class ApiManager:
         return data
 
     #endregion company api
+
+    #region community solution
+
+    # order_by values "most_votes", "hot", "newest_to_oldest"
+    def get_all_community_solutions(self, questionSlug, limit, skip = 0, order_by = "hot"):
+        key = self.reqh.key("community", "solutions", questionSlug)
+
+        request = {
+            "operationName": "communitySolutions",
+            "variables": {
+                "query": "",
+                "languageTags": [],
+                "topicTags": [],
+                "questionSlug": "minimum-number-of-increments-on-subarrays-to-form-a-target-array",
+                "skip": skip,
+                "first": limit,
+                "orderBy": order_by
+            },
+            "query": "\n    query communitySolutions($questionSlug: String!, $skip: Int!, $first: Int!, $query: String, $orderBy: TopicSortingOption, $languageTags: [String!], $topicTags: [String!]) {\n  questionSolutions(\n    filters: {questionSlug: $questionSlug, skip: $skip, first: $first, query: $query, orderBy: $orderBy, languageTags: $languageTags, topicTags: $topicTags}\n  ) {\n    hasDirectResults\n    totalNum\n    solutions {\n      id\n      title\n      commentCount\n      topLevelCommentCount\n      viewCount\n      pinned\n      isFavorite\n      solutionTags {\n        name\n        slug\n      }\n      post {\n        id\n        status\n        voteStatus\n        voteCount\n        creationDate\n        isHidden\n        author {\n          username\n          isActive\n          nameColor\n          activeBadge {\n            displayName\n            icon\n          }\n          profile {\n            userAvatar\n            reputation\n          }\n        }\n      }\n      searchMeta {\n        content\n        contentType\n        commentAuthor {\n          username\n        }\n        replyAuthor {\n          username\n        }\n        highlights\n      }\n    }\n  }\n}\n    ",
+        }
+
+        selector = ['data', 'questionSolutions', 'solutions']
+
+        data = self.reqh.request(
+            key=key,
+            request=request,
+            selector=selector)
+        return data
+
+
+    def get_community_solution_content(self, topic_id):
+        key = self.reqh.key("community", "solution", topic_id)
+
+        request = {
+            "operationName": "communitySolution",
+            "variables": {
+                "topicId": topic_id
+            },
+            "query": "\n    query communitySolution($topicId: Int!) {\n  topic(id: $topicId) {\n    id\n    viewCount\n    topLevelCommentCount\n    subscribed\n    title\n    pinned\n    solutionTags {\n      name\n      slug\n    }\n    hideFromTrending\n    commentCount\n    isFavorite\n    post {\n      id\n      voteCount\n      voteStatus\n      content\n      updationDate\n      creationDate\n      status\n      isHidden\n      author {\n        isDiscussAdmin\n        isDiscussStaff\n        username\n        nameColor\n        activeBadge {\n          displayName\n          icon\n        }\n        profile {\n          userAvatar\n          reputation\n        }\n        isActive\n      }\n      authorIsModerator\n      isOwnPost\n    }\n  }\n}\n    "
+        }
+
+        selector = ['data', 'topic', 'post', 'content']
+
+        data = self.reqh.request(
+            key=key,
+            request=request,
+            selector=selector)
+        return data
+
+    #endregion community solution

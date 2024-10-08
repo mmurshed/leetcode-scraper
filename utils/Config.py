@@ -24,7 +24,11 @@ class Config:
         self.download_images: bool = True
         self.download_videos: bool = False
         self.threads_count_for_pdf_conversion: int = 8
-        self.api_retry_count = 3
+        self.api_max_failures = 3
+
+        self.generate_ai_solution_compnay_favorite_slug = ""
+        self.open_ai_api_key = ""
+        self.open_ai_model = "gpt-4o-mini"
 
         # Dynamically update the attributes from kwargs
         for key, value in kwargs.items():

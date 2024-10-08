@@ -3,6 +3,7 @@ import argparse
 from diskcache import Cache
 import requests
 
+from ai.OpenAISolutionGenerator import OpenAISolutionGenerator
 from downloaders.CardsDownloader import CardsDownloader
 from downloaders.CompanyDownloader import CompanyDownloader
 from downloaders.ImageDownloader import ImageDownloader
@@ -11,6 +12,7 @@ from downloaders.QuestionDownloader import QuestionDownloader
 from downloaders.SolutionDownloader import SolutionDownloader
 from downloaders.SubmissionDownloader import SubmissionDownloader
 
+from api.CachedRequest import CachedRequest
 from api.ApiManager import ApiManager
 
 from utils.Config import Config
@@ -25,12 +27,24 @@ def init(logger):
     Constants.LEETCODE_HEADERS = Constants.create_headers(config.leetcode_cookie)
     cache = Cache(
         directory=config.cache_directory)
+    
+    cached_req = CachedRequest(
+        config=config,
+        logger=logger,
+        cache=cache)
 
     leetapi = ApiManager(
         config=config,
         logger=logger,
+        requesth=cached_req)
+    
+    ai_solution_generator = OpenAISolutionGenerator(
+        config=config,
+        logger=logger,
+        leetapi=leetapi,
         cache=cache)
-    imagehandler = ImageDownloader(
+
+    imgd = ImageDownloader(
         config=config,
         logger=logger)
     solution = SolutionDownloader(
@@ -47,8 +61,9 @@ def init(logger):
         logger=logger,
         leetapi=leetapi,
         solutiondownloader=solution,
-        imagedownloader=imagehandler,
-        submissiondownloader=submission)
+        imagedownloader=imgd,
+        submissiondownloader=submission,
+        ai_solution_generator=ai_solution_generator)
     
     cards = CardsDownloader(
         config=config,
@@ -56,7 +71,7 @@ def init(logger):
         leetapi=leetapi,
         questiondownloader=question,
         solutiondownloader=solution,
-        imagehdownloader=imagehandler
+        imagehdownloader=imgd
     )
 
     company = CompanyDownloader(
@@ -65,7 +80,8 @@ def init(logger):
         leetapi=leetapi,
         questiondownloader=question)
 
-    return config, cache, cards, company, imagehandler, question, submission
+
+    return config, cache, cards, company, question, submission
 
 def main(logger):
     Util.clear()
@@ -90,7 +106,10 @@ def main(logger):
 9: Download all your submissions
 
 10: Convert all files from a directory to pdf
-11: Clear cache
+
+11: Get cache by key
+12: Delete cache by key
+13: Clear cache
                   
 Press any to quit
                 """)
@@ -106,7 +125,7 @@ Press any to quit
 
             if choice > 1:
                 try:
-                    config, cache, cards, company, imagehandler, questionhandler, submission = init(logger)
+                    config, cache, cards, company, qued, submission = init(logger)
                 except Exception as e:
                     logger.error(f"Initilization error {e}")
                     continue
@@ -122,9 +141,9 @@ Press any to quit
 
             elif choice == 4:
                 question_id = input("Enter question id: ")
-                questionhandler.download_selected_question(int(question_id))
+                qued.download_selected_question(int(question_id))
             elif choice == 5:
-                questionhandler.download_all_questions()
+                qued.download_all_questions()
 
             elif choice == 6:
                 company_slug = input("Enter company slug: ")
@@ -135,10 +154,9 @@ Press any to quit
             elif choice == 8:
                 question_id = input("Enter question id: ")
                 submission.get_selected_submissions(
-                    questiondownloader=questionhandler,
                     question_id=int(question_id))
             elif choice == 9:
-                submission.get_all_submissions(questiondownloader=questionhandler)
+                submission.get_all_submissions()
 
             elif choice == 10:
                 directory = input("Enter directory: ")
@@ -152,6 +170,12 @@ Press any to quit
                     images_dir=Config.get_images_dir(directory))
                 converter.convert_folder(directory)
             elif choice == 11:
+                key = input("Enter key: ")
+                print(cache.get(key))
+            elif choice == 12:
+                key = input("Enter key: ")
+                cache.delete(key=key)
+            elif choice == 13:
                 cache.clear()
             else:
                 break

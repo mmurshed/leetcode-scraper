@@ -144,7 +144,7 @@ class Util:
     def get_logger() -> Logger:
         # Set up logging
         log_file = 'scrape_errors.log'
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.DEBUG)
         logger = logging.getLogger("Leet")
         handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

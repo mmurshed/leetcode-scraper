@@ -167,12 +167,18 @@ class CompanyDownloader:
                 if question.id in questions_seen:
                     continue
                 questions_seen.add(question.id)
-                self.download_company_question(question, company_fav_dir)
+
+                generate_ai_solution = (self.config.generate_ai_solution_compnay_favorite_slug == favorite_slug)
+
+                self.download_company_question(question, company_fav_dir, generate_ai_solution)
                         
 
-    def download_company_question(self, question: Question, company_fav_dir):
+    def download_company_question(self, question: Question, company_fav_dir, generate_ai_solution = False):
         if self.config.overwrite:
-            self.questiondownloader.create_question_html(question, company_fav_dir)
+            self.questiondownloader.create_question_html(
+                question=question,
+                root_dir=company_fav_dir,
+                generate_ai_solution=generate_ai_solution)
             return
 
         copied = Util.copy_question_file(
@@ -184,5 +190,9 @@ class CompanyDownloader:
 
         # if copy failed just download
         if not copied:
-            self.questiondownloader.create_question_html(question, company_fav_dir)
+            self.questiondownloader.create_question_html(
+                question=question,
+                root_dir=company_fav_dir,
+                generate_ai_solution=generate_ai_solution)
+
 
