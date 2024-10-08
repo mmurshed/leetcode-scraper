@@ -65,7 +65,7 @@ class QuestionDownloader:
         if len(questions) == 0:
             self.logger.error(f"Question id not found {question_id}")
             return
-        self.create_question_html(questions[0], self.config.questions_directory, True)
+        self.create_question_html(questions[0], self.config.questions_directory)
 
         self.create_question_index(questions)
 
@@ -76,7 +76,7 @@ class QuestionDownloader:
         not_downloaded_questions, _ = self.filter_out_downloaded(questions, self.config.questions_directory)
         
         for question in not_downloaded_questions:
-            self.create_question_html(question, self.config.questions_directory, False)
+            self.create_question_html(question, self.config.questions_directory)
 
         self.create_question_index(questions)
 
@@ -102,10 +102,10 @@ class QuestionDownloader:
         return not_downloaded, downloaded
 
     #region html generation
-    def create_question_html(self, question: Question, root_dir, generate_ai_solution=False):           
+    def create_question_html(self, question: Question, root_dir):           
         self.logger.info(f"Scraping question {question.id}")
 
-        question_html = self.get_question_html(question, root_dir, generate_ai_solution)
+        question_html = self.get_question_html(question, root_dir)
         content = f"""{Constants.HTML_HEADER}<body>{question_html}</body>"""
         content_soup = BeautifulSoup(content, 'html.parser')
         content_soup = self.imagedownloader.fix_image_urls(content_soup, question.id, root_dir)
@@ -154,7 +154,7 @@ class QuestionDownloader:
 
         return company_tag_stats_html
 
-    def get_question_html(self, question: Question, root_dir, generate_ai_solution=False):
+    def get_question_html(self, question: Question, root_dir):
         self.logger.info("Getting question data")
         question_content_data = self.lc.get_question(question.id, question.slug)
         question_content = QuestionContent.from_json(question_content_data)
@@ -209,7 +209,7 @@ class QuestionDownloader:
             solution_html = f"""
                 <div><h3>Solution</h3>
                 <md-block class="question__solution">{solution_html}</md-block></div>"""
-        elif generate_ai_solution and self.config.open_ai_api_key:
+        elif self.config.generate_ai_solution and self.config.open_ai_api_key:
             generated_solution = self.ai_solution_generator.cached_generate(question, question_content)
             if generated_solution:
                 solution_html = Util.markdown_with_math(generated_solution)

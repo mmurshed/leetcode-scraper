@@ -99,17 +99,18 @@ def main(logger):
 4: Download a question by id
 5: Download all questions
                   
-6: Download a company by name
-7: Download all company questions
+6: Download all questions for a company
+7: Download all favorite questions for a company
+8: Download all company questions
 
-8: Download submissions by question id
-9: Download all your submissions
+9: Download submissions by question id
+10: Download all your submissions
 
-10: Convert all files from a directory to pdf
+11: Convert all files from a directory to pdf
 
-11: Get cache by key
-12: Delete cache by key
-13: Clear cache
+12: Get cache by key
+13: Delete cache by key
+14: Clear cache
                   
 Press any to quit
                 """)
@@ -149,16 +150,31 @@ Press any to quit
                 company_slug = input("Enter company slug: ")
                 company.download_selected_company_questions(company_slug)
             elif choice == 7:
-                company.download_all_company_questions()
+                company_slug = input("Enter company slug: ")
+                favorite_details = company.get_company_favorite_slugs(company_slug)
+                prompt = "Company favorite slugs\n"
+                for idx, favorite_detail in enumerate(favorite_details, start=1):
+                    comp_fav_slug, name = favorite_detail
+                    prompt += f"{idx}. {name}\n"
+
+                print(prompt)
+
+                fav_slug = input("Enter favorite company slug: ")
+                fav_slug = int(fav_slug) - 1
+                comp_fav_slug, name = favorite_details[fav_slug]
+                company.download_favorite_company_questions(company_slug, comp_fav_slug)
 
             elif choice == 8:
+                company.download_all_company_questions()
+
+            elif choice == 9:
                 question_id = input("Enter question id: ")
                 submission.get_selected_submissions(
                     question_id=int(question_id))
-            elif choice == 9:
+            elif choice == 10:
                 submission.get_all_submissions()
 
-            elif choice == 10:
+            elif choice == 11:
                 directory = input("Enter directory: ")
 
                 if not os.path.exists(directory) or not os.path.isdir(directory):
@@ -169,13 +185,13 @@ Press any to quit
                     logger=logger,
                     images_dir=Config.get_images_dir(directory))
                 converter.convert_folder(directory)
-            elif choice == 11:
-                key = input("Enter key: ")
-                print(cache.get(key))
             elif choice == 12:
                 key = input("Enter key: ")
-                cache.delete(key=key)
+                print(cache.get(key))
             elif choice == 13:
+                key = input("Enter key: ")
+                cache.delete(key=key)
+            elif choice == 14:
                 cache.clear()
             else:
                 break

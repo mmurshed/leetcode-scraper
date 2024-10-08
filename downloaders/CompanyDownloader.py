@@ -44,8 +44,27 @@ class CompanyDownloader:
         favorite_details = self.get_company_question_data(company_slug)
         self.create_company_directories(company_slug, favorite_details)
         self.create_company_indices(company_slug, favorite_details)
-        self.download_company_questions(company_slug, favorite_details)
+        self.download_all_company_questions(company_slug, favorite_details)
 
+    def download_favorite_company_questions(self, company_slug, fav_slug):
+        companies = self.get_company_slugs()
+
+        company_slugs = {company.slug for company in companies}
+        if not companies or company_slug not in company_slugs:
+            self.logger.error(f"Company not valid {company_slug}")
+            return
+        
+        favorite_details = self.get_company_question_data(company_slug)
+
+        if not favorite_details or fav_slug not in favorite_details.keys():
+            self.logger.error(f"Company favorite slug not valid for company: {company_slug} favorite: {fav_slug}")
+            return
+        
+        _, questions = favorite_details[fav_slug]
+
+        self.create_company_directories(company_slug, favorite_details)
+        self.create_company_indices(company_slug, favorite_details)
+        self.download_all_favorite_company_questions(company_slug, fav_slug, questions)
 
     def download_all_company_questions(self):
         self.logger.info("Scraping all company questions")
@@ -57,7 +76,7 @@ class CompanyDownloader:
             favorite_details = self.get_company_question_data(company.slug)
             self.create_company_directories(company.slug, favorite_details)
             self.create_company_indices(company.slug, favorite_details)
-            self.download_company_questions(company.slug, favorite_details)
+            self.download_all_company_questions(company.slug, favorite_details)
     
     def create_all_company_index(self, companies: List[Company]):
         self.logger.info("Creating company index.html")
@@ -79,6 +98,17 @@ class CompanyDownloader:
         with open(filepath, 'w') as file:
             file.write(f"""<!DOCTYPE html><html lang="en"><head></head><body><table>{html}</table></body></html>""")
     
+    def get_company_favorite_slugs(self, company_slug):
+        favorite_details_data = self.lc.get_favorite_details_for_company(company_slug)
+
+        if not favorite_details_data:
+            self.logger.error(f"Company favorite details not found {company_slug}")
+            return
+
+        favorite_slugs = [ (item["favoriteSlug"], item["displayName"]) for item in favorite_details_data['generatedFavoritesInfo']['categoriesToSlugs']]
+        
+        return favorite_slugs
+
 
     def get_company_question_data(self, company_slug):
         favorite_details_data = self.lc.get_favorite_details_for_company(company_slug)
@@ -150,35 +180,37 @@ class CompanyDownloader:
                 <body>{overall_html}</body>
                 </html>""")
 
-    def download_company_questions(self, company_slug, favorite_details):
+    def download_all_company_questions(self, company_slug, favorite_details):
         self.logger.info("Scraping question data")
 
         questions_seen = set()
         
         for favorite_slug, (_, questions) in favorite_details.items():
-            company_fav_dir  = os.path.join(self.config.companies_directory, company_slug, favorite_slug)
-            not_downloaded_questions, downloaded_questions = self.questiondownloader.filter_out_downloaded(questions, company_fav_dir)
+            self.download_all_favorite_company_questions(company_slug, favorite_slug, questions, questions_seen)
 
+    def download_all_favorite_company_questions(self, company_slug, favorite_slug, questions, questions_seen=set()):
+        self.logger.info("Scraping question data")
+        
+        company_fav_dir  = os.path.join(self.config.companies_directory, company_slug, favorite_slug)
+        not_downloaded_questions, downloaded_questions = self.questiondownloader.filter_out_downloaded(questions, company_fav_dir)
+
+        # skip already processed questions
+        questions_seen.update([question.id for question in downloaded_questions])
+        
+        for question in not_downloaded_questions:
             # skip already processed questions
-            questions_seen.update([question.id for question in downloaded_questions])
-            
-            for question in not_downloaded_questions:
-                # skip already processed questions
-                if question.id in questions_seen:
-                    continue
-                questions_seen.add(question.id)
+            if question.id in questions_seen:
+                continue
+            questions_seen.add(question.id)
 
-                generate_ai_solution = (self.config.generate_ai_solution_compnay_favorite_slug == favorite_slug)
+            self.download_company_question(question, company_fav_dir)
 
-                self.download_company_question(question, company_fav_dir, generate_ai_solution)
-                        
 
-    def download_company_question(self, question: Question, company_fav_dir, generate_ai_solution = False):
+    def download_company_question(self, question: Question, company_fav_dir):
         if self.config.overwrite:
             self.questiondownloader.create_question_html(
                 question=question,
-                root_dir=company_fav_dir,
-                generate_ai_solution=generate_ai_solution)
+                root_dir=company_fav_dir)
             return
 
         copied = Util.copy_question_file(
@@ -192,7 +224,6 @@ class CompanyDownloader:
         if not copied:
             self.questiondownloader.create_question_html(
                 question=question,
-                root_dir=company_fav_dir,
-                generate_ai_solution=generate_ai_solution)
+                root_dir=company_fav_dir)
 
 

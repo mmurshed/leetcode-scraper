@@ -33,6 +33,30 @@ class Constants:
         "swift": "swift",
     }
 
+    LANG_NAMES = {
+        "all": "Python, Java",
+        "python": "python",
+        "python3": "python 3",
+        "c": "C",
+        "cpp": "C++",
+        "csharp": "C#",
+        "java": "Java",
+        "kotlin": "Kotlin",
+        "mysql": "SQL",
+        "mssql": "SQL",
+        "oraclesql": "SQL",
+        "javascript": "JavaScript",
+        "html": "HTML",
+        "php": "PHP",
+        "golang": "Go",
+        "scala": "Scala",
+        "pythonml": "Python",
+        "rust": "Rust",
+        "ruby": "Ruby",
+        "bash": "Bash",
+        "swift": "Swift",
+    }
+
     HTML_HEADER = None
 
     ASSETS_DIR = None

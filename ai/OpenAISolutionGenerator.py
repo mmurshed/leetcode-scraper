@@ -117,11 +117,14 @@ Solution:
         community_solution, comsol_count = self.generate_community_solutions(question, 3, order_by="most_votes")
         self.logger.debug(f"Community solution generated {comsol_count}")
 
+        lang_name = Constants.LANG_NAMES[self.config.preferred_language_order[0]]
+        prompt = str.replace(Constants.AI_PROMPT, "{{preferred_language}}", lang_name)
+
         hint_content = ""
         for hint in question_content.hints:
             hint_content +=  f"{hint}\n"
         
-        prompt = f"""{Constants.AI_PROMPT}
+        prompt = f"""{prompt}
 
 {example_text}
 
@@ -164,6 +167,7 @@ Solution:
 
     def generate(self, quesion: Question, question_content: QuestionContent):
         full_text = self.generate_prompt(quesion, question_content)
+
         response = self.submit(full_text)
         return response
 

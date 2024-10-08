@@ -26,7 +26,7 @@ class Config:
         self.threads_count_for_pdf_conversion: int = 8
         self.api_max_failures = 3
 
-        self.generate_ai_solution_compnay_favorite_slug = ""
+        self.generate_ai_solution = False
         self.open_ai_api_key = ""
         self.open_ai_model = "gpt-4o-mini"
 
