@@ -89,7 +89,6 @@ class PdfConverter:
         os.chdir(curdir)
 
     def convert_single_file(self, file_path):
-        # Set the PDF output folder one level up from the file's directory and rename to 'questions_pdf'
         curdir = os.curdir()
         source_folder = os.path.dirname(file_path)
         os.chdir(source_folder)

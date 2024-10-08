@@ -11,6 +11,7 @@ from logging import Logger
 
 from api.RetriableRequest import CircuitBreakerException, RetriableRequest
 
+from utils.Constants import Constants
 from utils.ImageUtil import ImageUtil
 from utils.Util import Util
 from utils.Config import Config
@@ -27,6 +28,7 @@ class ImageDownloader:
             config=self.config,
             logger=self.logger,
             session=cloudscraper.create_scraper())
+
 
     def download_image(self, question_id, img_url, images_dir):
         self.logger.debug(f"Downloading: {img_url}")
@@ -46,10 +48,12 @@ class ImageDownloader:
 
         if not self.config.cache_api_calls or not os.path.exists(image_path):
             data = None
+
             try:
                 data = self.reqh.request(
                     method="get",
-                    url=img_url)
+                    url=img_url,
+                    headers=Constants.IMAGE_HEADERS)
             except CircuitBreakerException as e:
                 self.logger.warning(f"Request blocked by circuit breaker: {e}")
             except requests.RequestException as e:
@@ -60,7 +64,7 @@ class ImageDownloader:
                     file.write(data)
 
                 if self.config.recompress_image:
-                    self.recompress_image(image_path)
+                    ImageUtil.recompress_image(image_path)
 
         if not os.path.exists(image_path):
             self.logger.error(f"File not found {image_path}\n{img_url}")

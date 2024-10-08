@@ -17,6 +17,7 @@ class Config:
         self.overwrite: bool = True
         self.preferred_language_order: list = ["all"]
         self.include_submissions_count: int = 0
+        self.include_community_solution_count: int = 1
         self.include_default_code: bool = False
         self.extract_gif_frames: bool = False
         self.recompress_image: bool = False

@@ -217,6 +217,26 @@ class QuestionDownloader:
                     <div><h3>AI Generated Solution</h3>
                     <md-block class="question__solution">{solution_html}</md-block></div>"""
 
+        community_solution_html = ""
+        if self.config.include_community_solution_count > 0:
+            community_solutions = self.lc.get_all_community_solutions(question.slug)
+        
+            for idx, community_solution in enumerate(community_solutions, start=1):
+                if idx > self.config.include_community_solution_count:
+                    break
+
+                community_solution_content = self.lc.get_community_solution_content(int(community_solution['id']))
+                if community_solution_content:
+                    community_solution_content = Util.markdown_with_math(community_solution_content)
+                    community_solution_html += f"""<div><h4>{community_solution['title']}</h4>
+                    <md-block class="question__solution">{community_solution_content}</md-block></div>"""
+
+            if community_solution_html:
+                community_solution_html = f"""
+                        <div><h3>Community Solutions</h3>
+                        {community_solution_html}</div>"""
+
+
         question_header_html = f"""<h2 class="question__url"><a target="_blank" href="{question_content.url}">{question.id}. {question_content.title}</a></h2>"""
         question_difficulty_html = f"""Difficulty: {question_content.difficulty}"""
         question_full_html = f"""{question_header_html}{question_difficulty_html}{question_html}{hint_html}{default_code_html}{solution_html}{company_tag_stats}{similar_questions}{submission_html}"""
@@ -226,6 +246,7 @@ class QuestionDownloader:
                         {hint_html}
                         {default_code_html}
                         {solution_html}
+                        {community_solution_html}
                         {company_tag_stats}
                         {similar_questions}
                         {submission_html}

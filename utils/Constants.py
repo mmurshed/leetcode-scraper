@@ -118,7 +118,11 @@ class Constants:
         "referer": "https://leetcode.com/",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0",
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
-        # "accept-encoding": "gzip, deflate, br, zstd"
+    })
+
+    IMAGE_HEADERS = CaseInsensitiveDict({
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0",
+        "accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
     })
 
     LEETCODE_HEADERS = CaseInsensitiveDict(DEFAULT_HEADERS.copy())

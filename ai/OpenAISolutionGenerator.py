@@ -92,10 +92,10 @@ Solution:
             count += default_count
         return example_text, count
 
-    def generate_community_solutions(self, quesion: Question, limit, order_by):
+    def generate_community_solutions(self, question: Question, limit):
         community_solution_text = ""
         count = 0
-        community_solutions = self.lc.get_all_community_solutions(quesion.slug, limit, order_by=order_by)
+        community_solutions = self.lc.get_all_community_solutions(question.slug)
 
         if len(community_solutions) == 0:
             return community_solution_text, count
@@ -114,7 +114,7 @@ Solution:
         example_text, count = self.generate_examples(question_content, 2)
         self.logger.debug(f"Examples generated {count}")
 
-        community_solution, comsol_count = self.generate_community_solutions(question, 3, order_by="most_votes")
+        community_solution, comsol_count = self.generate_community_solutions(question, 3)
         self.logger.debug(f"Community solution generated {comsol_count}")
 
         lang_name = Constants.LANG_NAMES[self.config.preferred_language_order[0]]

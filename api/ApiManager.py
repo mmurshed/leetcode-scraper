@@ -436,7 +436,7 @@ class ApiManager:
     #region community solution
 
     # order_by values "most_votes", "hot", "newest_to_oldest"
-    def get_all_community_solutions(self, questionSlug, limit, skip = 0, order_by = "hot"):
+    def get_all_community_solutions(self, questionSlug, limit = 15, skip = 0, order_by = "most_votes"):
         key = self.reqh.key("community", "solutions", questionSlug)
 
         request = {
@@ -445,7 +445,7 @@ class ApiManager:
                 "query": "",
                 "languageTags": [],
                 "topicTags": [],
-                "questionSlug": "minimum-number-of-increments-on-subarrays-to-form-a-target-array",
+                "questionSlug": questionSlug,
                 "skip": skip,
                 "first": limit,
                 "orderBy": order_by

@@ -121,12 +121,16 @@ class Util:
     def markdown_with_math(content):
         content = Util.convert_display_math_to_inline(content)
         content = Util.clean_tex_math(content)
+        content = content.replace("\\n", "\n")
 
         # Convert Markdown to HTML and ensure TeX math is not escaped
-        return markdown.markdown(
+        converted = markdown.markdown(
             content,
-            extensions=['extra', 'mdx_math'])
-    
+            extensions=['extra', 'mdx_math', 'nl2br'])
+        
+        return converted
+
+
     @staticmethod
     def replace_filename(str):
         numDict = {':': ' ', '?': ' ', '|': ' ', '>': ' ', '<': ' ', '/': ' ', '\\': ' '}
