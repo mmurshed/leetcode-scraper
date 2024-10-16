@@ -235,9 +235,6 @@ Press any to quit
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Leetcode Scraper Options')
-    parser.add_argument('--non-stop', type=bool,
-                        help='True/False - Will run non stop, will retry if any error occurs',
-                        required=False)
     parser.add_argument('--proxy', type=str,
                         help='Add rotating or static proxy username:password@ip:port',
                         required=False)

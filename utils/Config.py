@@ -80,8 +80,6 @@ class Config:
             "download_images": "Download images T/F? (T/F): ",
             "download_videos": "Download videos T/F? (T/F): ",
             "preferred_language_order": "Enter order of preferred languages for solution (comma-separated or all): ",
-            "generate_ai_solution": "Generate AI solution when missing T/F? (T/F): ",
-            "open_ai_api_key": "Open AI API Key for generating solution (required only if you want to generate AI solution)",
             "include_submissions_count": "How many submissions to include (0 for none): ",
             "include_community_solution_count": "How many community solutions to include (0 for none): ",
             "cache_api_calls": "Should the API calls be cached T/F? (T/F): "

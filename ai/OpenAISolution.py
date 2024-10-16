@@ -16,7 +16,7 @@ class OpenAISolution(AISolution):
         leetapi: ApiManager,
         cache: Cache):
 
-        AISolution.__init__(self, config, logger, leetapi, cache)       
+        AISolution.__init__(self, config, logger, cache)       
         self.client = OpenAI(api_key=self.config.open_ai_api_key)
         self.prompt_gen = OpenAIPrompt(
             config=config,
