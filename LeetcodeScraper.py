@@ -1,9 +1,11 @@
+from logging import Logger
 import os
 import argparse
 from diskcache import Cache
 import requests
 
-from ai.OpenAISolutionGenerator import OpenAISolutionGenerator
+from ai.OllamaSolution import OllamaSolution
+from ai.OpenAISolution import OpenAISolution
 from downloaders.CardsDownloader import CardsDownloader
 from downloaders.CompanyDownloader import CompanyDownloader
 from downloaders.ImageDownloader import ImageDownloader
@@ -21,8 +23,11 @@ from utils.Util import Util
 from utils.ConfigLoader import ConfigLoader
 from utils.PdfConverter import PdfConverter
 
-def init(logger):
+def init(logger: Logger):
     config = ConfigLoader.load_config()
+
+    if config.logging_level:
+        logger.setLevel(str.upper(config.logging_level))
 
     Constants.LEETCODE_HEADERS = Constants.create_headers(config.leetcode_cookie)
     cache = Cache(
@@ -38,11 +43,24 @@ def init(logger):
         logger=logger,
         requesth=cached_req)
     
-    ai_solution_generator = OpenAISolutionGenerator(
-        config=config,
-        logger=logger,
-        leetapi=leetapi,
-        cache=cache)
+    ai_solution_generator = None
+    if config.ai_solution_generator:
+        ai_solution_generator_method = str.lower(config.ai_solution_generator)
+        if "ollama" == ai_solution_generator_method:
+            logger.info(f"Ollama AI Solution Generator Initiated")
+            ai_solution_generator = OllamaSolution(
+                config=config,
+                logger=logger,
+                cache=cache)
+        elif "openai" == ai_solution_generator_method:
+            logger.info(f"Open AI Solution Generator Initiated")
+            ai_solution_generator = OpenAISolution(
+                config=config,
+                logger=logger,
+                leetapi=leetapi,
+                cache=cache)
+        else:
+            logger.error(f"Invalid AI solution generator method specified: {ai_solution_generator_method}")
 
     imgd = ImageDownloader(
         config=config,
@@ -83,7 +101,7 @@ def init(logger):
 
     return config, cache, cards, company, question, submission
 
-def main(logger):
+def main(logger: Logger):
     Util.clear()
     previous_choice = 0
 

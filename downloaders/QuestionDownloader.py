@@ -2,10 +2,9 @@ import datetime
 import os
 
 from logging import Logger
-from typing import List
 from bs4 import BeautifulSoup
 
-from ai.OpenAISolutionGenerator import OpenAISolutionGenerator
+from ai.AISolution import AISolution
 from utils.Constants import Constants
 from utils.Util import Util
 from utils.Config import Config
@@ -28,7 +27,7 @@ class QuestionDownloader:
         solutiondownloader: SolutionDownloader,
         imagedownloader: ImageDownloader,
         submissiondownloader: SubmissionDownloader,
-        ai_solution_generator: OpenAISolutionGenerator):
+        ai_solution_generator: AISolution):
         
         self.config = config
         self.logger = logger
@@ -209,12 +208,12 @@ class QuestionDownloader:
             solution_html = f"""
                 <div><h3>Solution</h3>
                 <md-block class="question__solution">{solution_html}</md-block></div>"""
-        elif self.config.generate_ai_solution and self.config.open_ai_api_key:
-            generated_solution = self.ai_solution_generator.cached_generate(question, question_content)
+        elif self.ai_solution_generator:
+            generated_solution = self.ai_solution_generator.get_solution(question, question_content)
             if generated_solution:
                 solution_html = Util.markdown_with_math(generated_solution)
                 solution_html = f"""
-                    <div><h3>AI Generated Solution</h3>
+                    <div><h3>AI Generated Solution ({self.config.ai_solution_generator})</h3>
                     <md-block class="question__solution">{solution_html}</md-block></div>"""
 
         community_solution_html = ""

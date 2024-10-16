@@ -64,7 +64,8 @@ class Constants:
     TEX_TEMPLATE_PATH = None
     TEX_HEADER_PATH = None
 
-    AI_PROMPT = None
+    OPEN_AI_PROMPT = None
+    OLLAMA_PROMPT = None
 
     @staticmethod
     def get_assets_dir():
@@ -96,8 +97,18 @@ class Constants:
 
 
     @staticmethod
-    def get_ai_prompt():
-        filepath = os.path.join(Constants.ASSETS_DIR, "prompt.txt")
+    def get_open_ai_prompt():
+        filepath = os.path.join(Constants.ASSETS_DIR, "opanaiprompt.txt")
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+        with open(filepath, "r") as file:
+            data = file.read()
+
+        return data
+
+    @staticmethod
+    def get_ollama_prompt():
+        filepath = os.path.join(Constants.ASSETS_DIR, "ollamaprompt.txt")
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"The file '{filepath}' does not exist.")
         with open(filepath, "r") as file:
@@ -133,4 +144,5 @@ Constants.ASSETS_DIR = Constants.get_assets_dir()
 Constants.HTML_HEADER = Constants.get_html_header()
 Constants.TEX_TEMPLATE_PATH = Constants.get_tex_template_path()
 Constants.TEX_HEADER_PATH = Constants.get_tex_header_path()
-Constants.AI_PROMPT = Constants.get_ai_prompt()
+Constants.OPEN_AI_PROMPT = Constants.get_open_ai_prompt()
+Constants.OLLAMA_PROMPT = Constants.get_ollama_prompt()

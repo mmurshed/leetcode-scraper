@@ -27,9 +27,16 @@ class Config:
         self.threads_count_for_pdf_conversion: int = 8
         self.api_max_failures = 3
 
-        self.generate_ai_solution = False
+        self.logging_level = "info"
+
+        # None, ollama or openai
+        self.ai_solution_generator = None
+
         self.open_ai_api_key = ""
         self.open_ai_model = "gpt-4o-mini"
+
+        self.ollama_url = "http://localhost:11434/api/generate"
+        self.ollama_model = "llama3.1"
 
         # Dynamically update the attributes from kwargs
         for key, value in kwargs.items():
