@@ -51,8 +51,8 @@ class Util:
         # Copy pdf
         if copy_pdf:
             question_basename = Util.qbasename(question_id, question_title)
-            pdf_dir = os.path.join(save_path, "questions_pdf")
-            dest_pdf_dir = os.path.join(dest_dir, "questions_pdf")
+            pdf_dir = os.path.join(save_path, "pdf")
+            dest_pdf_dir = os.path.join(dest_dir, "pdf")
 
             os.makedirs(dest_pdf_dir, exist_ok=True)
             question_filepath = os.path.join(pdf_dir, f"{question_basename}.pdf")
