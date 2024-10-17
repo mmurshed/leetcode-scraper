@@ -37,8 +37,8 @@ The following configuration values are essential for setting up and customizing 
 * `download_images`: Boolean flag to enable downloading of images. When true the images will be downloaded to `images` sub directory and linked from there. Otherwise, the images will be included as urls. True by default.
 * `download_videos`: Boolean flag to enable downloading of videos. When true the videos will be downloaded to `videos` sub directory and linked from there. Otherwise, the videos will be included as urls. False by default.
 * `preferred_language_order`: List of preferred languages for downloading questions (e.g., `csharp`, `cpp`, `python`, `java`, `scala`, etc.). When including solution, preferred lanauge order is used to include the implementation. If you want implementation in `all` languages, specify `all`. This setting is also used to generate AI implmentation.
-* `include_submissions_count`: Specifies the number of your own successful submissions to include, if any. 0 to exclude your submissions. 0 by default.
-* `include_community_solution_count`: Specifies the number of community solutions (most voted) to include. 0 to exclude community solutions. 1 by default.
+* `include_submissions_count`: Specifies the number of your own successful submissions to include, if any. 0 to exclude your submissions, which is the default.
+* `include_community_solution_count`: Specifies the number of community solutions (most voted) to include when official solution isn't available. If the official solution is available, no community solution will be included. 0 to exclude community solutions. 1 by default.
 * `cache_api_calls`: Boolean flag to enable/disable caching of API calls. When true API resposnes will be cached for number of days as specified in the `cache_expiration_days` settings. True by default.
 
 

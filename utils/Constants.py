@@ -57,6 +57,14 @@ class Constants:
         "swift": "Swift",
     }
 
+    LANG_NAMES_TO_SLUG = {
+        "python 3": "python",
+        "c++": "cpp",
+        "c#": "csharp",
+        "sql": "mysql",
+        "go": "golang",
+    }
+
     HTML_HEADER = None
 
     ASSETS_DIR = None

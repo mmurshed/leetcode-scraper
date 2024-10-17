@@ -52,7 +52,15 @@ class ConfigLoader:
                 # For preferred_language_order, allow comma-separated values
                 new_value = input(newprompt).strip()
                 if new_value:
-                    setattr(config, key, new_value.split(','))
+                    langs = set(str.lower(val) for val in new_value.split(','))
+
+                    # if C++ is specified replace with cpp
+                    for lang in langs:
+                        if Constants.LANG_NAMES_TO_SLUG[lang]:
+                            langs.remove(lang)
+                            langs.add(Constants.LANG_NAMES_TO_SLUG[lang])
+
+                    setattr(config, key, langs)
             elif "count" in prompt:
                 new_value = input(newprompt).strip()
                 if new_value:

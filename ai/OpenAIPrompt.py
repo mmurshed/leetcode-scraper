@@ -36,11 +36,10 @@ Example Solution {id}:
 
     def generate_examples_from_similar_questions(self, question_content: QuestionContent, limit):
         example_text = ""
-        count = 0
         questions = self.lc.get_all_questions()
 
         if len(questions) == 0:
-            return example_text, count
+            return example_text, 0
 
         questions = {question.slug: question for question in questions}
         for id, similar_question in enumerate(question_content.similar_questions, start=1):
@@ -52,11 +51,10 @@ Example Solution {id}:
 
                 if question_content.solution:
                     example_text += self.format_example(question_content, id) + "\n\n"
-                    count += 1
-            if count >= limit:
+            if id > limit:
                 break
 
-        return example_text, count
+        return example_text, id-1
 
     def generate_examples_from_default_questions(self, limit):
         example_text = ""
@@ -101,7 +99,7 @@ Example Solution {id}:
             if id > limit:
                 break
 
-        return community_solution_text, id
+        return community_solution_text, id-1
 
     def get_intial_prompt(self, question: Question, question_content: QuestionContent):
         example_text, count = self.generate_examples(question_content, 2)

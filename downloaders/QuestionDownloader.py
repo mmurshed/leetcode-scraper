@@ -217,7 +217,7 @@ class QuestionDownloader:
                     <md-block class="question__solution">{solution_html}</md-block></div>"""
 
         community_solution_html = ""
-        if self.config.include_community_solution_count > 0:
+        if not question_content.solution and self.config.include_community_solution_count > 0:
             community_solutions = self.lc.get_all_community_solutions(question.slug)
         
             for idx, community_solution in enumerate(community_solutions, start=1):

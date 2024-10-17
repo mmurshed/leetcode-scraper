@@ -49,11 +49,15 @@ class ImageDownloader:
         if not self.config.cache_api_calls or not os.path.exists(image_path):
             data = None
 
+            headers = None
+            if "imgur" in img_url:
+                headers = Constants.IMAGE_HEADERS
+
             try:
                 data = self.reqh.request(
                     method="get",
                     url=img_url,
-                    headers=Constants.IMAGE_HEADERS)
+                    headers=headers)
             except CircuitBreakerException as e:
                 self.logger.warning(f"Request blocked by circuit breaker: {e}")
             except requests.RequestException as e:
