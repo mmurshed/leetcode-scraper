@@ -146,7 +146,7 @@ class CompanyDownloader:
 
         for favorite_slug, (display_name, questions) in favorite_details.items():
             company_fav_dir  = os.path.join(self.config.companies_directory, company_slug, favorite_slug)
-            html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th><th>Frequency</th></tr>"""
+            html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th><th>Solved</th></tr>"""
             
             count = 0
             for question in questions:
@@ -156,19 +156,20 @@ class CompanyDownloader:
                 questions_seen.add(question.id)
                 count += 1
 
-                frequency_label = '{:.1f}'.format(round(question.frequency, 1))
+                # frequency_label = '{:.1f}'.format(round(question.frequency, 1))
                 question_fname = Util.qhtml(question.id, question.title)
+                solved_label = '\u2713' if question.solved else '\u2715'
                 html += f'''<tr>
                             <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
                             <td><a slug="{question.slug}" title="{question.title}" href="{question_fname}">{question.title}</a></td>
                             <td>{question.difficulty} </td>
-                            <td>{frequency_label}</td>
+                            <td>{solved_label}</td>
                             </tr>'''
 
             # Write each favorite slug
             fav_file = os.path.join(company_fav_dir, f"{favorite_slug}.html")
             with open(fav_file, 'w') as file:
-                file.write(f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>{company_slug} {display_name}</h1><p>Total questions {count}</p><table>{html}</table></body></html>""")
+                file.write(f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>{company_slug} {display_name}</h1><p>Total questions {count}, most frequent questions first.</p><table>{html}</table></body></html>""")
             
             overall_html += f"""<h1>{display_name}</h1><table>{html}</table>"""
 

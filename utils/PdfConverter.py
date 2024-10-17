@@ -89,15 +89,18 @@ class PdfConverter:
         os.chdir(curdir)
 
     def convert_single_file(self, file_path):
-        curdir = os.curdir()
+        curdir = os.curdir
         source_folder = os.path.dirname(file_path)
         os.chdir(source_folder)
+
+        output_dir = os.path.join(source_folder, 'pdf')
+        os.makedirs(output_dir, exist_ok=True)
 
         basename = os.path.basename(file_path)
 
         # Get the output paths
-        docx_output_path = os.path.join(source_folder, basename.replace('.html', '.docx'))
-        pdf_output_path = os.path.join(source_folder, basename.replace('.html', '.pdf'))
+        docx_output_path = os.path.join(output_dir, basename.replace('.html', '.docx'))
+        pdf_output_path = os.path.join(output_dir, basename.replace('.html', '.pdf'))
 
         # Convert the single file
         converted = self.convert_file(file_path, docx_output_path, pdf_output_path, self.docxArgs, self.pdfArgs)

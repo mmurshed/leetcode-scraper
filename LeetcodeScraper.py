@@ -124,7 +124,7 @@ def main(logger: Logger):
 9: Download submissions by question id
 10: Download all your submissions
 
-11: Convert all files from a directory to pdf
+11: Convert all files from a directory or a single file to pdf
 
 12: Get cache by key
 13: Delete cache by key
@@ -193,16 +193,19 @@ Press any to quit
                 submission.get_all_submissions()
 
             elif choice == 11:
-                directory = input("Enter directory: ")
+                path = input("Enter directory or file path: ")
 
-                if not os.path.exists(directory) or not os.path.isdir(directory):
-                    logger.error("Diectory doesn't exists or not valid")
-
-                converter = PdfConverter(
-                    config=config,
-                    logger=logger,
-                    images_dir=Config.get_images_dir(directory))
-                converter.convert_folder(directory)
+                if not os.path.exists(path):
+                    logger.error("Diectory or file doesn't exists.")
+                else:
+                    converter = PdfConverter(
+                        config=config,
+                        logger=logger,
+                        images_dir=Config.get_images_dir(path))
+                    if os.path.isdir(path):
+                        converter.convert_folder(path)
+                    else:
+                        converter.convert_single_file(path)
             elif choice == 12:
                 key = input("Enter key: ")
                 print(cache.get(key))
