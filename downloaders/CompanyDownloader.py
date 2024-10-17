@@ -158,7 +158,7 @@ class CompanyDownloader:
 
                 # frequency_label = '{:.1f}'.format(round(question.frequency, 1))
                 question_fname = Util.qhtml(question.id, question.title)
-                solved_label = '\u2713' if question.solved else '\u2715'
+                solved_label = 'Y' if question.solved else '-'
                 html += f'''<tr>
                             <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
                             <td><a slug="{question.slug}" title="{question.title}" href="{question_fname}">{question.title}</a></td>
