@@ -149,11 +149,14 @@ class CompanyDownloader:
             html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th><th>Solved</th></tr>"""
             
             count = 0
+            solved_count = 0
             for question in questions:
                 if question.id in questions_seen:
                     continue
 
                 questions_seen.add(question.id)
+                if question.solved:
+                    solved_count += 1
                 count += 1
 
                 # frequency_label = '{:.1f}'.format(round(question.frequency, 1))
@@ -169,7 +172,7 @@ class CompanyDownloader:
             # Write each favorite slug
             fav_file = os.path.join(company_fav_dir, f"{favorite_slug}.html")
             with open(fav_file, 'w') as file:
-                file.write(f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>{company_slug} {display_name}</h1><p>Total questions {count}, most frequent questions first.</p><table>{html}</table></body></html>""")
+                file.write(f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>{company_slug} {display_name}</h1><p>Solved {solved_count} out of total {count} questions. Most frequent questions first.</p><table>{html}</table></body></html>""")
             
             overall_html += f"""<h1>{display_name}</h1><table>{html}</table>"""
 
