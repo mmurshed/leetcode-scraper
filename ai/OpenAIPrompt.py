@@ -51,10 +51,10 @@ Example Solution {id}:
 
                 if question_content.solution:
                     example_text += self.format_example(question_content, id) + "\n\n"
-            if id > limit:
+            if id >= limit:
                 break
 
-        return example_text, id-1
+        return example_text, id
 
     def generate_examples_from_default_questions(self, limit):
         example_text = ""
@@ -64,15 +64,15 @@ Example Solution {id}:
             "decode-ways": 91
         }
         
-        count = 1
+        count = 0
         for slug, id in questions.items():
             question_content_data = self.lc.get_question(id, slug)
             question_content = QuestionContent.from_json(question_content_data)
 
             if question_content.solution:
-                example_text += self.format_example(question_content, count) + "\n\n"
                 count += 1
-            if count > limit:
+                example_text += self.format_example(question_content, count) + "\n\n"
+            if count >= limit:
                 break
 
         return example_text, count
@@ -96,10 +96,10 @@ Example Solution {id}:
             community_solution_content = self.lc.get_community_solution_content(int(community_solution['id']))
             if community_solution_content:
                 community_solution_text += f"""Community Solution {id}:\n{community_solution_content}\n\n"""
-            if id > limit:
+            if id >= limit:
                 break
 
-        return community_solution_text, id-1
+        return community_solution_text, id
 
     def get_intial_prompt(self, question: Question, question_content: QuestionContent):
         example_text, count = self.generate_examples(question_content, 2)
