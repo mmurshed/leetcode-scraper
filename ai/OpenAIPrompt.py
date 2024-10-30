@@ -42,7 +42,8 @@ Example Solution {id}:
             return example_text, 0
 
         questions = {question.slug: question for question in questions}
-        for id, similar_question in enumerate(question_content.similar_questions, start=1):
+        count = 0
+        for similar_question in question_content.similar_questions:
             title_slug = similar_question['titleSlug']
             if title_slug in questions.keys():
                 question = questions[title_slug]
@@ -50,11 +51,12 @@ Example Solution {id}:
                 question_content = QuestionContent.from_json(question_content_data)
 
                 if question_content.solution:
-                    example_text += self.format_example(question_content, id) + "\n\n"
-            if id >= limit:
+                    count += 1
+                    example_text += self.format_example(question_content, count) + "\n\n"
+            if count >= limit:
                 break
 
-        return example_text, id
+        return example_text, count
 
     def generate_examples_from_default_questions(self, limit):
         example_text = ""
@@ -92,14 +94,16 @@ Example Solution {id}:
         if len(community_solutions) == 0:
             return community_solution_text, 0
     
-        for id, community_solution in enumerate(community_solutions, start=1):
+        count = 0
+        for community_solution in community_solutions:
             community_solution_content = self.lc.get_community_solution_content(int(community_solution['id']))
             if community_solution_content:
-                community_solution_text += f"""Community Solution {id}:\n{community_solution_content}\n\n"""
-            if id >= limit:
+                count += 1
+                community_solution_text += f"""Community Solution {count}:\n{community_solution_content}\n\n"""
+            if count >= limit:
                 break
 
-        return community_solution_text, id
+        return community_solution_text, count
 
     def get_intial_prompt(self, question: Question, question_content: QuestionContent):
         example_text, count = self.generate_examples(question_content, 2)
