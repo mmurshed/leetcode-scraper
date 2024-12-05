@@ -21,7 +21,7 @@ class Util:
 
 
     @staticmethod
-    def copy_question_file(save_path, question_id, question_title, dest_dir, questions_dir, copy_pdf = True, copy_videos = False):
+    def copy_question_file(question_id, question_title, dest_dir, questions_dir, copy_pdf = True, copy_videos = False):
         question_filename = Util.qhtml(question_id, question_title)
         question_filepath = os.path.join(questions_dir, question_filename)
 
@@ -51,7 +51,7 @@ class Util:
         # Copy pdf
         if copy_pdf:
             question_basename = Util.qbasename(question_id, question_title)
-            pdf_dir = os.path.join(save_path, "pdf")
+            pdf_dir = os.path.join(questions_dir, "pdf")
             dest_pdf_dir = os.path.join(dest_dir, "pdf")
 
             os.makedirs(dest_pdf_dir, exist_ok=True)

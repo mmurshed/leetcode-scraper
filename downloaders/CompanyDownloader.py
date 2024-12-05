@@ -218,7 +218,6 @@ class CompanyDownloader:
             return
 
         copied = Util.copy_question_file(
-            save_path=self.config.save_directory,
             question_id=question.id,
             question_title=question.title,
             dest_dir=company_fav_dir,
@@ -226,6 +225,7 @@ class CompanyDownloader:
 
         # if copy failed just download
         if not copied:
+            self.logger.warning(f"Copy failed {question.id}")
             self.questiondownloader.create_question_html(
                 question=question,
                 root_dir=company_fav_dir)
