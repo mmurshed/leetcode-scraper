@@ -50,7 +50,7 @@ class ImageDownloader:
             data = None
 
             headers = None
-            if "imgur" in img_url:
+            if "imgur" in img_url or "loli" in img_url:
                 headers = Constants.IMAGE_HEADERS
 
             try:
