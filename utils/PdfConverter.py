@@ -66,7 +66,7 @@ class PdfConverter:
             workers.append(worker)
 
         # Populate the task queue with file paths
-        sorted_filenames = sorted(os.listdir(source_folder))
+        sorted_filenames = sorted(f for f in os.listdir(source_folder) if not f.startswith("._"))
         for filename in sorted_filenames:
             if filename.endswith('.html'):
                 html_file_path = os.path.join(source_folder, filename)
