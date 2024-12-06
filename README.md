@@ -67,7 +67,7 @@ The following configuration values are essential for setting up and customizing 
 * `ollama_model`: Model specification for Ollama API (e.g., `llama3.1`).
 
 ## Tips
-* Exclude video download in first attempt since videos take time to download. Download with both `download_images` and `overwrite` set to true. Then download again with `download_videos` and `overwrite` set to true. The second time the api calls will be cached and images already downloaded. So only video downloads will take place but you will already have the questions to work with.
+* Exclude video download in first attempt since videos take time to download. Download with both `download_images` and `overwrite` set to true, but `download_videos` set to false. Then download again with `download_videos` and `overwrite` set to true, but `download_images` set to false. The second time the api calls will be cached and images already downloaded. So only video downloads will take place but you will already have the questions to work with.
 * If PDF conversion fails, it will attempt to recompress PNG and JPG and retry. If the SVG fails, check if the SVG file was downlaoded correct. The image files start with question id. Find the question id in the `images` directory and then check if it opens in browser. Delete faulty image and download the question again.
 * To setup Ollama follow the [github page](https://github.com/ollama/ollama). In my testing `llama3.1` worked great.
 * To setup Open AI for solution generation use paid version. Once paid you can generate a token to use. The `gpt-4o-mini` works pretty well and is fairly cost effective.

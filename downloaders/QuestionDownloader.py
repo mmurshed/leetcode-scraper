@@ -81,7 +81,7 @@ class QuestionDownloader:
 
     def filter_out_downloaded(self, questions, root_dir):
         if self.config.overwrite:
-            return questions
+            return questions, [] # Not downloaded everything, downloaded nothing
 
         downloaded = []
         not_downloaded = []

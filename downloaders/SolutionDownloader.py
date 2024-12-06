@@ -67,6 +67,7 @@ class SolutionDownloader:
             os.makedirs(videos_dir, exist_ok=True)
 
             video_basename, video_extension = VideoDownloader.download_video(
+                question_id=question_id,
                 url=src_url,
                 videos_dir=videos_dir)
 
