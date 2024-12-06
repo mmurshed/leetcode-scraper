@@ -3,7 +3,7 @@ import time
 import requests
 
 from logging import Logger
-from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
+from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log, retry_if_exception
 
 from utils.Config import Config
 from utils.Constants import Constants
@@ -47,10 +47,25 @@ class RetriableRequest:
         """Custom logger function to access self.logger before retry."""
         # self.logger.warning(f"Retrying... Attempt number: {retry_state.attempt_number}")
 
+    def should_retry(exception):
+        """
+        Custom retry condition to skip retries for HTTP 4xx errors.
+        """
+        if isinstance(exception, requests.HTTPError):
+            # Ensure the response object exists and has a valid status code
+            if exception.response:
+                status_code = exception.response.status_code
+                if 400 <= status_code < 500:
+                    # Skip retry for client-side HTTP errors (4xx)
+                    return False
+        # Retry for all other exceptions
+        return True
+
     @retry(
         stop=stop_after_attempt(3),  # Retry 3 times
         wait=wait_exponential(multiplier=1, min=1, max=10),  # Exponential backoff
         before_sleep=log_before_retry,  # Use the custom logger method
+        retry=retry_if_exception(should_retry),  # Use custom retry condition
         reraise=True  # Raise the final exception after retries are exhausted
     )
     def request(self, method="post", request=None, selector=None, url=None, headers=None):
@@ -115,8 +130,11 @@ class RetriableRequest:
         data = response_content
 
         for key in selector:
+            if not data:
+                self.logger.error(f"Data is null for key: {key}, selector: {selector}, response: {response_content}")
+                return data
             # Check if the current element is a dictionary and the key is a string
-            if isinstance(data, dict) and isinstance(key, str):
+            elif isinstance(data, dict) and isinstance(key, str):
                 if key in data:
                     data = data[key]
                 else:
@@ -128,6 +146,7 @@ class RetriableRequest:
                 except IndexError:
                     raise IndexError(f"Index '{key}' out of range in response_content list")
             else:
+                self.logger.debug(f"Response content: {response_content}")
                 raise ValueError(f"Unexpected type for key: {key}. Expected str for dict or int for list. Data: {data}")
 
         return data
