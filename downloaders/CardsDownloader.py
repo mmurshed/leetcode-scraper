@@ -142,7 +142,7 @@ class CardsDownloader:
 
         if downloaded and len(downloaded) > 0:
             self.logger.info(f"Already downloaded")
-            for id, title in downloaded:
+            for id, title in downloaded.items():
                 self.logger.info(f"Item id: {id}")
         return not_downloaded
 

@@ -128,6 +128,6 @@ class RetriableRequest:
                 except IndexError:
                     raise IndexError(f"Index '{key}' out of range in response_content list")
             else:
-                raise ValueError(f"Unexpected type for key: {key}. Expected str for dict or int for list.")
+                raise ValueError(f"Unexpected type for key: {key}. Expected str for dict or int for list. Data: {data}")
 
         return data
