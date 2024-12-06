@@ -157,7 +157,7 @@ class CardsDownloader:
             content += question_html
 
         if item_content['article']:
-            content += self.get_article_html(item_content['article']['id'], cards_chapter_dir)
+            content += self.get_article_html(item_content['article']['id'], item_title, item_id)
         
         if item_content['htmlArticle']:
             content += self.get_html_article_html(item_content['htmlArticle']['id'], item_title, item_id)
