@@ -43,10 +43,13 @@ class RetriableRequest:
         self.circuit_reset_time = time.time() + self.circuit_timeout
         self.logger.error("Circuit breaker opened. No requests will be made for 60 seconds.")
 
+    @staticmethod
     def log_before_retry(retry_state):
         """Custom logger function to access self.logger before retry."""
         # self.logger.warning(f"Retrying... Attempt number: {retry_state.attempt_number}")
+        pass
 
+    @staticmethod
     def should_retry(exception):
         """
         Custom retry condition to skip retries for HTTP 4xx errors.
