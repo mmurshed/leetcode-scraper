@@ -196,7 +196,17 @@ class CompanyDownloader:
         self.logger.info("Scraping question data")
         
         company_fav_dir  = os.path.join(self.config.companies_directory, company_slug, favorite_slug)
-        not_downloaded_questions, downloaded_questions = self.questiondownloader.filter_out_downloaded(questions, company_fav_dir)
+        
+        # Check which questions are already downloaded in the company directory
+        downloaded_questions = []
+        not_downloaded_questions = []
+        
+        for question in questions:
+            question_filepath = os.path.join(company_fav_dir, Util.qhtml(question.id, question.title))
+            if os.path.exists(question_filepath) and not self.config.overwrite:
+                downloaded_questions.append(question)
+            else:
+                not_downloaded_questions.append(question)
 
         # skip already processed questions
         questions_seen.update([question.id for question in downloaded_questions])

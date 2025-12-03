@@ -37,6 +37,16 @@ class QuestionDownloader:
         self.imagedownloader = imagedownloader
         self.ai_solution_generator = ai_solution_generator
     
+    def get_question_folder(self, question_id: int) -> str:
+        """Get the folder name for a question based on its ID (grouped by hundreds)"""
+        folder_number = ((question_id - 1) // 100 + 1) * 100
+        return f"{folder_number:04d}"
+    
+    def get_question_directory(self, question_id: int) -> str:
+        """Get the full directory path for a question"""
+        folder_name = self.get_question_folder(question_id)
+        return os.path.join(self.config.questions_directory, folder_name)
+    
     def create_question_index(self, questions):
         os.makedirs(self.config.questions_directory, exist_ok=True)
         filepath = os.path.join(self.config.questions_directory, "index.html")
@@ -46,10 +56,12 @@ class QuestionDownloader:
         for question in questions:
             count += 1
             filename = Util.qhtml(question.id, question.title)
+            folder_name = self.get_question_folder(question.id)
+            relative_path = f"{folder_name}/{filename}"
 
             html += f'''<tr>
                         <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
-                        <td><a slug="{question.slug}" title="{question.title}" href="{filename}">{question.title}</a></td>
+                        <td><a slug="{question.slug}" title="{question.title}" href="{relative_path}">{question.title}</a></td>
                         <td>{question.difficulty}</td>
                         </tr>'''
 
@@ -64,7 +76,9 @@ class QuestionDownloader:
         if len(questions) == 0:
             self.logger.error(f"Question id not found {question_id}")
             return
-        self.create_question_html(questions[0], self.config.questions_directory)
+        
+        question_dir = self.get_question_directory(questions[0].id)
+        self.create_question_html(questions[0], question_dir)
 
         self.create_question_index(questions)
 
@@ -72,14 +86,15 @@ class QuestionDownloader:
     def download_all_questions(self):
         questions = self.lc.get_all_questions()
 
-        not_downloaded_questions, _ = self.filter_out_downloaded(questions, self.config.questions_directory)
+        not_downloaded_questions, _ = self.filter_out_downloaded(questions)
         
         for question in not_downloaded_questions:
-            self.create_question_html(question, self.config.questions_directory)
+            question_dir = self.get_question_directory(question.id)
+            self.create_question_html(question, question_dir)
 
         self.create_question_index(questions)
 
-    def filter_out_downloaded(self, questions, root_dir):
+    def filter_out_downloaded(self, questions):
         if self.config.overwrite:
             return questions, [] # Not downloaded everything, downloaded nothing
 
@@ -87,7 +102,8 @@ class QuestionDownloader:
         not_downloaded = []
 
         for question in questions:
-            filepath = os.path.join(root_dir, Util.qhtml(question.id, question.title))
+            question_dir = self.get_question_directory(question.id)
+            filepath = os.path.join(question_dir, Util.qhtml(question.id, question.title))
             
             if os.path.exists(filepath):
                 downloaded.append(question)
@@ -103,6 +119,9 @@ class QuestionDownloader:
     #region html generation
     def create_question_html(self, question: Question, root_dir):           
         self.logger.info(f"Scraping question {question.id}")
+        
+        # Ensure the directory exists
+        os.makedirs(root_dir, exist_ok=True)
 
         question_html = self.get_question_html(question, root_dir)
         content = f"""{Constants.HTML_HEADER}<body>{question_html}</body>"""

@@ -22,8 +22,13 @@ class Util:
 
     @staticmethod
     def copy_question_file(question_id, question_title, dest_dir, questions_dir, copy_pdf = True, copy_videos = False):
+        # Calculate the subfolder based on question ID (e.g., 0100, 0200, etc.)
+        folder_number = ((question_id - 1) // 100 + 1) * 100
+        folder_name = f"{folder_number:04d}"
+        question_subfolder = os.path.join(questions_dir, folder_name)
+        
         question_filename = Util.qhtml(question_id, question_title)
-        question_filepath = os.path.join(questions_dir, question_filename)
+        question_filepath = os.path.join(question_subfolder, question_filename)
 
         if not os.path.exists(question_filepath):
             return False
@@ -38,39 +43,43 @@ class Util:
         question_id_str = Util.qstr(question_id)
 
         # Copy images
-        images_dir = os.path.join(questions_dir, "images")
+        images_dir = os.path.join(question_subfolder, "images")
         dest_images_dir = os.path.join(dest_dir, "images")
-        os.makedirs(dest_images_dir, exist_ok=True)
-
-        for filename in os.listdir(images_dir):
-            if filename.startswith(question_id_str):
-                source_imagepath = os.path.join(images_dir, filename)
-                dest_imagepath = os.path.join(dest_images_dir, filename)
-                shutil.copy2(source_imagepath, dest_imagepath)
+        
+        if os.path.exists(images_dir):
+            os.makedirs(dest_images_dir, exist_ok=True)
+            for filename in os.listdir(images_dir):
+                if filename.startswith(question_id_str):
+                    source_imagepath = os.path.join(images_dir, filename)
+                    dest_imagepath = os.path.join(dest_images_dir, filename)
+                    shutil.copy2(source_imagepath, dest_imagepath)
 
         # Copy pdf
         if copy_pdf:
             question_basename = Util.qbasename(question_id, question_title)
-            pdf_dir = os.path.join(questions_dir, "pdf")
+            pdf_dir = os.path.join(question_subfolder, "pdf")
             dest_pdf_dir = os.path.join(dest_dir, "pdf")
 
-            os.makedirs(dest_pdf_dir, exist_ok=True)
-            question_filepath = os.path.join(pdf_dir, f"{question_basename}.pdf")
-            destination_filepath = os.path.join(dest_pdf_dir, f"{question_basename}.pdf")
-            
-            if os.path.exists(question_filepath):
-                shutil.copy2(question_filepath, destination_filepath)
+            if os.path.exists(pdf_dir):
+                os.makedirs(dest_pdf_dir, exist_ok=True)
+                question_filepath = os.path.join(pdf_dir, f"{question_basename}.pdf")
+                destination_filepath = os.path.join(dest_pdf_dir, f"{question_basename}.pdf")
+                
+                if os.path.exists(question_filepath):
+                    shutil.copy2(question_filepath, destination_filepath)
 
         # Copy videos
         if copy_videos:
-            videos_dir = os.path.join(questions_dir, "videos")
+            videos_dir = os.path.join(question_subfolder, "videos")
             dest_videos_dir = os.path.join(dest_dir, "videos")
-            os.makedirs(dest_videos_dir, exist_ok=True)
-            for filename in os.listdir(videos_dir):
-                if filename.startswith(question_id_str):
-                    source_imagepath = os.path.join(videos_dir, filename)
-                    dest_imagepath = os.path.join(dest_videos_dir, filename)
-                    shutil.copy2(source_imagepath, dest_imagepath)
+            
+            if os.path.exists(videos_dir):
+                os.makedirs(dest_videos_dir, exist_ok=True)
+                for filename in os.listdir(videos_dir):
+                    if filename.startswith(question_id_str):
+                        source_imagepath = os.path.join(videos_dir, filename)
+                        dest_imagepath = os.path.join(dest_videos_dir, filename)
+                        shutil.copy2(source_imagepath, dest_imagepath)
         
         return True
 
