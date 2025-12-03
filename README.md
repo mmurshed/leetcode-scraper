@@ -3,7 +3,29 @@
 Leetcode downloader that uses Api Requests to get content.
 
 ## Installation
+
+### Python Dependencies
 `pip install -r requirements.txt`
+
+### LaTeX Dependencies (for PDF conversion)
+
+PDF conversion requires LaTeX with additional packages. If you encounter errors like `File 'svg.sty' not found`, install the required LaTeX packages:
+
+**macOS:**
+```bash
+sudo tlmgr install svg trimspaces transparent xstring soul
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install texlive-latex-extra
+```
+
+**Windows:**
+- Install [MiKTeX](https://miktex.org/download) or [TeX Live](https://www.tug.org/texlive/)
+- MiKTeX will automatically prompt to install missing packages
+
+**Note:** If you don't need PDF conversion, you can skip LaTeX installation.
 
 ## Run
 
