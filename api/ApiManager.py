@@ -326,6 +326,70 @@ class ApiManager:
 
     #endregion submissions api
 
+    #region user progress api
+    def get_user_submission_progress(self, limit=50, skip=0):
+        """Get user's submission progress (questions with submissions)."""
+        key = self.reqh.key("user", "progress", "submissions", str(skip), str(limit))
+
+        request = {
+            "operationName": "userProgressQuestionList",
+            "variables": {
+                "filters": {
+                    "skip": skip,
+                    "limit": limit
+                }
+            },
+            "query": "\n    query userProgressQuestionList($filters: UserProgressQuestionListInput) {\n  userProgressQuestionList(filters: $filters) {\n    totalNum\n    questions {\n      translatedTitle\n      frontendId\n      title\n      titleSlug\n      difficulty\n      lastSubmittedAt\n      numSubmitted\n      questionStatus\n      lastResult\n      topicTags {\n        name\n        nameTranslated\n        slug\n      }\n    }\n  }\n}\n    "
+        }
+        selector = ['data', 'userProgressQuestionList']
+
+        data = self.reqh.request(
+            key=key,
+            request=request,
+            selector=selector)
+        
+        return data
+
+    def get_all_submissions(self):
+        """Get all questions that the user has submitted solutions for.
+        
+        Returns a list of all questions with submission details including:
+        - frontendId, title, titleSlug
+        - difficulty, questionStatus, lastResult
+        - lastSubmittedAt, numSubmitted
+        - topicTags
+        """
+        self.logger.info("Fetching all user submissions...")
+        
+        # Get first batch to determine total count
+        first_batch = self.get_user_submission_progress(limit=50, skip=0)
+        
+        if not first_batch or 'totalNum' not in first_batch:
+            self.logger.warning("Could not retrieve user submissions")
+            return []
+        
+        total_num = first_batch['totalNum']
+        all_questions = first_batch.get('questions', [])
+        
+        self.logger.info(f"Total questions with submissions: {total_num}")
+        
+        # Fetch remaining batches if needed
+        if total_num > 50:
+            skip = 50
+            while skip < total_num:
+                self.logger.info(f"Fetching submissions {skip} to {skip + 50}...")
+                batch = self.get_user_submission_progress(limit=50, skip=skip)
+                
+                if batch and 'questions' in batch:
+                    all_questions.extend(batch['questions'])
+                
+                skip += 50
+        
+        self.logger.info(f"Retrieved {len(all_questions)} questions with submissions")
+        return all_questions
+
+    #endregion user progress api
+
     #region solutions api
     def get_official_solution(self, question_id, question_slug):
         key = self.reqh.key("question", question_id, "solution")

@@ -665,7 +665,7 @@ class LeetcodeScraperGUI:
         all_questions_frame = ttk.Frame(questions_frame)
         all_questions_frame.pack(pady=5)
         ttk.Button(all_questions_frame, text="Download All Questions", command=self.download_all_questions, width=30).pack(side='left', padx=5)
-        ttk.Button(all_questions_frame, text="Check for Missing Downloads", command=self.check_missing_questions, width=30).pack(side='left', padx=5)
+        ttk.Button(all_questions_frame, text="Check Missing", command=self.check_missing_questions, width=30).pack(side='left', padx=5)
         
         ttk.Separator(questions_frame, orient='horizontal').pack(fill='x', pady=10)
         
@@ -796,7 +796,7 @@ class LeetcodeScraperGUI:
         all_cards_frame = ttk.Frame(cards_frame)
         all_cards_frame.pack(pady=5)
         ttk.Button(all_cards_frame, text="Download All Cards", command=self.download_all_cards, width=30).pack(side='left', padx=5)
-        ttk.Button(all_cards_frame, text="Check for Missing Downloads", command=self.check_missing_cards, width=30).pack(side='left', padx=5)
+        ttk.Button(all_cards_frame, text="Check Missing", command=self.check_missing_cards, width=30).pack(side='left', padx=5)
         
         ttk.Separator(cards_frame, orient='horizontal').pack(fill='x', pady=10)
         
@@ -883,7 +883,7 @@ class LeetcodeScraperGUI:
         all_companies_frame = ttk.Frame(parent)
         all_companies_frame.pack(pady=10)
         ttk.Button(all_companies_frame, text="Download All Company Questions", command=self.download_all_companies, width=35).pack(side='left', padx=5)
-        ttk.Button(all_companies_frame, text="Check for Missing Downloads", command=self.check_missing_companies, width=35).pack(side='left', padx=5)
+        ttk.Button(all_companies_frame, text="Check Missing", command=self.check_missing_companies, width=35).pack(side='left', padx=5)
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -994,7 +994,11 @@ class LeetcodeScraperGUI:
     def setup_submissions_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
-        ttk.Button(parent, text="Download All Your Submissions", command=self.download_all_submissions, width=30).pack(pady=10)
+        # Buttons for all submissions operations
+        all_submissions_frame = ttk.Frame(parent)
+        all_submissions_frame.pack(pady=10)
+        ttk.Button(all_submissions_frame, text="Download All Your Submissions", command=self.download_all_submissions, width=35).pack(side='left', padx=5)
+        ttk.Button(all_submissions_frame, text="Check Missing", command=self.check_missing_submissions, width=20).pack(side='left', padx=5)
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -1005,7 +1009,7 @@ class LeetcodeScraperGUI:
         # Question ID input with dropdown
         submission_input_frame = ttk.Frame(submission_frame)
         submission_input_frame.pack(pady=10)
-        ttk.Label(submission_input_frame, text="Question ID:").pack(side='left', padx=5)
+        ttk.Label(submission_input_frame, text="Submitted Question ID:").pack(side='left', padx=5)
         
         # Use Combobox for both typing and dropdown
         self.submission_question_id_var = tk.StringVar()
@@ -1021,30 +1025,49 @@ class LeetcodeScraperGUI:
         # Info text
         info_frame = ttk.Frame(parent)
         info_frame.pack(fill='x', padx=10, pady=10)
-        info_text = ttk.Label(info_frame, text="Download your submission history for specific questions or all questions.\nQuestion list loads automatically when you open this tab.",
+        info_text = ttk.Label(info_frame, text="Download your submission history for specific questions or all questions.\nThe dropdown shows only questions you've attempted or solved.\n✓ = Solved, ○ = Attempted\n\nSubmission list loads automatically when you open this tab.",
                              wraplength=500, justify='left', foreground='gray', font=('Arial', 9, 'italic'))
         info_text.pack()
     
     def load_submission_question_list(self, show_message=True):
-        """Load all questions from LeetCode API and populate the submissions dropdown.
+        """Load questions with submissions from LeetCode API and populate the dropdown.
         
         Args:
             show_message: If True, show success/error messages. Default True.
         """
         def task():
             try:
-                self.status_var.set("Loading questions list...")
-                self.logger.info("Loading questions list from LeetCode API...")
+                self.status_var.set("Loading submissions...")
+                self.logger.info("Loading user submissions from LeetCode API...")
                 
                 # Initialize components if needed
                 self.initialize_components()
                 
-                # Get all questions
-                questions = self.qued.lc.get_all_questions()
+                # Get all questions with submissions using the new API method
+                submissions = self.qued.lc.get_all_submissions()
                 
-                if questions:
-                    # Format as "ID - Title" for display
-                    question_list = [f"{q.id} - {q.title}" for q in sorted(questions, key=lambda x: int(x.id))]
+                if submissions:
+                    # Format as "ID - Title (Status)" for display
+                    # Include status to show solved/attempted state
+                    question_list = []
+                    for sub in submissions:
+                        q_id = sub.get('frontendId', '')
+                        title = sub.get('title', '')
+                        status = sub.get('questionStatus', '')
+                        
+                        # Create display text with status indicator
+                        if status == 'SOLVED':
+                            status_icon = '✓'
+                        elif status == 'ATTEMPTED':
+                            status_icon = '○'
+                        else:
+                            status_icon = '?'
+                        
+                        display_text = f"{q_id} - {title} [{status_icon}]"
+                        question_list.append(display_text)
+                    
+                    # Sort by question ID
+                    question_list.sort(key=lambda x: int(x.split(' - ')[0]))
                     
                     # Store all submission questions for filtering
                     self.all_submission_questions = question_list
@@ -1053,20 +1076,21 @@ class LeetcodeScraperGUI:
                     self.submission_question_id_combo['values'] = question_list
                     
                     self.submissions_loaded = True
-                    self.logger.info(f"Loaded {len(questions)} questions")
-                    self.status_var.set(f"Loaded {len(questions)} questions")
+                    self.logger.info(f"Loaded {len(submissions)} questions with submissions")
+                    self.status_var.set(f"Loaded {len(submissions)} questions with submissions")
                     if show_message:
-                        messagebox.showinfo("Success", f"Loaded {len(questions)} questions into dropdown")
+                        messagebox.showinfo("Success", f"Loaded {len(submissions)} questions with submissions\n\n✓ = Solved\n○ = Attempted")
                 else:
-                    self.logger.error("No questions found")
+                    self.logger.warning("No submissions found")
+                    self.status_var.set("No submissions found")
                     if show_message:
-                        messagebox.showwarning("Warning", "No questions found")
+                        messagebox.showwarning("Warning", "No submissions found. Have you solved any questions?")
                     
             except Exception as e:
-                self.logger.error(f"Failed to load questions: {e}")
-                self.status_var.set("Failed to load questions")
+                self.logger.error(f"Failed to load submissions: {e}")
+                self.status_var.set("Failed to load submissions")
                 if show_message:
-                    messagebox.showerror("Error", f"Failed to load questions: {e}")
+                    messagebox.showerror("Error", f"Failed to load submissions: {e}")
         
         self.run_in_thread(task)
     
@@ -2000,6 +2024,93 @@ class LeetcodeScraperGUI:
         def task():
             self.initialize_components()
             self.submission.get_all_submissions()
+        self.run_in_thread(task)
+    
+    def check_missing_submissions(self):
+        """Check for submissions that haven't been downloaded yet."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info("Checking for missing submissions...")
+                self.status_var.set("Checking missing submissions...")
+                
+                # Get all questions with submissions from the user progress API
+                submissions = self.qued.lc.get_all_submissions()
+                
+                if not submissions:
+                    self.logger.warning("No submissions found")
+                    messagebox.showinfo("No Submissions", "You don't have any submissions yet.")
+                    return
+                
+                # Check which submissions are downloaded
+                downloaded = []
+                missing = []
+                
+                for sub in submissions:
+                    q_id = sub.get('frontendId', '')
+                    title = sub.get('title', '')
+                    status = sub.get('questionStatus', '')
+                    
+                    # Check if submission directory exists with files
+                    submission_dir = os.path.join(self.config.submissions_directory, Util.qstr(q_id))
+                    
+                    if os.path.exists(submission_dir) and os.listdir(submission_dir):
+                        # Has files in the directory
+                        downloaded.append((q_id, title, status))
+                    else:
+                        # No files or directory doesn't exist
+                        missing.append((q_id, title, status))
+                
+                total = len(submissions)
+                downloaded_count = len(downloaded)
+                missing_count = len(missing)
+                
+                # Log summary
+                self.logger.info(f"Submissions check complete:")
+                self.logger.info(f"  Total questions with submissions: {total}")
+                self.logger.info(f"  Downloaded: {downloaded_count}")
+                self.logger.info(f"  Missing: {missing_count}")
+                
+                if missing_count > 0:
+                    self.logger.info("Missing submissions for questions:")
+                    for q_id, title, status in missing[:50]:  # Log first 50
+                        status_icon = '✓' if status == 'SOLVED' else '○'
+                        self.logger.info(f"  {q_id} - {title} [{status_icon}]")
+                    if missing_count > 50:
+                        self.logger.info(f"  ... and {missing_count - 50} more")
+                
+                # Create message
+                if missing_count == 0:
+                    self.status_var.set("All submissions downloaded!")
+                    message = (f"Submissions Check Complete!\n\n"
+                             f"Total questions with submissions: {total}\n"
+                             f"✓ All submission files are downloaded!")
+                else:
+                    self.status_var.set(f"Found {missing_count} missing submissions")
+                    
+                    # Show first 15 missing
+                    display_missing = missing[:15]
+                    display_list = '\n'.join([
+                        f"{q_id} - {title} [{'✓' if status == 'SOLVED' else '○'}]" 
+                        for q_id, title, status in display_missing
+                    ])
+                    more_text = f"\n... and {missing_count - 15} more" if missing_count > 15 else ""
+                    
+                    message = (f"Submissions Check\n\n"
+                             f"Total questions with submissions: {total}\n"
+                             f"✓ Downloaded: {downloaded_count}\n"
+                             f"✗ Missing: {missing_count}\n\n"
+                             f"Missing submissions for:\n{display_list}{more_text}\n\n"
+                             f"✓ = Solved, ○ = Attempted\n"
+                             f"Check the log for the complete list.")
+                
+                messagebox.showinfo("Submissions Check Complete", message)
+                
+            except Exception as e:
+                self.logger.error(f"Error checking missing submissions: {e}")
+                messagebox.showerror("Error", f"Failed to check missing submissions: {e}")
+        
         self.run_in_thread(task)
         
     def download_question_submissions(self):
