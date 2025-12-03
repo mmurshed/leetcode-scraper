@@ -6,11 +6,59 @@ Leetcode downloader that uses Api Requests to get content.
 `pip install -r requirements.txt`
 
 ## Run
+
+### GUI Mode (Default)
 `python LeetcodeScraper.py`
 
-Use `--proxy` option to set a proxy url.
+The GUI provides a user-friendly tabbed interface with the following tabs:
+- **Questions**: Download individual questions, question ranges, or all questions
+- **Cards**: Download specific cards or all cards from the Explore page
+- **Companies**: Download questions for specific companies
+- **Submissions**: Download your accepted submissions
+- **Utilities**: Cache management and PDF conversion tools
+- **Config**: Configure all settings with a visual form
 
-## Menu Options
+### Console Mode
+`python LeetcodeScraper.py --console`
+
+Use the console mode for command-line interface with menu options.
+
+### Additional Options
+- Use `--proxy` option to set a proxy url (both GUI and console modes)
+
+## GUI Features
+
+### Questions Tab
+- **Single Question Download**: Enter or select a question ID from the dropdown
+- **Range Download**: Download multiple questions by specifying From ID and To ID
+- **Download All Questions**: Download the entire question set
+- Question lists are automatically loaded when you switch to the Questions tab
+
+### Cards Tab
+- Download specific cards by slug name
+- Download all available cards
+- Card lists are automatically loaded when you switch to the Cards tab
+
+### Companies Tab
+- Download all questions for a specific company
+- Download favorite questions for a company
+- Company lists are automatically loaded when you switch to the Companies tab
+
+### Submissions Tab
+- Download submissions for a specific question ID
+- Download all your accepted submissions
+- Question lists are automatically loaded for easy selection
+
+### Utilities Tab
+- Convert files to PDF
+- Manage cache (get, delete, or clear)
+
+### Config Tab
+- Visual form to configure all settings
+- Automatically loads current configuration
+- Save changes directly from the GUI
+
+## Console Menu Options
 
 1. **Setup Config**: Initialize or update the configuration settings.
 2. **Download a Card by Name**: Download a specific card using its name. It will ask about the card name (e.g., `google`). Cards are available in the **Explore** page. Once you click the play button the card name will be displayed in the URL.
@@ -67,9 +115,13 @@ The following configuration values are essential for setting up and customizing 
 * `ollama_model`: Model specification for Ollama API (e.g., `llama3.1`).
 
 ## Tips
-* Exclude video download in first attempt since videos take time to download. Download with both `download_images` and `overwrite` set to true, but `download_videos` set to false. Then download again with `download_videos` and `overwrite` set to true, but `download_images` set to false. The second time the api calls will be cached and images already downloaded. So only video downloads will take place but you will already have the questions to work with.
-* If PDF conversion fails, it will attempt to recompress PNG and JPG and retry. If the SVG fails, check if the SVG file was downlaoded correct. The image files start with question id. Find the question id in the `images` directory and then check if it opens in browser. Delete faulty image and download the question again.
-* To setup Ollama follow the [github page](https://github.com/ollama/ollama). In my testing `llama3.1` worked great.
-* To setup Open AI for solution generation use paid version. Once paid you can generate a token to use. The `gpt-4o-mini` works pretty well and is fairly cost effective.
-* To avoid duplicates when downloading company questions, each favorite category contains question for that period. For example, three months category contain questions from 30 days to 3 months, but not question earlier than 30 days.
-* When updating make sure the cache is clean but `overwrite` is set to false to avoid downloading again. For example, to update google questions for 30-days, set `overwrite` to false, the delete cache keys `company-favorite-google-thirty-days`, `company-favorite-google-three-months`, `company-favorite-google-six-months`,`company-favorite-google-more-than-six-months`, `company-favorite-google-all`.
+* **GUI vs Console**: The GUI mode is recommended for ease of use with dropdown menus, visual configuration, and real-time log output. Use console mode for scripting or automation.
+* **Range Downloads**: Use the range download feature in the Questions tab to efficiently download multiple questions (e.g., questions 1-100). The GUI will warn you for large ranges (>100 questions).
+* **Question Organization**: Downloaded questions are automatically organized into folders by hundreds (e.g., questions 1-100 in `questions/0100/`, 101-200 in `questions/0200/`).
+* **Video Downloads**: Exclude video download in first attempt since videos take time to download. Download with both `download_images` and `overwrite` set to true, but `download_videos` set to false. Then download again with `download_videos` and `overwrite` set to true, but `download_images` set to false. The second time the api calls will be cached and images already downloaded. So only video downloads will take place but you will already have the questions to work with.
+* **PDF Conversion**: If PDF conversion fails, it will attempt to recompress PNG and JPG and retry. If the SVG fails, check if the SVG file was downloaded correctly. The image files start with question id. Find the question id in the `images` directory and then check if it opens in browser. Delete faulty image and download the question again.
+* **Ollama Setup**: To setup Ollama follow the [github page](https://github.com/ollama/ollama). In my testing `llama3.1` worked great.
+* **OpenAI Setup**: To setup OpenAI for solution generation use paid version. Once paid you can generate a token to use. The `gpt-4o-mini` works pretty well and is fairly cost effective.
+* **Company Questions**: To avoid duplicates when downloading company questions, each favorite category contains question for that period. For example, three months category contain questions from 30 days to 3 months, but not questions earlier than 30 days.
+* **Cache Management**: When updating make sure the cache is clean but `overwrite` is set to false to avoid downloading again. For example, to update google questions for 30-days, set `overwrite` to false, then delete cache keys `company-favorite-google-thirty-days`, `company-favorite-google-three-months`, `company-favorite-google-six-months`, `company-favorite-google-more-than-six-months`, `company-favorite-google-all`.
+* **Logs**: All operations are logged to both the console/GUI and to log files in the save directory for troubleshooting.
