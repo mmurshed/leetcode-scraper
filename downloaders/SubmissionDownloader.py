@@ -46,7 +46,7 @@ class SubmissionDownloader:
 
         submissions_data = self.lc.get_submission_list(question_id, question_slug)
         if not submissions_data or len(submissions_data) == 0:
-            self.logger.error(f"Submission wasn't downloaded {question_id}")
+            self.logger.info(f"Submission wasn't downloaded {question_id}")
             return
         
         submissions = [Submission.from_json(submission) for submission in submissions_data if submission['statusDisplay'] == "Accepted"]
