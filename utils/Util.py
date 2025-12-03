@@ -163,6 +163,9 @@ class Util:
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+        
+        # Suppress httpx INFO logs (from OpenAI SDK)
+        logging.getLogger("httpx").setLevel(logging.WARNING)
 
         return logger
 

@@ -47,7 +47,7 @@ class CardsDownloader:
 
     #endregion card urls
     def create_card_index(self, chapters, card_slug, cards_chapter_dir):
-        self.logger.info("Creating index.html")
+        self.logger.debug("Creating index.html")
 
         card_details = self.lc.get_card_details(card_slug)
 
@@ -92,7 +92,7 @@ class CardsDownloader:
             return
 
         # Creating HTML for each cards topics
-        self.logger.info(f"Scraping card url: {card_slug}")
+        self.logger.debug(f"Scraping card url: {card_slug}")
         chapters = self.lc.get_chapters_with_items(card_slug)
 
         if chapters:
@@ -104,7 +104,7 @@ class CardsDownloader:
 
         # Creating HTML for each cards topics
         for card in cards:
-            self.logger.info(f"Scraping card url: {card.slug}")
+            self.logger.debug(f"Scraping card url: {card.slug}")
             chapters = self.lc.get_chapters_with_items(card.slug)
 
             if chapters:
@@ -178,14 +178,14 @@ class CardsDownloader:
             file.write(content_soup.prettify())
 
     def get_article_html(self, article_id, item_title, item_id):
-        self.logger.info("Getting article data")
+        self.logger.debug("Getting article data")
         article_content = self.lc.get_article(item_id, article_id)
         article_content = Util.markdown_with_math(article_content)
         article_html = f"""<h3>{item_title}</h3><md-block class="article__content">{article_content}</md-block>"""
         return article_html
 
     def get_html_article_html(self, html_article_id, item_title, item_id):
-        self.logger.info("Getting html article data")
+        self.logger.debug("Getting html article data")
         html_article = self.lc.get_html_article(item_id, html_article_id)
         html_article = Util.markdown_with_math(html_article)
         html_article_html = f"""<h3>{item_title}</h3><md-block class="html_article__content">{html_article}</md-block>"""

@@ -67,7 +67,7 @@ class CompanyDownloader:
         self.download_all_favorite_company_questions(company_slug, fav_slug, questions)
 
     def download_all_company_questions(self):
-        self.logger.info("Scraping all company questions")
+        self.logger.debug("Scraping all company questions")
 
         companies = self.get_company_slugs()
         self.create_all_company_index(companies)
@@ -79,7 +79,7 @@ class CompanyDownloader:
             self.download_all_company_questions(company.slug, favorite_details)
     
     def create_all_company_index(self, companies: List[Company]):
-        self.logger.info("Creating company index.html")
+        self.logger.debug("Creating company index.html")
         cols = 10
         rows = len(companies)//10 + 1
         html = ''
@@ -185,7 +185,7 @@ class CompanyDownloader:
                 </html>""")
 
     def download_all_company_questions(self, company_slug, favorite_details):
-        self.logger.info("Scraping question data")
+        self.logger.debug("Scraping question data")
 
         questions_seen = set()
         
@@ -193,7 +193,7 @@ class CompanyDownloader:
             self.download_all_favorite_company_questions(company_slug, favorite_slug, questions, questions_seen)
 
     def download_all_favorite_company_questions(self, company_slug, favorite_slug, questions, questions_seen=set()):
-        self.logger.info("Scraping question data")
+        self.logger.debug("Scraping question data")
         
         company_fav_dir  = os.path.join(self.config.companies_directory, company_slug, favorite_slug)
         

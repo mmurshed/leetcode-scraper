@@ -359,7 +359,7 @@ class ApiManager:
         - lastSubmittedAt, numSubmitted
         - topicTags
         """
-        self.logger.info("Fetching all user submissions...")
+        self.logger.debug("Fetching all user submissions...")
         
         # Get first batch to determine total count
         first_batch = self.get_user_submission_progress(limit=50, skip=0)
@@ -377,7 +377,7 @@ class ApiManager:
         if total_num > 50:
             skip = 50
             while skip < total_num:
-                self.logger.info(f"Fetching submissions {skip} to {skip + 50}...")
+                self.logger.debug(f"Fetching submissions {skip} to {skip + 50}...")
                 batch = self.get_user_submission_progress(limit=50, skip=skip)
                 
                 if batch and 'questions' in batch:

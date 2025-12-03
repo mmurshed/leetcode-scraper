@@ -150,7 +150,7 @@ class SolutionDownloader:
         return slides_html
 
     def replace_slides_json(self, content, question_id):
-        self.logger.info("Replacing slides json")
+        self.logger.debug("Replacing slides json")
 
         slide_idx = [0]  # A list to hold the counter, because lists are mutable
 

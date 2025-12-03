@@ -47,13 +47,13 @@ def init(logger: Logger):
     if config.ai_solution_generator:
         ai_solution_generator_method = str.lower(config.ai_solution_generator)
         if "ollama" == ai_solution_generator_method:
-            logger.info(f"Ollama AI Solution Generator Initiated")
+            logger.debug(f"Ollama AI Solution Generator Initiated")
             ai_solution_generator = OllamaSolution(
                 config=config,
                 logger=logger,
                 cache=cache)
         elif "openai" == ai_solution_generator_method:
-            logger.info(f"Open AI Solution Generator Initiated")
+            logger.debug(f"Open AI Solution Generator Initiated")
             ai_solution_generator = OpenAISolution(
                 config=config,
                 logger=logger,

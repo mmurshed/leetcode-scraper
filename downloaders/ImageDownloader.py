@@ -75,8 +75,12 @@ class ImageDownloader:
                 with open(image_path, 'wb') as file:
                     file.write(data)
 
-                if self.config.recompress_image:
-                    ImageUtil.recompress_image(image_path)
+                # Check if this image format should be recompressed
+                if self.config.recompress_image_formats and len(self.config.recompress_image_formats) > 0:
+                    # recompress_image may return a new path if format was converted (e.g., webp -> png)
+                    new_path = ImageUtil.recompress_image(image_path, self.config.recompress_image_formats)
+                    if new_path and new_path != image_path:
+                        image_path = new_path
 
         if not os.path.exists(image_path):
             self.logger.error(f"File not found {image_path}\n{img_url}")
@@ -86,6 +90,9 @@ class ImageDownloader:
             os.remove(image_path)
             self.logger.error(f"Invalid image file from url: {img_url}")
             return None
+
+        # Update extension based on actual file
+        img_ext = str.lower(image_path.split('.')[-1])
 
         if self.config.extract_gif_frames and img_ext == "gif":
             files = self.decompose_gif(image_path, url_hash, images_dir)
@@ -131,7 +138,7 @@ class ImageDownloader:
         return imgs_decoded
 
     def fix_image_urls(self, content_soup, question_id, root_dir):
-        self.logger.info("Fixing image urls")
+        self.logger.debug("Fixing image urls")
 
         images = content_soup.select('img')
 

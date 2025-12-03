@@ -20,7 +20,7 @@ class Config:
         self.include_community_solution_count: int = 1
         self.include_default_code: bool = False
         self.extract_gif_frames: bool = False
-        self.recompress_image: bool = False
+        self.recompress_image_formats: list = ["webp"]  # Options: "all", "png", "jpg", "webp"
         self.base64_encode_image: bool = False
         self.download_images: str = "new"  # Options: "none", "always", "new"
         self.download_videos: str = "new"  # Options: "none", "always", "new"
@@ -116,4 +116,16 @@ class Config:
         # Migrate download_videos: True -> "new", False -> "none"
         if isinstance(self.download_videos, bool):
             self.download_videos = "new" if self.download_videos else "none"
+        
+        # Migrate recompress_image (old name) to recompress_image_formats
+        if hasattr(self, 'recompress_image'):
+            if isinstance(self.recompress_image, bool):
+                self.recompress_image_formats = ["webp"] if self.recompress_image else []
+            elif isinstance(self.recompress_image, list):
+                self.recompress_image_formats = self.recompress_image
+            # Remove old attribute
+            delattr(self, 'recompress_image')
+        # Also handle if recompress_image_formats was somehow set as bool
+        elif isinstance(self.recompress_image_formats, bool):
+            self.recompress_image_formats = ["webp"] if self.recompress_image_formats else []
 

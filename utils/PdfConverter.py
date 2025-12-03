@@ -15,12 +15,16 @@ class PdfConverter:
         self, 
         config: Config,
         logger: Logger,
-        images_dir: str):
+        images_dir: str,
+        overwrite_pdf: bool = False,
+        keep_docx: bool = False):
         
         self.config = config
         self.logger = logger
         self.num_threads = self.valid_num_threads(self.config.threads_count_for_pdf_conversion)
         self.images_dir = images_dir
+        self.overwrite_pdf = overwrite_pdf
+        self.keep_docx = keep_docx
         
         self.docxArgs = [
             '--resource-path', images_dir
@@ -129,27 +133,30 @@ class PdfConverter:
         if not success:
             try:
                 question_id, _ = Util.html_to_question(html_file_path)
-                self.logger.info(f"Recompressing the images and retrying pdf convert for question id {question_id} html file path {html_file_path}")
-                ImageUtil.recompress_images(question_id=question_id, images_dir=self.images_dir)
+                self.logger.debug(f"Recompressing the images and retrying pdf convert for question id {question_id} html file path {html_file_path}")
+                # Pass recompress formats from config
+                formats = self.config.recompress_image_formats if isinstance(self.config.recompress_image_formats, list) else ["all"]
+                ImageUtil.recompress_images(question_id=question_id, images_dir=self.images_dir, formats=formats)
                 success = self.convert_file(html_file_path, docx_output_path, pdf_output_path, docxArgs, pdfArgs)
             except Exception as e:
-                self.logger.info(f"EXCEPTION Recompressing the images and retrying pdf convert {e}")
+                self.logger.debug(f"EXCEPTION Recompressing the images and retrying pdf convert {e}")
                 return False
         return success  # All retries failed
 
     def convert_file(self, html_file_path, docx_output_path, pdf_output_path, docxArgs, pdfArgs):
         self.logger.info(f"Converting: {html_file_path}")
 
-        if os.path.exists(pdf_output_path):
+        # Check if PDF exists and whether to overwrite
+        if os.path.exists(pdf_output_path) and not self.overwrite_pdf:
             self.logger.warning(f"Pdf file exists, skipping recreation {pdf_output_path}")
             return True
 
         success = True
 
         # Convert HTML to DOCX
-        if not os.path.exists(docx_output_path):
+        if not os.path.exists(docx_output_path) or self.overwrite_pdf:
             try:
-                self.logger.info(f"Converting to DOCX: {docx_output_path}")
+                self.logger.debug(f"Converting to DOCX: {docx_output_path}")
                 pypandoc.convert_file(
                     source_file=html_file_path,
                     to='docx',
@@ -166,7 +173,7 @@ class PdfConverter:
         # Convert DOCX to PDF
         if success:
             try:
-                self.logger.info(f"Converting to PDF: {pdf_output_path}")
+                self.logger.debug(f"Converting to PDF: {pdf_output_path}")
                 pypandoc.convert_file(
                     source_file=docx_output_path,
                     to='pdf',
@@ -176,10 +183,12 @@ class PdfConverter:
                 self.logger.error(f"ERROR converting to PDF: {pdf_output_path}\n{str(e)}")
                 success = False
 
-        # Remove the DOCX file after PDF conversion
-        if os.path.exists(docx_output_path):
-            self.logger.info(f"Removing DOCX file: {docx_output_path}")
+        # Remove the DOCX file after PDF conversion (unless keep_docx is True)
+        if os.path.exists(docx_output_path) and not self.keep_docx:
+            self.logger.debug(f"Removing DOCX file: {docx_output_path}")
             os.remove(docx_output_path)
+        elif os.path.exists(docx_output_path) and self.keep_docx:
+            self.logger.debug(f"Keeping DOCX file: {docx_output_path}")
 
         # Previous step was successful and pdf file exists
         success = success and os.path.exists(pdf_output_path)

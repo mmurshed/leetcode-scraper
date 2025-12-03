@@ -85,12 +85,17 @@ class LeetcodeScraperGUI:
         notebook.add(submissions_frame, text="Submissions")
         self.setup_submissions_tab(submissions_frame)
         
-        # Tab 5: Utilities
-        utilities_frame = ttk.Frame(notebook)
-        notebook.add(utilities_frame, text="Utilities")
-        self.setup_utilities_tab(utilities_frame)
+        # Tab 5: Converter
+        converter_frame = ttk.Frame(notebook)
+        notebook.add(converter_frame, text="Converter")
+        self.setup_converter_tab(converter_frame)
         
-        # Tab 6: Config (last tab)
+        # Tab 6: Cache
+        cache_frame = ttk.Frame(notebook)
+        notebook.add(cache_frame, text="Cache")
+        self.setup_cache_tab(cache_frame)
+        
+        # Tab 7: Config (last tab)
         config_frame = ttk.Frame(notebook)
         config_scrollable = self.create_scrollable_frame(config_frame)
         notebook.add(config_frame, text="Config")
@@ -98,13 +103,14 @@ class LeetcodeScraperGUI:
         
         # Store notebook and config tab index for auto-loading
         self.notebook = notebook
-        self.config_tab_index = 5  # Index of the Config tab (0-based)
         self.questions_tab_index = 0
         self.cards_tab_index = 1
         self.companies_tab_index = 2
         self.submissions_tab_index = 3
-        self.utilities_tab_index = 4
-        
+        self.converter_tab_index = 4
+        self.cache_tab_index = 5
+        self.config_tab_index = 6  # Index of the Config tab (0-based)        
+
         # Track which lists have been loaded
         self.questions_loaded = False
         self.cards_loaded = False
@@ -184,8 +190,8 @@ class LeetcodeScraperGUI:
             # Auto-load questions list for submissions when switching to Submissions tab
             if not self.submissions_loaded:
                 self.load_submission_question_list(show_message=False)
-        elif selected_tab == self.utilities_tab_index:
-            # Auto-load cache keys when switching to Utilities tab
+        elif selected_tab == self.cache_tab_index:
+            # Auto-load cache keys when switching to Cache tab
             if not self.cache_keys_loaded:
                 self.load_cache_keys(show_message=False)
     
@@ -233,12 +239,12 @@ class LeetcodeScraperGUI:
         
         download_options = [
             ("none", "Don't Download"),
-            ("new", "Only download if not exists (Default)"),
+            ("new", "Only download if doesn't exist (Default)"),
             ("always", "Always Download (Replace Existing)")
         ]
 
         question_download_options = [
-            ("new", "Only download if not exists (Default)"),
+            ("new", "Only download if doesn't exist (Default)"),
             ("always", "Always Download (Replace Existing)")
         ]
 
@@ -270,9 +276,14 @@ class LeetcodeScraperGUI:
         # Image Processing
         image_frame = ttk.LabelFrame(parent, text="Image Processing", padding="10")
         image_frame.pack(fill='x', padx=10, pady=5)
+                 
+        # Recompress image - multi-select
+        recompress_options = ["all", "png", "jpg", "webp"]
+        self.add_multiselect_field(image_frame, "recompress_image_formats", 
+                                   "Recompress image formats (for compatibility):", recompress_options)
         
         self.add_checkbox_field(image_frame, "extract_gif_frames", "Extract GIF Frames as separate images")
-        self.add_checkbox_field(image_frame, "recompress_image", "Recompress images to improve compatibility")
+
         self.add_checkbox_field(image_frame, "base64_encode_image", "Embed images in HTML insted of linking from the images directory")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
@@ -480,7 +491,7 @@ class LeetcodeScraperGUI:
                 if show_messages:
                     messagebox.showwarning("Config Not Found", "No configuration file found. Please fill in the form and save.")
                 else:
-                    self.logger.info("No config file found. Please configure and save.")
+                    self.logger.warning("No config file found. Please configure and save.")
                 return
                 
             config = Config.from_json_file(config_path)
@@ -514,7 +525,7 @@ class LeetcodeScraperGUI:
                         else:
                             var.set(str(value))
             
-            self.logger.info("Configuration loaded successfully")
+            self.logger.debug("Configuration loaded successfully")
             self.status_var.set("Config loaded")
             
             # Trigger AI generator change to show/hide relevant settings
@@ -551,10 +562,17 @@ class LeetcodeScraperGUI:
                 elif isinstance(var, tk.IntVar):
                     setattr(config, key, int(var.get()))
                 elif isinstance(var, tk.Listbox):
-                    # Handle multi-select listbox (for preferred_language_order)
+                    # Handle multi-select listbox (for preferred_language_order and recompress_image_formats)
                     selected_indices = var.curselection()
                     selected_items = [var.get(i) for i in selected_indices]
-                    setattr(config, key, selected_items if selected_items else ["all"])
+                    
+                    # Set appropriate defaults based on field
+                    if key == "preferred_language_order":
+                        setattr(config, key, selected_items if selected_items else ["all"])
+                    elif key == "recompress_image_formats":
+                        setattr(config, key, selected_items if selected_items else ["webp"])
+                    else:
+                        setattr(config, key, selected_items)
                 elif isinstance(var, tk.StringVar):
                     value = var.get()
                     # Check if this is a labeled dropdown field
@@ -583,9 +601,9 @@ class LeetcodeScraperGUI:
                 # Copy all attributes from the new config to the existing one
                 for key in vars(config):
                     setattr(self.config, key, getattr(config, key))
-                self.logger.info("In-memory configuration updated")
+                self.logger.debug("In-memory configuration updated")
             
-            self.logger.info(f"Configuration saved to {config_path}")
+            self.logger.debug(f"Configuration saved to {config_path}")
             self.status_var.set("Config saved and applied")
             messagebox.showinfo("Success", f"Configuration saved to {config_path}\n\nChanges will take effect immediately for new operations.")
         except Exception as e:
@@ -613,7 +631,7 @@ class LeetcodeScraperGUI:
             try:
                 import requests
                 
-                self.logger.info("Fetching OpenAI models...")
+                self.logger.debug("Fetching OpenAI models...")
                 
                 headers = {
                     "Authorization": f"Bearer {api_key}",
@@ -637,7 +655,7 @@ class LeetcodeScraperGUI:
                         model_combo = self.config_widgets.get("open_ai_model")
                         if model_combo:
                             model_combo['values'] = gpt_models
-                            self.logger.info(f"Loaded {len(gpt_models)} OpenAI models")
+                            self.logger.debug(f"Loaded {len(gpt_models)} OpenAI models")
                             self.status_var.set(f"Loaded {len(gpt_models)} OpenAI models")
                     else:
                         self.logger.warning("No GPT models found in API response")
@@ -695,7 +713,7 @@ class LeetcodeScraperGUI:
             try:
                 import requests
                 
-                self.logger.info("Fetching Ollama models...")
+                self.logger.debug("Fetching Ollama models...")
                 
                 # Ollama API endpoint for listing models
                 # The base_url might be like "http://localhost:11434/api/generate"
@@ -721,7 +739,7 @@ class LeetcodeScraperGUI:
                         model_combo = self.config_widgets.get("ollama_model")
                         if model_combo:
                             model_combo['values'] = model_names
-                            self.logger.info(f"Loaded {len(model_names)} Ollama models")
+                            self.logger.debug(f"Loaded {len(model_names)} Ollama models")
                             self.status_var.set(f"Loaded {len(model_names)} Ollama models")
                     else:
                         self.logger.warning("No Ollama models found. Make sure Ollama is running and has models installed.")
@@ -817,10 +835,7 @@ class LeetcodeScraperGUI:
             show_message: If True, show success/error messages. Default True.
         """
         def task():
-            try:
-                self.status_var.set("Loading questions list...")
-                self.logger.info("Loading questions list from LeetCode API...")
-                
+            try:                
                 # Import here to avoid circular dependencies
                 from api.ApiManager import ApiManager
                 from api.CachedRequest import CachedRequest
@@ -838,6 +853,9 @@ class LeetcodeScraperGUI:
                 
                 # Initialize components if needed
                 self.initialize_components()
+
+                self.status_var.set("Loading questions list...")
+                self.logger.debug("Loading questions list from LeetCode API...")
                 
                 # Get all questions
                 questions = self.qued.lc.get_all_questions()
@@ -855,7 +873,7 @@ class LeetcodeScraperGUI:
                     self.question_to_id_combo['values'] = question_list
                     
                     self.questions_loaded = True
-                    self.logger.info(f"Loaded {len(questions)} questions")
+                    self.logger.debug(f"Loaded {len(questions)} questions")
                     self.status_var.set(f"Loaded {len(questions)} questions")
                     if show_message:
                         messagebox.showinfo("Success", f"Loaded {len(questions)} questions into dropdown")
@@ -920,7 +938,7 @@ class LeetcodeScraperGUI:
         def task():
             try:
                 self.status_var.set("Loading cards list...")
-                self.logger.info("Loading cards list from LeetCode API...")
+                self.logger.debug("Loading cards list from LeetCode API...")
                 
                 # Initialize components if needed
                 self.initialize_components()
@@ -1037,7 +1055,7 @@ class LeetcodeScraperGUI:
         def task():
             try:
                 self.status_var.set("Loading companies list...")
-                self.logger.info("Loading companies list from LeetCode API...")
+                self.logger.debug("Loading companies list from LeetCode API...")
                 
                 # Initialize components if needed
                 self.initialize_components()
@@ -1061,7 +1079,7 @@ class LeetcodeScraperGUI:
                     self.company_slug_mapping = {f"{c.name} ({c.slug})": c.slug for c in companies}
                     
                     self.companies_loaded = True
-                    self.logger.info(f"Loaded {len(companies)} companies")
+                    self.logger.debug(f"Loaded {len(companies)} companies")
                     self.status_var.set(f"Loaded {len(companies)} companies")
                     if show_message:
                         messagebox.showinfo("Success", f"Loaded {len(companies)} companies into dropdown")
@@ -1125,7 +1143,7 @@ class LeetcodeScraperGUI:
         def task():
             try:
                 self.status_var.set("Loading submissions...")
-                self.logger.info("Loading user submissions from LeetCode API...")
+                self.logger.debug("Loading user submissions from LeetCode API...")
                 
                 # Initialize components if needed
                 self.initialize_components()
@@ -1163,7 +1181,7 @@ class LeetcodeScraperGUI:
                     self.submission_question_id_combo['values'] = question_list
                     
                     self.submissions_loaded = True
-                    self.logger.info(f"Loaded {len(submissions)} questions with submissions")
+                    self.logger.debug(f"Loaded {len(submissions)} questions with submissions")
                     self.status_var.set(f"Loaded {len(submissions)} questions with submissions")
                     if show_message:
                         messagebox.showinfo("Success", f"Loaded {len(submissions)} questions with submissions\n\n✓ = Solved\n○ = Attempted")
@@ -1254,12 +1272,26 @@ class LeetcodeScraperGUI:
             filtered = [q for q in self.all_submission_questions if typed in q.lower()]
             self.submission_question_id_combo['values'] = filtered
         
-    def setup_utilities_tab(self, parent):
+    def setup_converter_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
         # PDF Conversion
         pdf_frame = ttk.LabelFrame(parent, text="PDF Conversion", padding="10")
         pdf_frame.pack(fill='x', padx=10, pady=5)
+        
+        # PDF conversion options (applicable to both directory and file)
+        options_frame = ttk.Frame(pdf_frame)
+        options_frame.pack(fill='x', pady=(5, 10))
+        
+        self.pdf_overwrite_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Overwrite even if exists", 
+                       variable=self.pdf_overwrite_var).pack(anchor='w', padx=5, pady=2)
+        
+        self.pdf_keep_docx_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Keep Word document(s)", 
+                       variable=self.pdf_keep_docx_var).pack(anchor='w', padx=5, pady=2)
+        
+        ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=5)
         
         # Directory conversion
         dir_label = ttk.Label(pdf_frame, text="Convert Directory:", font=('Arial', 9, 'bold'))
@@ -1276,19 +1308,34 @@ class LeetcodeScraperGUI:
         
         ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=10)
         
-        # Single file conversion
-        file_label = ttk.Label(pdf_frame, text="Convert Single File:", font=('Arial', 9, 'bold'))
+        # Single file conversion (HTML to PDF)
+        file_label = ttk.Label(pdf_frame, text="Convert HTML File:", font=('Arial', 9, 'bold'))
         file_label.pack(anchor='w', pady=(5, 2))
         
         self.pdf_file_var = tk.StringVar()
         pdf_file_frame = ttk.Frame(pdf_frame)
         pdf_file_frame.pack(pady=5, fill='x')
-        ttk.Label(pdf_file_frame, text="File:").pack(side='left', padx=5)
+        ttk.Label(pdf_file_frame, text="HTML File:").pack(side='left', padx=5)
         ttk.Entry(pdf_file_frame, textvariable=self.pdf_file_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
         ttk.Button(pdf_file_frame, text="Browse", command=self.browse_pdf_file).pack(side='left', padx=5)
         ttk.Button(pdf_file_frame, text="Convert", command=self.convert_file_to_pdf).pack(side='left', padx=5)
         
-        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=10)
+        
+        # Single DOCX file conversion (DOCX to PDF)
+        docx_label = ttk.Label(pdf_frame, text="Convert DOCX File:", font=('Arial', 9, 'bold'))
+        docx_label.pack(anchor='w', pady=(5, 2))
+        
+        self.pdf_docx_file_var = tk.StringVar()
+        pdf_docx_frame = ttk.Frame(pdf_frame)
+        pdf_docx_frame.pack(pady=5, fill='x')
+        ttk.Label(pdf_docx_frame, text="DOCX File:").pack(side='left', padx=5)
+        ttk.Entry(pdf_docx_frame, textvariable=self.pdf_docx_file_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
+        ttk.Button(pdf_docx_frame, text="Browse", command=self.browse_pdf_docx_file).pack(side='left', padx=5)
+        ttk.Button(pdf_docx_frame, text="Convert", command=self.convert_docx_to_pdf).pack(side='left', padx=5)
+    
+    def setup_cache_tab(self, parent):
+        parent.columnconfigure(0, weight=1)
         
         # Cache Management
         cache_frame = ttk.LabelFrame(parent, text="Cache Management", padding="10")
@@ -1312,6 +1359,14 @@ class LeetcodeScraperGUI:
         ttk.Button(cache_buttons_frame, text="Delete", command=self.delete_cache).pack(side='left', padx=2)
         
         ttk.Button(cache_frame, text="Clear All Cache", command=self.clear_cache).pack(pady=5)
+        
+        # Info text
+        info_frame = ttk.Frame(parent)
+        info_frame.pack(fill='x', padx=10, pady=10)
+        info_text = ttk.Label(info_frame, text="Manage API response cache.\nCache keys load automatically when you open this tab.\n\nClearing cache will force fresh API calls for all operations.",
+                             wraplength=500, justify='left', foreground='gray', font=('Arial', 9, 'italic'))
+        info_text.pack()
+        
         
     def run_in_thread(self, func):
         """Run a function in a separate thread to avoid blocking the GUI."""
@@ -1372,7 +1427,7 @@ class LeetcodeScraperGUI:
             try:
                 self.initialize_components()
                 
-                self.logger.info("Checking for missing cards...")
+                self.logger.debug("Checking for missing cards...")
                 self.status_var.set("Checking for missing cards...")
                 
                 # Get all cards from LeetCode
@@ -1462,7 +1517,7 @@ class LeetcodeScraperGUI:
             try:
                 self.initialize_components()
                 
-                self.logger.info(f"Checking missing items for card: {card_slug}")
+                self.logger.debug(f"Checking missing items for card: {card_slug}")
                 self.status_var.set(f"Checking card {card_slug}...")
                 
                 # Validate card exists
@@ -1562,7 +1617,7 @@ class LeetcodeScraperGUI:
             try:
                 self.initialize_components()
                 
-                self.logger.info("Checking for missing questions...")
+                self.logger.debug("Checking for missing questions...")
                 self.status_var.set("Checking for missing questions...")
                 
                 # Get all questions from LeetCode
@@ -1785,7 +1840,7 @@ class LeetcodeScraperGUI:
                 self.initialize_components()
                 
                 range_size = to_id - from_id + 1
-                self.logger.info(f"Checking range {from_id} to {to_id} ({range_size} questions)...")
+                self.logger.debug(f"Checking range {from_id} to {to_id} ({range_size} questions)...")
                 self.status_var.set(f"Checking range {from_id}-{to_id}...")
                 
                 # Get all questions to validate IDs exist
@@ -1887,7 +1942,7 @@ class LeetcodeScraperGUI:
             try:
                 self.initialize_components()
                 
-                self.logger.info("Checking for missing company questions...")
+                self.logger.debug("Checking for missing company questions...")
                 self.status_var.set("Checking for missing company questions...")
                 
                 # Get all companies from LeetCode
@@ -1998,7 +2053,7 @@ class LeetcodeScraperGUI:
             try:
                 self.initialize_components()
                 
-                self.logger.info(f"Checking missing questions for company: {company_slug}")
+                self.logger.debug(f"Checking missing questions for company: {company_slug}")
                 self.status_var.set(f"Checking {company_slug}...")
                 
                 # Validate company exists
@@ -2142,7 +2197,7 @@ class LeetcodeScraperGUI:
             try:
                 self.initialize_components()
                 
-                self.logger.info("Checking for missing submissions...")
+                self.logger.debug("Checking for missing submissions...")
                 self.status_var.set("Checking missing submissions...")
                 
                 # Get all questions with submissions from the user progress API
@@ -2257,11 +2312,11 @@ class LeetcodeScraperGUI:
         directory = filedialog.askdirectory(title="Select Directory to Convert")
         if directory:
             self.pdf_dir_var.set(directory)
-    
+
     def browse_pdf_file(self):
-        """Browse for a single file to convert."""
+        """Browse for a single HTML file to convert."""
         file = filedialog.askopenfilename(
-            title="Select File to Convert",
+            title="Select HTML File to Convert",
             filetypes=[
                 ("HTML files", "*.html *.htm"),
                 ("All files", "*.*")
@@ -2269,6 +2324,18 @@ class LeetcodeScraperGUI:
         )
         if file:
             self.pdf_file_var.set(file)
+    
+    def browse_pdf_docx_file(self):
+        """Browse for a single DOCX file to convert to PDF."""
+        file = filedialog.askopenfilename(
+            title="Select DOCX File to Convert",
+            filetypes=[
+                ("Word documents", "*.docx"),
+                ("All files", "*.*")
+            ]
+        )
+        if file:
+            self.pdf_docx_file_var.set(file)
             
     def convert_directory_to_pdf(self):
         """Convert all files in a directory to PDF."""
@@ -2289,10 +2356,17 @@ class LeetcodeScraperGUI:
             
         def task():
             self.initialize_components()
+            
+            # Get checkbox values
+            overwrite = self.pdf_overwrite_var.get()
+            keep_docx = self.pdf_keep_docx_var.get()
+            
             converter = PdfConverter(
                 config=self.config,
                 logger=self.logger,
-                images_dir=Config.get_images_dir(path))
+                images_dir=Config.get_images_dir(path),
+                overwrite_pdf=overwrite,
+                keep_docx=keep_docx)
             converter.convert_folder(path)
         self.run_in_thread(task)
     
@@ -2311,7 +2385,7 @@ class LeetcodeScraperGUI:
         
         def task():
             try:
-                self.logger.info(f"Checking for missing PDFs in: {path}")
+                self.logger.debug(f"Checking for missing PDFs in: {path}")
                 self.status_var.set("Checking for missing PDFs...")
                 
                 # Find all HTML files in the directory and subdirectories
@@ -2322,7 +2396,7 @@ class LeetcodeScraperGUI:
                             html_files.append(os.path.join(root, file))
                 
                 if not html_files:
-                    self.logger.info("No HTML files found in directory")
+                    self.logger.warning(f"No HTML files found in {path}")
                     self.status_var.set("No HTML files found")
                     messagebox.showinfo("No HTML Files", "No HTML files found in the selected directory")
                     return
@@ -2415,13 +2489,97 @@ class LeetcodeScraperGUI:
             
         def task():
             self.initialize_components()
+            
+            # Get checkbox values
+            overwrite = self.pdf_overwrite_var.get()
+            keep_docx = self.pdf_keep_docx_var.get()
+            
             converter = PdfConverter(
                 config=self.config,
                 logger=self.logger,
-                images_dir=Config.get_images_dir(path))
+                images_dir=Config.get_images_dir(path),
+                overwrite_pdf=overwrite,
+                keep_docx=keep_docx)
             converter.convert_single_file(path)
         self.run_in_thread(task)
+    
+    def convert_docx_to_pdf(self):
+        """Convert a single DOCX file directly to PDF."""
+        import os
+        import pypandoc
         
+        path = self.pdf_docx_file_var.get().strip()
+        if not path:
+            messagebox.showwarning("Input Required", "Please select a DOCX file")
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Error", "File doesn't exist")
+            return
+        if not os.path.isfile(path):
+            messagebox.showerror("Error", "Selected path is not a file")
+            return
+        if not path.lower().endswith('.docx'):
+            messagebox.showerror("Error", "Selected file is not a DOCX file")
+            return
+            
+        def task():
+            self.initialize_components()
+            
+            from utils.Config import Config
+            from utils.Constants import Constants
+            
+            source_folder = os.path.dirname(path)
+            basename = os.path.basename(path)
+            
+            # Get checkbox value for overwrite
+            overwrite = self.pdf_overwrite_var.get()
+            
+            # Output in the same directory as the DOCX file
+            pdf_output_path = path.replace('.docx', '.pdf')
+            
+            # Check if PDF exists and whether to overwrite
+            if os.path.exists(pdf_output_path) and not overwrite:
+                self.logger.warning(f"PDF file already exists: {pdf_output_path}")
+                messagebox.showinfo("File Exists", f"PDF already exists:\n{os.path.basename(pdf_output_path)}\n\nCheck 'Overwrite even if exists' to recreate it.")
+                return
+            
+            # Get images directory
+            images_dir = Config.get_images_dir(source_folder)
+            
+            # PDF conversion arguments
+            pdfArgs = [
+                '-V', 'geometry:margin=0.5in',
+                '--pdf-engine=xelatex',
+                f'--template={Constants.TEX_TEMPLATE_PATH}',
+                f'--include-in-header={Constants.TEX_HEADER_PATH}',
+                '--variable', 'svg',
+                '--resource-path', images_dir
+            ]
+            
+            try:
+                self.logger.info(f"Converting DOCX to PDF: {basename}")
+                self.status_var.set(f"Converting {basename}...")
+                
+                pypandoc.convert_file(
+                    source_file=path,
+                    to='pdf',
+                    outputfile=pdf_output_path,
+                    extra_args=pdfArgs)
+                
+                if os.path.exists(pdf_output_path):
+                    self.logger.info(f"Successfully converted to PDF: {pdf_output_path}")
+                    self.status_var.set("Conversion complete!")
+                    messagebox.showinfo("Success", f"Successfully converted to:\n{os.path.basename(pdf_output_path)}")
+                else:
+                    self.logger.error(f"PDF file not created: {pdf_output_path}")
+                    messagebox.showerror("Error", "PDF file was not created")
+                    
+            except Exception as e:
+                self.logger.error(f"Error converting DOCX to PDF: {e}")
+                messagebox.showerror("Conversion Error", f"Failed to convert DOCX to PDF:\n\n{str(e)}")
+        
+        self.run_in_thread(task)
+    
     def load_cache_keys(self, show_message=True):
         """Load all cache keys from diskcache."""
         def task():

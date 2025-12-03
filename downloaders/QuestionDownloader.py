@@ -119,7 +119,7 @@ class QuestionDownloader:
 
     #region html generation
     def create_question_html(self, question: Question, root_dir):           
-        self.logger.info(f"Scraping question {question.id}")
+        self.logger.debug(f"Scraping question {question.id}")
         
         # Ensure the directory exists
         os.makedirs(root_dir, exist_ok=True)
@@ -134,7 +134,7 @@ class QuestionDownloader:
             file.write(content_soup.prettify())
 
     def get_similar_questions_html(self, similar_questions):
-        self.logger.info("Generating similar questions")
+        self.logger.debug("Generating similar questions")
         similar_questions_html = """"""
 
         if not similar_questions or similar_questions == []:
@@ -174,7 +174,7 @@ class QuestionDownloader:
         return company_tag_stats_html
 
     def get_question_html(self, question: Question, root_dir):
-        self.logger.info("Getting question data")
+        self.logger.debug("Getting question data")
         question_content_data = self.lc.get_question(question.id, question.slug)
         question_content = QuestionContent.from_json(question_content_data)
 
