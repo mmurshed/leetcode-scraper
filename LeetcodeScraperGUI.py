@@ -102,12 +102,17 @@ class LeetcodeScraperGUI:
         self.cards_tab_index = 1
         self.companies_tab_index = 2
         self.submissions_tab_index = 3
+        self.utilities_tab_index = 4
         
         # Track which lists have been loaded
         self.questions_loaded = False
         self.cards_loaded = False
         self.companies_loaded = False
         self.submissions_loaded = False
+        self.cache_keys_loaded = False
+        
+        # Store all cache keys for filtering
+        self.all_cache_keys = []
         
         # Bind tab change event to auto-load config and lists
         notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
@@ -172,6 +177,10 @@ class LeetcodeScraperGUI:
             # Auto-load questions list for submissions when switching to Submissions tab
             if not self.submissions_loaded:
                 self.load_submission_question_list(show_message=False)
+        elif selected_tab == self.utilities_tab_index:
+            # Auto-load cache keys when switching to Utilities tab
+            if not self.cache_keys_loaded:
+                self.load_cache_keys(show_message=False)
     
     def setup_config_tab(self, parent):
         """Setup configuration tab with all config fields."""
@@ -179,6 +188,7 @@ class LeetcodeScraperGUI:
         
         # Initialize config field variables
         self.config_vars = {}
+        self.config_widgets = {}  # Store widget references for dynamic updates
         
         # Title
         ttk.Label(parent, text="LeetCode Scraper Configuration", font=('Arial', 12, 'bold')).pack(pady=10)
@@ -214,7 +224,7 @@ class LeetcodeScraperGUI:
         download_frame = ttk.LabelFrame(parent, text="Download Settings", padding="10")
         download_frame.pack(fill='x', padx=10, pady=5)
         
-        self.add_checkbox_field(download_frame, "overwrite", "Overwrite Existing Files")
+        self.add_checkbox_field(download_frame, "overwrite", "Download again even if the file exists")
         self.add_checkbox_field(download_frame, "download_images", "Download Images")
         self.add_checkbox_field(download_frame, "download_videos", "Download Videos")
         self.add_checkbox_field(download_frame, "include_default_code", "Include Default Code")
@@ -225,9 +235,14 @@ class LeetcodeScraperGUI:
         content_frame = ttk.LabelFrame(parent, text="Content Settings", padding="10")
         content_frame.pack(fill='x', padx=10, pady=5)
         
-        self.add_text_field(content_frame, "preferred_language_order", "Preferred Languages (comma-separated):")
-        self.add_number_field(content_frame, "include_submissions_count", "Submissions to Include:")
-        self.add_number_field(content_frame, "include_community_solution_count", "Community Solutions to Include:")
+        # Import language list from Constants
+        from utils.Constants import Constants
+        available_languages = ["all"] + sorted([lang for lang in Constants.LANG_NAMES.keys() if lang != "all"])
+        self.add_multiselect_field(content_frame, "preferred_language_order", 
+                                   "Preferred Languages:", available_languages)
+        
+        self.add_number_field(content_frame, "include_submissions_count", "Number of your code submissions to include:")
+        self.add_number_field(content_frame, "include_community_solution_count", "Number of community solutions to include:")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -235,9 +250,9 @@ class LeetcodeScraperGUI:
         image_frame = ttk.LabelFrame(parent, text="Image Processing", padding="10")
         image_frame.pack(fill='x', padx=10, pady=5)
         
-        self.add_checkbox_field(image_frame, "extract_gif_frames", "Extract GIF Frames")
-        self.add_checkbox_field(image_frame, "recompress_image", "Recompress Images")
-        self.add_checkbox_field(image_frame, "base64_encode_image", "Base64 Encode Images")
+        self.add_checkbox_field(image_frame, "extract_gif_frames", "Extract GIF Frames as separate images")
+        self.add_checkbox_field(image_frame, "recompress_image", "Recompress images to improve compatibility")
+        self.add_checkbox_field(image_frame, "base64_encode_image", "Embed images in HTML insted of linking from the images directory")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -245,9 +260,9 @@ class LeetcodeScraperGUI:
         advanced_frame = ttk.LabelFrame(parent, text="Advanced Settings", padding="10")
         advanced_frame.pack(fill='x', padx=10, pady=5)
         
-        self.add_number_field(advanced_frame, "threads_count_for_pdf_conversion", "PDF Conversion Threads:")
-        self.add_number_field(advanced_frame, "api_max_failures", "API Max Failures:")
-        self.add_dropdown_field(advanced_frame, "logging_level", "Logging Level:", 
+        self.add_number_field(advanced_frame, "threads_count_for_pdf_conversion", "Number of threads to use for PDF conversion:")
+        self.add_number_field(advanced_frame, "api_max_failures", "Maximum number of retries for API call failures:")
+        self.add_dropdown_field(advanced_frame, "logging_level", "Logging level:", 
                                ["debug", "info", "warning", "error"])
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
@@ -263,13 +278,25 @@ class LeetcodeScraperGUI:
         openai_subframe = ttk.LabelFrame(ai_frame, text="OpenAI Settings", padding="5")
         openai_subframe.pack(fill='x', pady=5)
         self.add_text_field(openai_subframe, "open_ai_api_key", "API Key:", width=50)
-        self.add_text_field(openai_subframe, "open_ai_model", "Model:", width=30)
+        self.add_editable_dropdown_field(openai_subframe, "open_ai_model", "Model:", width=30)
+        
+        # Add callback to fetch models when API key is entered
+        api_key_var = self.config_vars.get("open_ai_api_key")
+        if api_key_var:
+            # Bind to key release event to detect when user finishes typing
+            # We need to get the entry widget, not just the variable
+            api_key_var.trace_add("write", lambda *args: self.on_openai_key_changed())
         
         # Ollama Settings
         ollama_subframe = ttk.LabelFrame(ai_frame, text="Ollama Settings", padding="5")
         ollama_subframe.pack(fill='x', pady=5)
         self.add_text_field(ollama_subframe, "ollama_url", "URL:")
-        self.add_text_field(ollama_subframe, "ollama_model", "Model:")
+        self.add_editable_dropdown_field(ollama_subframe, "ollama_model", "Model:", width=30)
+        
+        # Add callback to fetch models when Ollama URL is entered
+        ollama_url_var = self.config_vars.get("ollama_url")
+        if ollama_url_var:
+            ollama_url_var.trace_add("write", lambda *args: self.on_ollama_url_changed())
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -326,6 +353,50 @@ class LeetcodeScraperGUI:
         combo = ttk.Combobox(frame, textvariable=var, values=options, width=20, state='readonly')
         combo.pack(side='left', padx=5)
         self.config_vars[key] = var
+    
+    def add_editable_dropdown_field(self, parent, key, label, width=30):
+        """Add an editable dropdown field (combobox that allows typing)."""
+        frame = ttk.Frame(parent)
+        frame.pack(fill='x', pady=2)
+        ttk.Label(frame, text=label, width=30, anchor='w').pack(side='left', padx=5)
+        var = tk.StringVar()
+        combo = ttk.Combobox(frame, textvariable=var, values=[], width=width, state='normal')
+        combo.pack(side='left', padx=5)
+        self.config_vars[key] = var
+        # Store reference to the combobox widget for updating values later
+        self.config_widgets[key] = combo
+        return combo
+    
+    def add_multiselect_field(self, parent, key, label, options):
+        """Add a multi-select listbox field."""
+        frame = ttk.Frame(parent)
+        frame.pack(fill='x', pady=2)
+        
+        # Label and info frame
+        label_frame = ttk.Frame(frame)
+        label_frame.pack(fill='x')
+        ttk.Label(label_frame, text=label, width=30, anchor='w').pack(side='left', padx=5)
+        ttk.Label(label_frame, text="(Hold Ctrl/Cmd to select multiple)", 
+                 font=('Arial', 8), foreground='gray').pack(side='left', padx=5)
+        
+        # Listbox with scrollbar
+        list_frame = ttk.Frame(frame)
+        list_frame.pack(fill='x', padx=35, pady=2)
+        
+        scrollbar = ttk.Scrollbar(list_frame)
+        scrollbar.pack(side='right', fill='y')
+        
+        listbox = tk.Listbox(list_frame, selectmode='multiple', height=6, 
+                            yscrollcommand=scrollbar.set, exportselection=False)
+        listbox.pack(side='left', fill='both', expand=True)
+        scrollbar.config(command=listbox.yview)
+        
+        # Populate listbox
+        for option in options:
+            listbox.insert(tk.END, option)
+        
+        # Store reference to listbox (not a var)
+        self.config_vars[key] = listbox
         
     def browse_directory(self, var):
         """Browse for a directory."""
@@ -361,6 +432,14 @@ class LeetcodeScraperGUI:
                         var.set(bool(value))
                     elif isinstance(var, tk.IntVar):
                         var.set(int(value))
+                    elif isinstance(var, tk.Listbox):
+                        # Handle multi-select listbox (for preferred_language_order)
+                        var.selection_clear(0, tk.END)
+                        if isinstance(value, list):
+                            for i in range(var.size()):
+                                item = var.get(i)
+                                if item in value:
+                                    var.selection_set(i)
                     elif isinstance(var, tk.StringVar):
                         if isinstance(value, list):
                             var.set(', '.join(str(v) for v in value))
@@ -397,15 +476,19 @@ class LeetcodeScraperGUI:
             
             # Update config from form fields
             for key, var in self.config_vars.items():
-                value = var.get()
-                
                 if isinstance(var, tk.BooleanVar):
-                    setattr(config, key, bool(value))
+                    setattr(config, key, bool(var.get()))
                 elif isinstance(var, tk.IntVar):
-                    setattr(config, key, int(value))
+                    setattr(config, key, int(var.get()))
+                elif isinstance(var, tk.Listbox):
+                    # Handle multi-select listbox (for preferred_language_order)
+                    selected_indices = var.curselection()
+                    selected_items = [var.get(i) for i in selected_indices]
+                    setattr(config, key, selected_items if selected_items else ["all"])
                 elif isinstance(var, tk.StringVar):
+                    value = var.get()
                     if key == "preferred_language_order":
-                        # Convert comma-separated string to list
+                        # This shouldn't happen anymore (using listbox), but keep as fallback
                         langs = [s.strip().lower() for s in value.split(',') if s.strip()]
                         setattr(config, key, langs if langs else ["all"])
                     elif key == "ai_solution_generator":
@@ -426,6 +509,136 @@ class LeetcodeScraperGUI:
         except Exception as e:
             self.logger.error(f"Failed to save config: {e}")
             messagebox.showerror("Error", f"Failed to save configuration: {e}")
+    
+    def on_openai_key_changed(self):
+        """Callback when OpenAI API key is changed - fetch available models."""
+        api_key = self.config_vars.get("open_ai_api_key")
+        if not api_key:
+            return
+        
+        key_value = api_key.get().strip()
+        
+        # Only fetch if key looks valid (starts with "sk-" and has reasonable length)
+        if key_value and key_value.startswith("sk-") and len(key_value) > 20:
+            # Debounce - only fetch after user stops typing for 1 second
+            if hasattr(self, '_openai_fetch_timer'):
+                self.root.after_cancel(self._openai_fetch_timer)
+            self._openai_fetch_timer = self.root.after(1000, lambda: self.fetch_openai_models(key_value))
+    
+    def fetch_openai_models(self, api_key):
+        """Fetch available OpenAI models from the API."""
+        def task():
+            try:
+                import requests
+                
+                self.logger.info("Fetching OpenAI models...")
+                
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                response = requests.get("https://api.openai.com/v1/models", headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    models = data.get("data", [])
+                    
+                    # Filter for GPT models and sort them
+                    gpt_models = sorted([
+                        m["id"] for m in models 
+                        if m["id"].startswith(("gpt-", "o1-", "chatgpt-"))
+                    ], reverse=True)
+                    
+                    if gpt_models:
+                        # Update the combobox with available models
+                        model_combo = self.config_widgets.get("open_ai_model")
+                        if model_combo:
+                            model_combo['values'] = gpt_models
+                            self.logger.info(f"Loaded {len(gpt_models)} OpenAI models")
+                            self.status_var.set(f"Loaded {len(gpt_models)} OpenAI models")
+                    else:
+                        self.logger.warning("No GPT models found in API response")
+                elif response.status_code == 401:
+                    self.logger.warning("Invalid OpenAI API key")
+                else:
+                    self.logger.warning(f"Failed to fetch OpenAI models: HTTP {response.status_code}")
+                    
+            except requests.RequestException as e:
+                self.logger.error(f"Error fetching OpenAI models: {e}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error fetching OpenAI models: {e}")
+        
+        # Run in background thread
+        thread = threading.Thread(target=task, daemon=True)
+        thread.start()
+    
+    def on_ollama_url_changed(self):
+        """Callback when Ollama URL is changed - fetch available models."""
+        url_var = self.config_vars.get("ollama_url")
+        if not url_var:
+            return
+        
+        url_value = url_var.get().strip()
+        
+        # Only fetch if URL looks valid (contains http and localhost or valid domain)
+        if url_value and url_value.startswith("http"):
+            # Debounce - only fetch after user stops typing for 1 second
+            if hasattr(self, '_ollama_fetch_timer'):
+                self.root.after_cancel(self._ollama_fetch_timer)
+            self._ollama_fetch_timer = self.root.after(1000, lambda: self.fetch_ollama_models(url_value))
+    
+    def fetch_ollama_models(self, base_url):
+        """Fetch available Ollama models from the API."""
+        def task():
+            try:
+                import requests
+                
+                self.logger.info("Fetching Ollama models...")
+                
+                # Ollama API endpoint for listing models
+                # The base_url might be like "http://localhost:11434/api/generate"
+                # We need to extract the base and use the /api/tags endpoint
+                if "/api/" in base_url:
+                    api_base = base_url.split("/api/")[0]
+                else:
+                    api_base = base_url.rstrip("/")
+                
+                tags_url = f"{api_base}/api/tags"
+                
+                response = requests.get(tags_url, timeout=5)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    models = data.get("models", [])
+                    
+                    # Extract model names
+                    model_names = sorted([m.get("name", m.get("model", "")) for m in models if m.get("name") or m.get("model")])
+                    
+                    if model_names:
+                        # Update the combobox with available models
+                        model_combo = self.config_widgets.get("ollama_model")
+                        if model_combo:
+                            model_combo['values'] = model_names
+                            self.logger.info(f"Loaded {len(model_names)} Ollama models")
+                            self.status_var.set(f"Loaded {len(model_names)} Ollama models")
+                    else:
+                        self.logger.warning("No Ollama models found. Make sure Ollama is running and has models installed.")
+                else:
+                    self.logger.warning(f"Failed to fetch Ollama models: HTTP {response.status_code}")
+                    
+            except requests.ConnectionError:
+                self.logger.warning("Cannot connect to Ollama. Make sure Ollama is running.")
+            except requests.Timeout:
+                self.logger.warning("Ollama request timed out. Check if Ollama is responsive.")
+            except requests.RequestException as e:
+                self.logger.error(f"Error fetching Ollama models: {e}")
+            except Exception as e:
+                self.logger.error(f"Unexpected error fetching Ollama models: {e}")
+        
+        # Run in background thread
+        thread = threading.Thread(target=task, daemon=True)
+        thread.start()
         
     def setup_questions_tab(self, parent):
         parent.columnconfigure(0, weight=1)
@@ -806,13 +1019,31 @@ class LeetcodeScraperGUI:
         pdf_frame = ttk.LabelFrame(parent, text="PDF Conversion", padding="10")
         pdf_frame.pack(fill='x', padx=10, pady=5)
         
-        self.pdf_path_var = tk.StringVar()
-        pdf_input_frame = ttk.Frame(pdf_frame)
-        pdf_input_frame.pack(pady=5, fill='x')
-        ttk.Label(pdf_input_frame, text="Path:").pack(side='left', padx=5)
-        ttk.Entry(pdf_input_frame, textvariable=self.pdf_path_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
-        ttk.Button(pdf_input_frame, text="Browse", command=self.browse_pdf_path).pack(side='left', padx=5)
-        ttk.Button(pdf_frame, text="Convert to PDF", command=self.convert_to_pdf).pack(pady=5)
+        # Directory conversion
+        dir_label = ttk.Label(pdf_frame, text="Convert Directory:", font=('Arial', 9, 'bold'))
+        dir_label.pack(anchor='w', pady=(5, 2))
+        
+        self.pdf_dir_var = tk.StringVar()
+        pdf_dir_frame = ttk.Frame(pdf_frame)
+        pdf_dir_frame.pack(pady=5, fill='x')
+        ttk.Label(pdf_dir_frame, text="Directory:").pack(side='left', padx=5)
+        ttk.Entry(pdf_dir_frame, textvariable=self.pdf_dir_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
+        ttk.Button(pdf_dir_frame, text="Browse", command=self.browse_pdf_directory).pack(side='left', padx=5)
+        ttk.Button(pdf_dir_frame, text="Convert", command=self.convert_directory_to_pdf).pack(side='left', padx=5)
+        
+        ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=10)
+        
+        # Single file conversion
+        file_label = ttk.Label(pdf_frame, text="Convert Single File:", font=('Arial', 9, 'bold'))
+        file_label.pack(anchor='w', pady=(5, 2))
+        
+        self.pdf_file_var = tk.StringVar()
+        pdf_file_frame = ttk.Frame(pdf_frame)
+        pdf_file_frame.pack(pady=5, fill='x')
+        ttk.Label(pdf_file_frame, text="File:").pack(side='left', padx=5)
+        ttk.Entry(pdf_file_frame, textvariable=self.pdf_file_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
+        ttk.Button(pdf_file_frame, text="Browse", command=self.browse_pdf_file).pack(side='left', padx=5)
+        ttk.Button(pdf_file_frame, text="Convert", command=self.convert_file_to_pdf).pack(side='left', padx=5)
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -821,12 +1052,21 @@ class LeetcodeScraperGUI:
         cache_frame.pack(fill='x', padx=10, pady=5)
         
         cache_input_frame = ttk.Frame(cache_frame)
-        cache_input_frame.pack(pady=5)
+        cache_input_frame.pack(pady=5, fill='x')
         ttk.Label(cache_input_frame, text="Cache Key:").pack(side='left', padx=5)
-        self.cache_key_entry = ttk.Entry(cache_input_frame, width=30)
-        self.cache_key_entry.pack(side='left', padx=5)
-        ttk.Button(cache_input_frame, text="Get", command=self.get_cache).pack(side='left', padx=2)
-        ttk.Button(cache_input_frame, text="Delete", command=self.delete_cache).pack(side='left', padx=2)
+        self.cache_key_var = tk.StringVar()
+        self.cache_key_combo = ttk.Combobox(cache_input_frame, textvariable=self.cache_key_var, width=40)
+        self.cache_key_combo.pack(side='left', padx=5, fill='x', expand=True)
+        ttk.Button(cache_input_frame, text="Refresh Keys", command=self.load_cache_keys).pack(side='left', padx=2)
+        
+        # Bind to filter as user types
+        self.cache_key_var.trace_add('write', lambda *args: self.filter_cache_keys())
+        
+        # Action buttons
+        cache_buttons_frame = ttk.Frame(cache_frame)
+        cache_buttons_frame.pack(pady=5)
+        ttk.Button(cache_buttons_frame, text="Get", command=self.get_cache).pack(side='left', padx=2)
+        ttk.Button(cache_buttons_frame, text="Delete", command=self.delete_cache).pack(side='left', padx=2)
         
         ttk.Button(cache_frame, text="Clear All Cache", command=self.clear_cache).pack(pady=5)
         
@@ -1080,22 +1320,39 @@ class LeetcodeScraperGUI:
             self.submission.get_selected_submissions(question_id=question_id)
         self.run_in_thread(task)
         
-    def browse_pdf_path(self):
-        path = filedialog.askdirectory(title="Select Directory") or filedialog.askopenfilename(title="Select File")
-        if path:
-            self.pdf_path_var.set(path)
+    def browse_pdf_directory(self):
+        """Browse for a directory to convert."""
+        directory = filedialog.askdirectory(title="Select Directory to Convert")
+        if directory:
+            self.pdf_dir_var.set(directory)
+    
+    def browse_pdf_file(self):
+        """Browse for a single file to convert."""
+        file = filedialog.askopenfilename(
+            title="Select File to Convert",
+            filetypes=[
+                ("HTML files", "*.html *.htm"),
+                ("All files", "*.*")
+            ]
+        )
+        if file:
+            self.pdf_file_var.set(file)
             
-    def convert_to_pdf(self):
+    def convert_directory_to_pdf(self):
+        """Convert all files in a directory to PDF."""
         from utils.Config import Config
         from utils.PdfConverter import PdfConverter
         import os
         
-        path = self.pdf_path_var.get().strip()
+        path = self.pdf_dir_var.get().strip()
         if not path:
-            messagebox.showwarning("Input Required", "Please select a directory or file")
+            messagebox.showwarning("Input Required", "Please select a directory")
             return
         if not os.path.exists(path):
-            messagebox.showerror("Error", "Directory or file doesn't exist")
+            messagebox.showerror("Error", "Directory doesn't exist")
+            return
+        if not os.path.isdir(path):
+            messagebox.showerror("Error", "Selected path is not a directory")
             return
             
         def task():
@@ -1104,16 +1361,88 @@ class LeetcodeScraperGUI:
                 config=self.config,
                 logger=self.logger,
                 images_dir=Config.get_images_dir(path))
-            if os.path.isdir(path):
-                converter.convert_folder(path)
-            else:
-                converter.convert_single_file(path)
+            converter.convert_folder(path)
+        self.run_in_thread(task)
+    
+    def convert_file_to_pdf(self):
+        """Convert a single file to PDF."""
+        from utils.Config import Config
+        from utils.PdfConverter import PdfConverter
+        import os
+        
+        path = self.pdf_file_var.get().strip()
+        if not path:
+            messagebox.showwarning("Input Required", "Please select a file")
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Error", "File doesn't exist")
+            return
+        if not os.path.isfile(path):
+            messagebox.showerror("Error", "Selected path is not a file")
+            return
+            
+        def task():
+            self.initialize_components()
+            converter = PdfConverter(
+                config=self.config,
+                logger=self.logger,
+                images_dir=Config.get_images_dir(path))
+            converter.convert_single_file(path)
         self.run_in_thread(task)
         
+    def load_cache_keys(self, show_message=True):
+        """Load all cache keys from diskcache."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                # Get all keys from the cache
+                keys = sorted(list(self.cache.iterkeys()))
+                
+                if keys:
+                    # Store all keys for filtering
+                    self.all_cache_keys = keys
+                    
+                    # Update combobox values
+                    self.cache_key_combo['values'] = keys
+                    
+                    self.cache_keys_loaded = True
+                    self.logger.info(f"Loaded {len(keys)} cache keys")
+                    self.status_var.set(f"Loaded {len(keys)} cache keys")
+                    if show_message:
+                        messagebox.showinfo("Success", f"Loaded {len(keys)} cache keys")
+                else:
+                    self.all_cache_keys = []
+                    self.cache_key_combo['values'] = []
+                    self.cache_keys_loaded = True
+                    self.logger.info("No cache keys found")
+                    self.status_var.set("No cache keys found")
+                    if show_message:
+                        messagebox.showinfo("Info", "No cache keys found")
+            except Exception as e:
+                self.logger.error(f"Failed to load cache keys: {e}")
+                self.status_var.set("Failed to load cache keys")
+                if show_message:
+                    messagebox.showerror("Error", f"Failed to load cache keys: {e}")
+        
+        self.run_in_thread(task)
+    
+    def filter_cache_keys(self):
+        """Filter cache keys based on what user types."""
+        typed = self.cache_key_var.get().lower()
+        
+        if not typed:
+            # If nothing typed, show all keys
+            self.cache_key_combo['values'] = self.all_cache_keys
+        else:
+            # Filter keys that contain the typed text
+            filtered = [key for key in self.all_cache_keys if typed in key.lower()]
+            self.cache_key_combo['values'] = filtered
+    
     def get_cache(self):
-        key = self.cache_key_entry.get().strip()
+        key = self.cache_key_var.get().strip()
         if not key:
-            messagebox.showwarning("Input Required", "Please enter a cache key")
+            messagebox.showwarning("Input Required", "Please select a cache key")
             return
         def task():
             self.initialize_components()
@@ -1123,14 +1452,17 @@ class LeetcodeScraperGUI:
         self.run_in_thread(task)
         
     def delete_cache(self):
-        key = self.cache_key_entry.get().strip()
+        key = self.cache_key_var.get().strip()
         if not key:
-            messagebox.showwarning("Input Required", "Please enter a cache key")
+            messagebox.showwarning("Input Required", "Please select a cache key")
             return
         def task():
             self.initialize_components()
             self.cache.delete(key=key)
             self.logger.info(f"Deleted cache key: {key}")
+            # Refresh the cache keys list after deletion
+            self.cache_keys_loaded = False
+            self.load_cache_keys(show_message=False)
         self.run_in_thread(task)
         
     def clear_cache(self):
@@ -1139,6 +1471,9 @@ class LeetcodeScraperGUI:
                 self.initialize_components()
                 self.cache.clear()
                 self.logger.info("Cache cleared")
+                # Refresh the cache keys list after clearing
+                self.cache_keys_loaded = False
+                self.load_cache_keys(show_message=False)
             self.run_in_thread(task)
 
 
