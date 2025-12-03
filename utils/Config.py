@@ -27,10 +27,10 @@ class Config:
         self.threads_count_for_pdf_conversion: int = 8
         self.api_max_failures = 3
 
-        self.logging_level = "info"
+        self.logging_level = "info" # Options: "debug", "info", "warning", "error"
 
         # None, ollama or openai
-        self.ai_solution_generator = None
+        self.ai_solution_generator = None # Options: "none", "ollama", "openai"
 
         self.open_ai_api_key = ""
         self.open_ai_model = "gpt-5-mini"
