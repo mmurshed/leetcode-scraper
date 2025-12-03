@@ -665,7 +665,7 @@ class LeetcodeScraperGUI:
         all_questions_frame = ttk.Frame(questions_frame)
         all_questions_frame.pack(pady=5)
         ttk.Button(all_questions_frame, text="Download All Questions", command=self.download_all_questions, width=30).pack(side='left', padx=5)
-        ttk.Button(all_questions_frame, text="Check Missing", command=self.check_missing_questions, width=30).pack(side='left', padx=5)
+        ttk.Button(all_questions_frame, text="Find Missing", command=self.check_missing_questions, width=30).pack(side='left', padx=5)
         
         ttk.Separator(questions_frame, orient='horizontal').pack(fill='x', pady=10)
         
@@ -714,7 +714,7 @@ class LeetcodeScraperGUI:
         self.question_to_id_var.trace_add('write', lambda *args: self.filter_questions('to_id'))
         
         ttk.Button(range_input_frame, text="Download", command=self.download_question_range).pack(side='left', padx=5)
-        ttk.Button(range_input_frame, text="Check Missing", command=self.check_question_range).pack(side='left', padx=5)
+        ttk.Button(range_input_frame, text="Find Missing", command=self.check_question_range).pack(side='left', padx=5)
         
         # Info text
         info_frame = ttk.Frame(parent)
@@ -796,7 +796,7 @@ class LeetcodeScraperGUI:
         all_cards_frame = ttk.Frame(cards_frame)
         all_cards_frame.pack(pady=5)
         ttk.Button(all_cards_frame, text="Download All Cards", command=self.download_all_cards, width=30).pack(side='left', padx=5)
-        ttk.Button(all_cards_frame, text="Check Missing", command=self.check_missing_cards, width=30).pack(side='left', padx=5)
+        ttk.Button(all_cards_frame, text="Find Missing", command=self.check_missing_cards, width=30).pack(side='left', padx=5)
         
         ttk.Separator(cards_frame, orient='horizontal').pack(fill='x', pady=10)
         
@@ -815,7 +815,7 @@ class LeetcodeScraperGUI:
         self.card_slug_var.trace_add('write', lambda *args: self.filter_cards())
         
         ttk.Button(card_input_frame, text="Download", command=self.download_card).pack(side='left')
-        ttk.Button(card_input_frame, text="Check Missing", command=self.check_missing_card).pack(side='left', padx=5)
+        ttk.Button(card_input_frame, text="Find Missing", command=self.check_missing_card).pack(side='left', padx=5)
         
         # Info text
         info_frame = ttk.Frame(parent)
@@ -883,7 +883,7 @@ class LeetcodeScraperGUI:
         all_companies_frame = ttk.Frame(parent)
         all_companies_frame.pack(pady=10)
         ttk.Button(all_companies_frame, text="Download All Company Questions", command=self.download_all_companies, width=35).pack(side='left', padx=5)
-        ttk.Button(all_companies_frame, text="Check Missing", command=self.check_missing_companies, width=35).pack(side='left', padx=5)
+        ttk.Button(all_companies_frame, text="Find Missing", command=self.check_missing_companies, width=35).pack(side='left', padx=5)
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -906,7 +906,7 @@ class LeetcodeScraperGUI:
         self.company_slug_var.trace_add('write', lambda *args: self.filter_companies('company'))
         
         ttk.Button(company_input_frame, text="Download", command=self.download_company_questions).pack(side='left', padx=5)
-        ttk.Button(company_input_frame, text="Check Missing", command=self.check_missing_company_questions).pack(side='left', padx=5)
+        ttk.Button(company_input_frame, text="Find Missing", command=self.check_missing_company_questions).pack(side='left', padx=5)
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -998,7 +998,7 @@ class LeetcodeScraperGUI:
         all_submissions_frame = ttk.Frame(parent)
         all_submissions_frame.pack(pady=10)
         ttk.Button(all_submissions_frame, text="Download All Your Submissions", command=self.download_all_submissions, width=35).pack(side='left', padx=5)
-        ttk.Button(all_submissions_frame, text="Check Missing", command=self.check_missing_submissions, width=20).pack(side='left', padx=5)
+        ttk.Button(all_submissions_frame, text="Find Missing", command=self.check_missing_submissions, width=20).pack(side='left', padx=5)
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -1185,7 +1185,7 @@ class LeetcodeScraperGUI:
         ttk.Entry(pdf_dir_frame, textvariable=self.pdf_dir_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
         ttk.Button(pdf_dir_frame, text="Browse", command=self.browse_pdf_directory).pack(side='left', padx=5)
         ttk.Button(pdf_dir_frame, text="Convert", command=self.convert_directory_to_pdf).pack(side='left', padx=5)
-        ttk.Button(pdf_dir_frame, text="Check", command=self.check_missing_pdfs).pack(side='left', padx=5)
+        ttk.Button(pdf_dir_frame, text="Find Missing", command=self.check_missing_pdfs).pack(side='left', padx=5)
         
         ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=10)
         
