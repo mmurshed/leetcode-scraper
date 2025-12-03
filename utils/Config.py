@@ -27,7 +27,7 @@ class Config:
         self.threads_count_for_pdf_conversion: int = 8
         self.api_max_failures = 3
 
-        self.logging_level = "info" # Options: "debug", "info", "warning", "error"
+        self.logging_level = "warning" # Options: "debug", "info", "warning", "error"
 
         # None, ollama or openai
         self.ai_solution_generator = None # Options: "none", "ollama", "openai"
@@ -45,6 +45,8 @@ class Config:
         
         # Migrate old boolean values to new string format
         self._migrate_boolean_fields()
+
+        self.set_derivative_values()
 
     @staticmethod
     def from_json(json_str: str) -> 'Config':
