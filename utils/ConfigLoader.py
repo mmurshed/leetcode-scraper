@@ -1,4 +1,5 @@
 import os
+import json
 
 from utils.Constants import Constants
 from utils.Util import Util
@@ -24,8 +25,18 @@ class ConfigLoader:
         config_found = False
         # Load existing config if available
         if os.path.exists(config_file_path):
-            config = Config.from_json_file(config_file_path)
-            config_found = True
+            try:
+                # Check if file is not empty
+                with open(config_file_path, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        config = Config.from_json(content)
+                        config_found = True
+                    else:
+                        config = Config()
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"Warning: Could not load existing config ({e}). Creating new one.")
+                config = Config()
         else:
             config = Config()
 
@@ -52,16 +63,19 @@ class ConfigLoader:
                 # For preferred_language_order, allow comma-separated values
                 new_value = input(newprompt).strip()
                 if new_value:
-                    langs = set(str.lower(val) for val in new_value.split(','))
+                    langs = [str.lower(val.strip()) for val in new_value.split(',')]
 
                     # if C++ is specified replace with cpp
+                    converted_langs = []
                     for lang in langs:
-                        if Constants.LANG_NAMES_TO_SLUG[lang]:
-                            langs.remove(lang)
-                            langs.add(Constants.LANG_NAMES_TO_SLUG[lang])
+                        if lang in Constants.LANG_NAMES_TO_SLUG:
+                            converted_langs.append(Constants.LANG_NAMES_TO_SLUG[lang])
+                        else:
+                            converted_langs.append(lang)
 
-                    setattr(config, key, langs)
-            elif "count" in prompt:
+                    setattr(config, key, converted_langs)
+            elif "count" in key.lower() or "How many" in prompt:
+                # For integer/count fields
                 new_value = input(newprompt).strip()
                 if new_value:
                     setattr(config, key, int(new_value))

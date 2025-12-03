@@ -33,7 +33,7 @@ class Config:
         self.ai_solution_generator = None
 
         self.open_ai_api_key = ""
-        self.open_ai_model = "gpt-4o-mini"
+        self.open_ai_model = "gpt-5-mini"
 
         self.ollama_url = "http://localhost:11434/api/generate"
         self.ollama_model = "llama3.1"

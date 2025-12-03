@@ -36,7 +36,7 @@ class OpenAISolution(AISolution):
                         }
                     ]}],
                 temperature=1,
-                max_tokens=16384,
+                max_completion_tokens=16384,
                 top_p=1,
                 frequency_penalty=0,
                 presence_penalty=0,
