@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: LeetcodeScraper",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/LeetcodeScraper.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+    ]
+}
+
