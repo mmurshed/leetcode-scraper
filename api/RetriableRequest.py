@@ -108,17 +108,23 @@ class RetriableRequest:
             return data
 
         except requests.RequestException as e:
-            # Increment the failure counter
-            self.retry_count += 1
-            self.logger.error(f"Request failed: {e}. Failure count: {self.retry_count}")
-            self.logger.error(f"method: {method}")
-            self.logger.error(f"request: {request}")
+            # Check if this is a 404 error - don't count it towards circuit breaker
+            is_404 = False
+            if isinstance(e, requests.HTTPError) and e.response and e.response.status_code == 404:
+                is_404 = True
+                self.logger.warning(f"404 Not Found: {e}. Skipping without counting towards circuit breaker.")
+            else:
+                # Increment the failure counter only for non-404 errors
+                self.retry_count += 1
+                self.logger.error(f"Request failed: {e}. Failure count: {self.retry_count}")
+                self.logger.error(f"method: {method}")
+                self.logger.error(f"request: {request}")
 
-            # If max failures are reached, open the circuit breaker
-            if self.retry_count >= self.max_failures:
-                self.open_circuit()
+                # If max failures are reached, open the circuit breaker
+                if self.retry_count >= self.max_failures:
+                    self.open_circuit()
 
-            # Reraise the exception to trigger the retry mechanism in @retry
+            # Reraise the exception to trigger the retry mechanism in @retry (or exit if 404)
             raise e
 
     #region basic method
