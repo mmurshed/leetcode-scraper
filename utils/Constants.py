@@ -59,10 +59,22 @@ class Constants:
 
     LANG_NAMES_TO_SLUG = {
         "python 3": "python",
+        "python": "python",
         "c++": "cpp",
+        "c": "c",
+        "cpp": "cpp",
         "c#": "csharp",
+        "csharp": "csharp",
         "sql": "mysql",
+        "mssql": "mssql",
+        "oraclesql": "oraclesql",
         "go": "golang",
+        "scala": "scala",
+        "pythonml": "pythonml",
+        "rust": "rust",
+        "ruby": "ruby",
+        "bash": "bash",
+        "swift": "swift",
     }
 
     HTML_HEADER = None
