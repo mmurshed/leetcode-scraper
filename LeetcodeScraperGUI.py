@@ -510,9 +510,16 @@ class LeetcodeScraperGUI:
             # Save to file
             config.to_json_file(config_path)
             
+            # Update the in-memory config to reflect changes immediately
+            if self.config is not None:
+                # Copy all attributes from the new config to the existing one
+                for key in vars(config):
+                    setattr(self.config, key, getattr(config, key))
+                self.logger.info("In-memory configuration updated")
+            
             self.logger.info(f"Configuration saved to {config_path}")
-            self.status_var.set("Config saved")
-            messagebox.showinfo("Success", f"Configuration saved to {config_path}")
+            self.status_var.set("Config saved and applied")
+            messagebox.showinfo("Success", f"Configuration saved to {config_path}\n\nChanges will take effect immediately for new operations.")
         except Exception as e:
             self.logger.error(f"Failed to save config: {e}")
             messagebox.showerror("Error", f"Failed to save configuration: {e}")
