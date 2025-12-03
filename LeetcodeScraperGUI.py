@@ -231,9 +231,23 @@ class LeetcodeScraperGUI:
         download_frame = ttk.LabelFrame(parent, text="Download Settings", padding="10")
         download_frame.pack(fill='x', padx=10, pady=5)
         
-        self.add_checkbox_field(download_frame, "overwrite", "Download again even if the file exists")
-        self.add_checkbox_field(download_frame, "download_images", "Download Images")
-        self.add_checkbox_field(download_frame, "download_videos", "Download Videos")
+        download_options = [
+            ("none", "Don't Download"),
+            ("new", "Only download if not exists (Default)"),
+            ("always", "Always Download (Replace Existing)")
+        ]
+
+        question_download_options = [
+            ("new", "Only download if not exists (Default)"),
+            ("always", "Always Download (Replace Existing)")
+        ]
+
+        self.add_labeled_dropdown_field(download_frame, "download_questions", "Download Questions:", 
+                                       question_download_options)
+        self.add_labeled_dropdown_field(download_frame, "download_images", "Download Images:", 
+                                       download_options)
+        self.add_labeled_dropdown_field(download_frame, "download_videos", "Download Videos:", 
+                                       download_options)
         self.add_checkbox_field(download_frame, "include_default_code", "Include Default Code")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
@@ -282,10 +296,10 @@ class LeetcodeScraperGUI:
                                ["None", "openai", "ollama"])
         
         # OpenAI Settings
-        openai_subframe = ttk.LabelFrame(ai_frame, text="OpenAI Settings", padding="5")
-        openai_subframe.pack(fill='x', pady=5)
-        self.add_text_field(openai_subframe, "open_ai_api_key", "API Key:", width=50)
-        self.add_editable_dropdown_field(openai_subframe, "open_ai_model", "Model:", width=30)
+        self.openai_subframe = ttk.LabelFrame(ai_frame, text="OpenAI Settings", padding="5")
+        self.openai_subframe.pack(fill='x', pady=5)
+        self.add_text_field(self.openai_subframe, "open_ai_api_key", "API Key:", width=50)
+        self.add_editable_dropdown_field(self.openai_subframe, "open_ai_model", "Model:", width=30)
         
         # Add callback to fetch models when API key is entered
         api_key_var = self.config_vars.get("open_ai_api_key")
@@ -295,15 +309,24 @@ class LeetcodeScraperGUI:
             api_key_var.trace_add("write", lambda *args: self.on_openai_key_changed())
         
         # Ollama Settings
-        ollama_subframe = ttk.LabelFrame(ai_frame, text="Ollama Settings", padding="5")
-        ollama_subframe.pack(fill='x', pady=5)
-        self.add_text_field(ollama_subframe, "ollama_url", "URL:")
-        self.add_editable_dropdown_field(ollama_subframe, "ollama_model", "Model:", width=30)
+        self.ollama_subframe = ttk.LabelFrame(ai_frame, text="Ollama Settings", padding="5")
+        self.ollama_subframe.pack(fill='x', pady=5)
+        self.add_text_field(self.ollama_subframe, "ollama_url", "URL:")
+        self.add_editable_dropdown_field(self.ollama_subframe, "ollama_model", "Model:", width=30)
         
         # Add callback to fetch models when Ollama URL is entered
         ollama_url_var = self.config_vars.get("ollama_url")
         if ollama_url_var:
             ollama_url_var.trace_add("write", lambda *args: self.on_ollama_url_changed())
+        
+        # Add callback to AI generator dropdown to show/hide relevant settings
+        ai_generator_var = self.config_vars.get("ai_solution_generator")
+        if ai_generator_var:
+            ai_generator_var.trace_add("write", lambda *args: self.on_ai_generator_changed())
+        
+        # Initially hide both subframes (will be shown when config loads)
+        self.openai_subframe.pack_forget()
+        self.ollama_subframe.pack_forget()
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -360,6 +383,37 @@ class LeetcodeScraperGUI:
         combo = ttk.Combobox(frame, textvariable=var, values=options, width=20, state='readonly')
         combo.pack(side='left', padx=5)
         self.config_vars[key] = var
+    
+    def add_labeled_dropdown_field(self, parent, key, label, options):
+        """Add a dropdown field with value-label pairs.
+        
+        Args:
+            parent: Parent widget
+            key: Config key
+            label: Display label
+            options: List of (value, label) tuples
+        """
+        frame = ttk.Frame(parent)
+        frame.pack(fill='x', pady=2)
+        ttk.Label(frame, text=label, width=30, anchor='w').pack(side='left', padx=5)
+        var = tk.StringVar()
+        
+        # Extract just the labels for display
+        display_labels = [label_text for _, label_text in options]
+        
+        combo = ttk.Combobox(frame, textvariable=var, values=display_labels, width=40, state='readonly')
+        combo.pack(side='left', padx=5)
+        
+        # Store both the variable and the mapping
+        self.config_vars[key] = var
+        # Store mapping of display label to actual value
+        if not hasattr(self, '_dropdown_mappings'):
+            self._dropdown_mappings = {}
+        self._dropdown_mappings[key] = {label_text: value for value, label_text in options}
+        # Store reverse mapping too
+        if not hasattr(self, '_dropdown_reverse_mappings'):
+            self._dropdown_reverse_mappings = {}
+        self._dropdown_reverse_mappings[key] = {value: label_text for value, label_text in options}
     
     def add_editable_dropdown_field(self, parent, key, label, width=30):
         """Add an editable dropdown field (combobox that allows typing)."""
@@ -448,7 +502,12 @@ class LeetcodeScraperGUI:
                                 if item in value:
                                     var.selection_set(i)
                     elif isinstance(var, tk.StringVar):
-                        if isinstance(value, list):
+                        # Check if this is a labeled dropdown field
+                        if hasattr(self, '_dropdown_reverse_mappings') and key in self._dropdown_reverse_mappings:
+                            # Convert the actual value to display label
+                            display_label = self._dropdown_reverse_mappings[key].get(value, value)
+                            var.set(display_label)
+                        elif isinstance(value, list):
                             var.set(', '.join(str(v) for v in value))
                         elif value is None or value == "None":
                             var.set("None")
@@ -457,6 +516,10 @@ class LeetcodeScraperGUI:
             
             self.logger.info("Configuration loaded successfully")
             self.status_var.set("Config loaded")
+            
+            # Trigger AI generator change to show/hide relevant settings
+            self.on_ai_generator_changed()
+            
             if show_messages:
                 messagebox.showinfo("Success", "Configuration loaded successfully")
         except Exception as e:
@@ -494,7 +557,12 @@ class LeetcodeScraperGUI:
                     setattr(config, key, selected_items if selected_items else ["all"])
                 elif isinstance(var, tk.StringVar):
                     value = var.get()
-                    if key == "preferred_language_order":
+                    # Check if this is a labeled dropdown field
+                    if hasattr(self, '_dropdown_mappings') and key in self._dropdown_mappings:
+                        # Convert display label to actual value
+                        actual_value = self._dropdown_mappings[key].get(value, value)
+                        setattr(config, key, actual_value)
+                    elif key == "preferred_language_order":
                         # This shouldn't happen anymore (using listbox), but keep as fallback
                         langs = [s.strip().lower() for s in value.split(',') if s.strip()]
                         setattr(config, key, langs if langs else ["all"])
@@ -601,6 +669,25 @@ class LeetcodeScraperGUI:
             if hasattr(self, '_ollama_fetch_timer'):
                 self.root.after_cancel(self._ollama_fetch_timer)
             self._ollama_fetch_timer = self.root.after(1000, lambda: self.fetch_ollama_models(url_value))
+    
+    def on_ai_generator_changed(self):
+        """Callback when AI generator selection changes - show/hide relevant settings."""
+        ai_generator_var = self.config_vars.get("ai_solution_generator")
+        if not ai_generator_var:
+            return
+        
+        selected = ai_generator_var.get().strip().lower()
+        
+        # Hide both frames first
+        self.openai_subframe.pack_forget()
+        self.ollama_subframe.pack_forget()
+        
+        # Show relevant frame based on selection
+        if selected == "openai":
+            self.openai_subframe.pack(fill='x', pady=5)
+        elif selected == "ollama":
+            self.ollama_subframe.pack(fill='x', pady=5)
+        # If "none", both remain hidden
     
     def fetch_ollama_models(self, base_url):
         """Fetch available Ollama models from the API."""
@@ -1247,7 +1334,30 @@ class LeetcodeScraperGUI:
             try:
                 self.config, self.cache, self.cards, self.company, self.qued, self.submission = init(self.logger)
             except Exception as e:
-                raise Exception(f"Initialization error: {e}\n\nPlease setup config first (Option 1)")
+                error_msg = str(e)
+                
+                # Check if it's a "no config found" error
+                if "No config found" in error_msg or "config.json" in error_msg.lower():
+                    friendly_msg = (
+                        "Configuration Required\n\n"
+                        "No configuration file was found. Please configure the application first:\n\n"
+                        "1. Go to the 'Config' tab\n"
+                        "2. Fill in the required settings (at minimum: LeetCode Cookie and Save Directory)\n"
+                        "3. Click 'Save Config'\n\n"
+                        "After saving, you can use all features of the application."
+                    )
+                    self.logger.error(f"Configuration missing: {error_msg}")
+                    raise Exception(friendly_msg)
+                else:
+                    # Other initialization errors
+                    friendly_msg = (
+                        f"Initialization Error\n\n"
+                        f"Failed to initialize the application components:\n\n"
+                        f"{error_msg}\n\n"
+                        f"Please check your configuration in the 'Config' tab and ensure all settings are valid."
+                    )
+                    self.logger.error(f"Initialization error: {error_msg}")
+                    raise Exception(friendly_msg)
     
     # Command methods
     def download_all_cards(self):

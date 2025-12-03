@@ -203,7 +203,8 @@ class CompanyDownloader:
         
         for question in questions:
             question_filepath = os.path.join(company_fav_dir, Util.qhtml(question.id, question.title))
-            if os.path.exists(question_filepath) and not self.config.overwrite:
+            # Check if exists: if "always", download anyway; if "new", skip if exists
+            if os.path.exists(question_filepath) and self.config.download_questions != "always":
                 downloaded_questions.append(question)
             else:
                 not_downloaded_questions.append(question)
@@ -221,12 +222,14 @@ class CompanyDownloader:
 
 
     def download_company_question(self, question: Question, company_fav_dir):
-        if self.config.overwrite:
+        # If "always", recreate the question HTML directly
+        if self.config.download_questions == "always":
             self.questiondownloader.create_question_html(
                 question=question,
                 root_dir=company_fav_dir)
             return
 
+        # Otherwise, try to copy from questions directory
         copied = Util.copy_question_file(
             question_id=question.id,
             question_title=question.title,

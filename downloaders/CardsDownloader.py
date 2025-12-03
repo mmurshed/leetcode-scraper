@@ -127,7 +127,8 @@ class CardsDownloader:
 
 
     def filter_out_downloaded(self, items, root_dir):
-        if self.config.overwrite:
+        # If download_questions is "always", download everything (skip nothing)
+        if self.config.download_questions == "always":
             return items
 
         downloaded = {}

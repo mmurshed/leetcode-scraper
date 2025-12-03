@@ -14,7 +14,7 @@ class Config:
         self.submissions_directory: str = ""
         self.cache_api_calls: bool = True
         self.cache_expiration_days: int = 7
-        self.overwrite: bool = True
+        self.download_questions: str = "new"  # Options: "none", "always", "new"
         self.preferred_language_order: list = ["all"]
         self.include_submissions_count: int = 0
         self.include_community_solution_count: int = 1
@@ -22,8 +22,8 @@ class Config:
         self.extract_gif_frames: bool = False
         self.recompress_image: bool = False
         self.base64_encode_image: bool = False
-        self.download_images: bool = True
-        self.download_videos: bool = False
+        self.download_images: str = "new"  # Options: "none", "always", "new"
+        self.download_videos: str = "new"  # Options: "none", "always", "new"
         self.threads_count_for_pdf_conversion: int = 8
         self.api_max_failures = 3
 
@@ -42,6 +42,9 @@ class Config:
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+        
+        # Migrate old boolean values to new string format
+        self._migrate_boolean_fields()
 
     @staticmethod
     def from_json(json_str: str) -> 'Config':
@@ -76,9 +79,9 @@ class Config:
         prompts = {
             "leetcode_cookie": "Enter the LEETCODE_SESSION Cookie Value: ",
             "save_directory": "Enter directory where files should be saved: ",
-            "overwrite": "Download again even if the file exists T/F? (T/F): ",
-            "download_images": "Download images T/F? (T/F): ",
-            "download_videos": "Download videos T/F? (T/F): ",
+            "download_questions": "Download questions: new, always? (new): ",
+            "download_images": "Download images: none, new, always? (new): ",
+            "download_videos": "Download videos: none, new, always? (new): ",
             "preferred_language_order": "Enter order of preferred languages for solution (comma-separated or all): ",
             "include_submissions_count": "How many submissions to include (0 for none): ",
             "include_community_solution_count": "How many community solutions to include (0 for none): ",
@@ -90,3 +93,25 @@ class Config:
     def get_images_dir(directory):
         return os.path.join(directory, "images")
     
+    def _migrate_boolean_fields(self):
+        """Migrate old boolean values to new string format for backward compatibility."""
+        # Migrate overwrite/download_questions: True -> "always", False -> "new"
+        # Also handle old "overwrite" field name
+        if hasattr(self, 'overwrite'):
+            if isinstance(self.overwrite, bool):
+                self.download_questions = "always" if self.overwrite else "new"
+            else:
+                self.download_questions = self.overwrite
+            # Remove old attribute
+            delattr(self, 'overwrite')
+        elif isinstance(self.download_questions, bool):
+            self.download_questions = "always" if self.download_questions else "new"
+        
+        # Migrate download_images: True -> "new", False -> "none"
+        if isinstance(self.download_images, bool):
+            self.download_images = "new" if self.download_images else "none"
+        
+        # Migrate download_videos: True -> "new", False -> "none"
+        if isinstance(self.download_videos, bool):
+            self.download_videos = "new" if self.download_videos else "none"
+

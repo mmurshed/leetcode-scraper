@@ -62,14 +62,25 @@ class SolutionDownloader:
         video_extension = "mp4"
         video_basename = f"{Util.qbasename(question_id, video_id)}.{video_extension}"
 
-        if self.config.download_videos:
+        # Only download if download_videos is not "none"
+        if self.config.download_videos != "none":
             videos_dir = os.path.join(root_dir, "videos")
             os.makedirs(videos_dir, exist_ok=True)
 
-            video_basename, video_extension = VideoDownloader.download_video(
-                question_id=question_id,
-                url=src_url,
-                videos_dir=videos_dir)
+            video_path = os.path.join(videos_dir, video_basename)
+            
+            # Check if we should download: "always" = always, "new" = only if not exists
+            should_download = False
+            if self.config.download_videos == "always":
+                should_download = True
+            elif self.config.download_videos == "new" and not os.path.exists(video_path):
+                should_download = True
+            
+            if should_download:
+                video_basename, video_extension = VideoDownloader.download_video(
+                    question_id=question_id,
+                    url=src_url,
+                    videos_dir=videos_dir)
 
         video_html = f"""
             <video width="{width}" height="{height}" controls>

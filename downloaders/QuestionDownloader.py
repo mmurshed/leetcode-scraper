@@ -95,8 +95,9 @@ class QuestionDownloader:
         self.create_question_index(questions)
 
     def filter_out_downloaded(self, questions):
-        if self.config.overwrite:
-            return questions, [] # Not downloaded everything, downloaded nothing
+        # If download_questions is "always", download everything (skip nothing)
+        if self.config.download_questions == "always":
+            return questions, []  # Not downloaded: everything, downloaded: nothing
 
         downloaded = []
         not_downloaded = []

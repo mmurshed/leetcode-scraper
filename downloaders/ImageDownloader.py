@@ -46,7 +46,15 @@ class ImageDownloader:
 
         image_path = os.path.join(images_dir, f"{Util.qbasename(question_id, url_hash)}.{img_ext}")
 
-        if not self.config.cache_api_calls or not os.path.exists(image_path):
+        # Check if we should download: "none" = never, "new" = only if not exists, "always" = always
+        should_download = False
+        if self.config.download_images == "always":
+            should_download = True
+        elif self.config.download_images == "new" and not os.path.exists(image_path):
+            should_download = True
+        # If "none", should_download stays False
+        
+        if should_download:
             data = None
 
             headers = None
@@ -128,7 +136,8 @@ class ImageDownloader:
         images = content_soup.select('img')
 
         images_dir = os.path.join(root_dir, "images")
-        if self.config.download_images:
+        # Only create images directory if we're actually downloading images
+        if self.config.download_images != "none":
             os.makedirs(images_dir, exist_ok=True)
 
         for image in images:
@@ -160,7 +169,8 @@ class ImageDownloader:
                 if img_url:
                     image['src'] = img_url
 
-                if self.config.download_images and img_url:
+                # Only download if download_images is not "none"
+                if self.config.download_images != "none" and img_url:
                     files = self.download_image(question_id, img_url, images_dir)
                     if files:
                         if self.config.base64_encode_image:
