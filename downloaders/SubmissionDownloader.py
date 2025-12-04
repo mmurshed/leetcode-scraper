@@ -33,12 +33,12 @@ class SubmissionDownloader:
 
 
     def get_all_submissions(self):
-        questions = self.lc.get_all_questions()
+        submissions = self.lc.get_all_submissions()
 
-        for question in questions:
-            self.get_submission_data(question.id, question.slug, True)
+        for submission in submissions:
+            self.get_submission_data(question_id=submission.id, question_slug=submission.slug, save_submission_as_file=True, accepted_only=False, limit=None)
 
-    def get_submission_data(self, question_id, question_slug, save_submission_as_file, limit = None):
+    def get_submission_data(self, question_id, question_slug, save_submission_as_file, limit = None, accepted_only = True):
 
         submissions_code = {}
 
@@ -49,7 +49,10 @@ class SubmissionDownloader:
             self.logger.debug(f"Submission wasn't downloaded {question_id}")
             return
         
-        submissions = [Submission.from_json(submission) for submission in submissions_data if submission['statusDisplay'] == "Accepted"]
+        if accepted_only:
+            submissions = [Submission.from_json(submission) for submission in submissions_data if submission['statusDisplay'] == "Accepted"]
+        else:
+            submissions = [Submission.from_json(submission) for submission in submissions_data]
         
         limit = limit or len(submissions)        
         

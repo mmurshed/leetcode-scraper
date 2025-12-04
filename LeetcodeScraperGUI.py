@@ -215,23 +215,14 @@ class LeetcodeScraperGUI:
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
         # Basic Settings
-        basic_frame = ttk.LabelFrame(parent, text="Basic Settings", padding="10")
+        basic_frame = ttk.LabelFrame(parent, text="Mandatory Settings", padding="10")
         basic_frame.pack(fill='x', padx=10, pady=5)
         
         self.add_text_field(basic_frame, "leetcode_cookie", "LeetCode Cookie:", width=60)
         self.add_directory_field(basic_frame, "save_directory", "Save Directory:")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
-        
-        # Cache Settings
-        cache_frame = ttk.LabelFrame(parent, text="Cache Settings", padding="10")
-        cache_frame.pack(fill='x', padx=10, pady=5)
-        
-        self.add_checkbox_field(cache_frame, "cache_api_calls", "Cache API Calls")
-        self.add_number_field(cache_frame, "cache_expiration_days", "Cache Expiration (days):")
-        
-        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
-        
+                
         # Download Settings
         download_frame = ttk.LabelFrame(parent, text="Download Settings", padding="10")
         download_frame.pack(fill='x', padx=10, pady=5)
@@ -253,60 +244,30 @@ class LeetcodeScraperGUI:
                                        download_options)
         self.add_labeled_dropdown_field(download_frame, "download_videos", "Download Videos:", 
                                        download_options)
-        self.add_checkbox_field(download_frame, "include_default_code", "Include Default Code")
+        self.add_checkbox_field(download_frame, "include_default_code", "Download Default Code")
+        self.add_number_field(download_frame, "include_submissions_count", "Number of your code submissions to include in question content:")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Content Settings
-        content_frame = ttk.LabelFrame(parent, text="Content Settings", padding="10")
-        content_frame.pack(fill='x', padx=10, pady=5)
+        # Solution Settings
+        solution_frame = ttk.LabelFrame(parent, text="Download Solution Settings", padding="10")
+        solution_frame.pack(fill='x', padx=10, pady=5)
         
         # Import language list from Constants
         from utils.Constants import Constants
         available_languages = ["all"] + sorted([lang for lang in Constants.LANG_NAMES.keys() if lang != "all"])
-        self.add_ordered_list_field(content_frame, "preferred_language_order", 
-                                    "Preferred Languages (in order):", available_languages)
+        self.add_ordered_list_field(solution_frame, "preferred_language_order", 
+                                    "Preferred official solution languages (in order):", available_languages)
         
-        self.add_number_field(content_frame, "include_submissions_count", "Number of your code submissions to include:")
-        self.add_number_field(content_frame, "include_community_solution_count", "Number of community solutions to include:")
+        self.add_number_field(solution_frame, "include_community_solution_count", "Number of community solutions to include when official solution is not available:")
         
-        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Image Processing
-        image_frame = ttk.LabelFrame(parent, text="Image Processing", padding="10")
-        image_frame.pack(fill='x', padx=10, pady=5)
-                 
-        # Recompress image - multi-select
-        recompress_options = ["png", "jpg", "webp"]
-        self.add_multiselect_field(image_frame, "recompress_image_formats", 
-                                   "Recompress image formats (for compatibility):", recompress_options)
-        
-        self.add_checkbox_field(image_frame, "extract_gif_frames", "Extract GIF Frames as separate images")
-
-        self.add_checkbox_field(image_frame, "base64_encode_image", "Embed images in HTML insted of linking from the images directory")
-        
-        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
-        
-        # Advanced Settings
-        advanced_frame = ttk.LabelFrame(parent, text="Advanced Settings", padding="10")
-        advanced_frame.pack(fill='x', padx=10, pady=5)
-        
-        self.add_number_field(advanced_frame, "threads_count_for_pdf_conversion", "Number of threads to use for PDF conversion:")
-        self.add_number_field(advanced_frame, "api_max_failures", "Maximum number of retries for API call failures:")
-        self.add_dropdown_field(advanced_frame, "logging_level", "Logging level:", 
-                               ["debug", "info", "warning", "error"])
-        
-        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
-        
-        # AI Solution Settings
-        ai_frame = ttk.LabelFrame(parent, text="AI Solution Generator", padding="10")
-        ai_frame.pack(fill='x', padx=10, pady=5)
-        
-        self.add_dropdown_field(ai_frame, "ai_solution_generator", "AI Generator:", 
+        # AI Solution Settings        
+        self.add_dropdown_field(solution_frame, "ai_solution_generator", "AI Solution Generator (when official solution is not available):", 
                                ["None", "openai", "ollama"])
         
         # OpenAI Settings
-        self.openai_subframe = ttk.LabelFrame(ai_frame, text="OpenAI Settings", padding="5")
+        self.openai_subframe = ttk.LabelFrame(solution_frame, text="OpenAI Settings", padding="5")
         self.openai_subframe.pack(fill='x', pady=5)
         self.add_text_field(self.openai_subframe, "open_ai_api_key", "API Key:", width=50)
         self.add_editable_dropdown_field(self.openai_subframe, "open_ai_model", "Model:", width=30)
@@ -319,7 +280,7 @@ class LeetcodeScraperGUI:
             api_key_var.trace_add("write", lambda *args: self.on_openai_key_changed())
         
         # Ollama Settings
-        self.ollama_subframe = ttk.LabelFrame(ai_frame, text="Ollama Settings", padding="5")
+        self.ollama_subframe = ttk.LabelFrame(solution_frame, text="Ollama Settings", padding="5")
         self.ollama_subframe.pack(fill='x', pady=5)
         self.add_text_field(self.ollama_subframe, "ollama_url", "URL:")
         self.add_editable_dropdown_field(self.ollama_subframe, "ollama_model", "Model:", width=30)
@@ -337,6 +298,42 @@ class LeetcodeScraperGUI:
         # Initially hide both subframes (will be shown when config loads)
         self.openai_subframe.pack_forget()
         self.ollama_subframe.pack_forget()
+        
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
+
+        # Image Processing
+        image_frame = ttk.LabelFrame(parent, text="Image Processing", padding="10")
+        image_frame.pack(fill='x', padx=10, pady=5)
+                 
+        # Recompress image - multi-select
+        recompress_options = ["png", "jpg", "webp"]
+        self.add_multiselect_field(image_frame, "recompress_image_formats", 
+                                   "Improve compatibility for image formats:", recompress_options, height=3)
+        
+        self.add_checkbox_field(image_frame, "extract_gif_frames", "Extract GIF Frames as separate images")
+
+        self.add_checkbox_field(image_frame, "base64_encode_image", "Embed images in HTML insted of linking from the images directory")
+        
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
+
+        # Advanced Settings
+        advanced_frame = ttk.LabelFrame(parent, text="Advanced Settings", padding="10")
+        advanced_frame.pack(fill='x', padx=10, pady=5)
+        
+        self.add_number_field(advanced_frame, "threads_count_for_pdf_conversion", "Number of threads to use for PDF conversion:")
+        self.add_number_field(advanced_frame, "api_max_failures", "Maximum number of retries for API call failures:")
+        self.add_dropdown_field(advanced_frame, "logging_level", "Logging level:", 
+                               ["debug", "info", "warning", "error"])
+
+        
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
+
+        # Cache Settings
+        cache_frame = ttk.LabelFrame(parent, text="Cache Settings", padding="10")
+        cache_frame.pack(fill='x', padx=10, pady=5)
+        
+        self.add_checkbox_field(cache_frame, "cache_api_calls", "Cache API Calls")
+        self.add_number_field(cache_frame, "cache_expiration_days", "Cache Expiration (days):")
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
@@ -438,7 +435,7 @@ class LeetcodeScraperGUI:
         self.config_widgets[key] = combo
         return combo
     
-    def add_multiselect_field(self, parent, key, label, options):
+    def add_multiselect_field(self, parent, key, label, options, height=6):
         """Add a multi-select listbox field."""
         frame = ttk.Frame(parent)
         frame.pack(fill='x', pady=2)
@@ -457,7 +454,7 @@ class LeetcodeScraperGUI:
         scrollbar = ttk.Scrollbar(list_frame)
         scrollbar.pack(side='right', fill='y')
         
-        listbox = tk.Listbox(list_frame, selectmode='multiple', height=6, 
+        listbox = tk.Listbox(list_frame, selectmode='multiple', height=height, 
                             yscrollcommand=scrollbar.set, exportselection=False)
         listbox.pack(side='left', fill='both', expand=True)
         scrollbar.config(command=listbox.yview)
@@ -1230,41 +1227,65 @@ class LeetcodeScraperGUI:
         
         # Use Combobox for both typing and dropdown
         self.company_slug_var = tk.StringVar()
-        self.company_slug_combo = ttk.Combobox(company_input_frame, textvariable=self.company_slug_var, width=30)
+        self.company_slug_combo = ttk.Combobox(company_input_frame, textvariable=self.company_slug_var, width=20)
         self.company_slug_combo.pack(side='left', padx=5)
         self.company_slug_combo['values'] = ()  # Empty initially
         
         # Add filtering
         self.company_slug_var.trace_add('write', lambda *args: self.filter_companies('company'))
         
-        ttk.Button(company_input_frame, text="Download", command=self.download_company_questions).pack(side='left', padx=5)
+        ttk.Button(company_input_frame, text="Download Selected Company Questions", command=self.download_company_questions).pack(side='left', padx=5)
         ttk.Button(company_input_frame, text="Find Missing", command=self.check_missing_company_questions).pack(side='left', padx=5)
         
+        # Bind company selection to load favorites
+        self.company_slug_combo.bind('<<ComboboxSelected>>', lambda e: self.load_company_favorites())
+        
+        
+        # Trending companies download        
+        trending_input_frame = ttk.Frame(parent)
+        trending_input_frame.pack(pady=5)
+        ttk.Label(trending_input_frame, text="Download trending companies from the list above:").pack(side='left', padx=5)
+        
+        self.trending_count_var = tk.IntVar(value=20)
+        trending_spinbox = ttk.Spinbox(trending_input_frame, from_=1, to=100, textvariable=self.trending_count_var, width=10)
+        trending_spinbox.pack(side='left', padx=5)
+        
+        ttk.Button(trending_input_frame, text="Download", command=self.download_trending_companies).pack(side='left', padx=5)
+                
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Favorite company questions
-        fav_frame = ttk.LabelFrame(parent, text="Favorite Company Questions", padding="10")
+        # Favorite company questions        
+        fav_frame = ttk.Frame(parent)
         fav_frame.pack(fill='x', padx=10, pady=5)
         
-        fav_input_frame = ttk.Frame(fav_frame)
-        fav_input_frame.pack(pady=5)
-        ttk.Label(fav_input_frame, text="Company Name:").pack(side='left', padx=5)
+        ttk.Label(fav_frame, text="Select a company above to load its question groups:", 
+                 font=('Arial', 9, 'italic'), foreground='gray').pack(anchor='w', pady=2)
         
-        # Use Combobox for favorite company slug
-        self.fav_company_slug_var = tk.StringVar()
-        self.fav_company_slug_combo = ttk.Combobox(fav_input_frame, textvariable=self.fav_company_slug_var, width=20)
-        self.fav_company_slug_combo.pack(side='left', padx=5)
-        self.fav_company_slug_combo['values'] = ()  # Will be populated with company list
+        # Container for listbox and button side by side
+        content_frame = ttk.Frame(fav_frame)
+        content_frame.pack(fill='both', expand=True, pady=5)
         
-        # Add filtering
-        self.fav_company_slug_var.trace_add('write', lambda *args: self.filter_companies('fav_company'))
+        # Left side: Listbox with scrollbar
+        listbox_frame = ttk.Frame(content_frame)
+        listbox_frame.pack(side='left', fill='both', expand=True)
         
-        ttk.Button(fav_input_frame, text="Load Favorites", command=self.load_company_favorites).pack(side='left')
+        scrollbar = ttk.Scrollbar(listbox_frame)
+        scrollbar.pack(side='right', fill='y')
         
-        self.favorites_listbox = tk.Listbox(fav_frame, height=5)
-        self.favorites_listbox.pack(fill='x', pady=5)
+        self.favorites_listbox = tk.Listbox(listbox_frame, height=5, selectmode='extended', 
+                                            yscrollcommand=scrollbar.set, exportselection=False)
+        self.favorites_listbox.pack(side='left', fill='both', expand=True)
+        scrollbar.config(command=self.favorites_listbox.yview)
         
-        ttk.Button(fav_frame, text="Download Selected Favorite", command=self.download_favorite_questions).pack(pady=5)
+        # Right side: Button and helper text
+        button_frame = ttk.Frame(content_frame)
+        button_frame.pack(side='left', fill='y', padx=(10, 0))
+        
+        ttk.Button(button_frame, text="Download Selected Group(s)", 
+                  command=self.download_favorite_questions, width=30).pack(pady=4)
+        
+        ttk.Label(button_frame, text="(Hold Ctrl/Cmd to select multiple)", 
+                 font=('Arial', 8), foreground='gray', justify='center').pack(pady=2)
         
         # Info text
         info_frame = ttk.Frame(parent)
@@ -1291,19 +1312,19 @@ class LeetcodeScraperGUI:
                 companies = self.company.get_company_slugs()
                 
                 if companies:
-                    # Format as "name (slug)" for display
-                    company_list = [f"{c.name} ({c.slug})" for c in sorted(companies, key=lambda x: x.name)]
-                    company_slugs = [c.slug for c in sorted(companies, key=lambda x: x.name)]
+                    # Format as "name (question_count)" for display
+                    company_list = [f"{c.name} ({c.question_count})" for c in companies]
                     
                     # Store all companies for filtering
                     self.all_companies = company_list
                     
                     # Update both comboboxes
                     self.company_slug_combo['values'] = company_list
-                    self.fav_company_slug_combo['values'] = company_list
                     
-                    # Store slug mapping for easy lookup
-                    self.company_slug_mapping = {f"{c.name} ({c.slug})": c.slug for c in companies}
+                    # Store slug mapping for easy lookup (slug -> display format)
+                    self.company_slug_mapping = {c.slug: f"{c.name} ({c.question_count})" for c in companies}
+                    # Also store reverse mapping (display -> slug) for lookups
+                    self.company_display_to_slug = {f"{c.name} ({c.question_count})": c.slug for c in companies}
                     
                     self.companies_loaded = True
                     self.logger.info(f"Loaded {len(companies)} companies")
@@ -1354,16 +1375,17 @@ class LeetcodeScraperGUI:
                     messagebox.showwarning("Error", "Could not retrieve companies from LeetCode")
                     return
                 
-                # Format as "name (slug)" for display
-                company_list = [f"{c.name} ({c.slug})" for c in sorted(companies, key=lambda x: x.name)]
+                # Format as "name (question_count)" for display
+                company_list = [f"{c.name} ({c.question_count})" for c in companies]
                 
                 # Update the dropdown lists
                 self.all_companies = company_list
                 self.company_slug_combo['values'] = company_list
-                self.fav_company_slug_combo['values'] = company_list
                 
-                # Store slug mapping for easy lookup
-                self.company_slug_mapping = {f"{c.name} ({c.slug})": c.slug for c in companies}
+                # Store slug mapping for easy lookup (slug -> display format)
+                self.company_slug_mapping = {c.slug: f"{c.name} ({c.question_count})" for c in companies}
+                # Also store reverse mapping (display -> slug) for lookups
+                self.company_display_to_slug = {f"{c.name} ({c.question_count})": c.slug for c in companies}
                 
                 self.logger.info(f"Refreshed company list: {len(companies)} companies")
                 self.status_var.set("Company list refreshed")
@@ -1440,9 +1462,9 @@ class LeetcodeScraperGUI:
                     # Include status to show solved/attempted state
                     question_list = []
                     for sub in submissions:
-                        q_id = sub.get('frontendId', '')
-                        title = sub.get('title', '')
-                        status = sub.get('questionStatus', '')
+                        q_id = sub.frontend_id
+                        title = sub.title
+                        status = sub.question_status
                         
                         # Create display text with status indicator
                         if status == 'SOLVED':
@@ -1518,9 +1540,9 @@ class LeetcodeScraperGUI:
                 # Format as "ID - Title [Status]" for display
                 question_list = []
                 for sub in submissions:
-                    q_id = sub.get('frontendId', '')
-                    title = sub.get('title', '')
-                    status = sub.get('questionStatus', '')
+                    q_id = sub.frontend_id
+                    title = sub.title
+                    status = sub.question_status
                     
                     # Create display text with status indicator
                     if status == 'SOLVED':
@@ -2488,16 +2510,20 @@ class LeetcodeScraperGUI:
     def download_company_questions(self):
         company_input = self.company_slug_var.get().strip()
         if not company_input:
-            messagebox.showwarning("Input Required", "Please enter or select a company slug")
+            messagebox.showwarning("Input Required", "Please enter or select a company")
             return
         
         # Extract company slug from input
-        # Input can be either "slug" or "Company Name (slug)"
-        if '(' in company_input and ')' in company_input:
-            # Extract slug from "Company Name (slug)" format
-            company_slug = company_input.split('(')[-1].split(')')[0].strip()
+        # Use reverse mapping if available, otherwise try to parse or use directly
+        if hasattr(self, 'company_display_to_slug') and company_input in self.company_display_to_slug:
+            company_slug = self.company_display_to_slug[company_input]
+        elif '(' in company_input and ')' in company_input:
+            # Fallback: Extract from "Company Name (question_count)" format - this won't work reliably anymore
+            # But keep for backward compatibility if user types manually
+            messagebox.showwarning("Invalid Input", "Please select a company from the dropdown list")
+            return
         else:
-            # Direct slug input
+            # Direct slug input (manual typing)
             company_slug = company_input
             
         def task():
@@ -2509,17 +2535,20 @@ class LeetcodeScraperGUI:
         """Check for missing downloads for a specific company."""
         company_input = self.company_slug_var.get().strip()
         if not company_input:
-            messagebox.showwarning("Input Required", "Please enter or select a company slug")
+            messagebox.showwarning("Input Required", "Please enter or select a company")
             return
         
-        # Extract company slug from input
-        # Input can be either "slug" or "Company Name (slug)"
-        if '(' in company_input and ')' in company_input:
-            # Extract slug from "Company Name (slug)" format
-            company_slug = company_input.split('(')[-1].split(')')[0].strip()
-            company_name = company_input.split('(')[0].strip()
+        # Extract company slug and name from input
+        # Use reverse mapping if available, otherwise try to parse or use directly
+        if hasattr(self, 'company_display_to_slug') and company_input in self.company_display_to_slug:
+            company_slug = self.company_display_to_slug[company_input]
+            company_name = company_input.split(' (')[0] if ' (' in company_input else company_slug
+        elif '(' in company_input and ')' in company_input:
+            # Fallback: user typed manually in old format
+            messagebox.showwarning("Invalid Input", "Please select a company from the dropdown list")
+            return
         else:
-            # Direct slug input
+            # Direct slug input (manual typing)
             company_slug = company_input
             company_name = company_slug
         
@@ -2612,51 +2641,193 @@ class LeetcodeScraperGUI:
                 messagebox.showerror("Error", f"Failed to check company questions: {e}")
         
         self.run_in_thread(task)
+    
+    def download_trending_companies(self):
+        """Download questions for top N trending companies from the list."""
+        count = self.trending_count_var.get()
         
-    def load_company_favorites(self):
-        company_input = self.fav_company_slug_var.get().strip()
-        if not company_input:
-            messagebox.showwarning("Input Required", "Please enter or select a company slug")
+        if count <= 0:
+            messagebox.showwarning("Invalid Input", "Please enter a positive number")
             return
         
-        # Extract company slug from input
-        if '(' in company_input and ')' in company_input:
-            company_slug = company_input.split('(')[-1].split(')')[0].strip()
+        # Check if companies are loaded
+        if not hasattr(self, 'company_display_to_slug') or not self.company_display_to_slug:
+            messagebox.showwarning("No Companies", "Please wait for the company list to load first")
+            return
+        
+        # Get the top N companies from the combobox
+        all_company_displays = self.company_slug_combo['values']
+        
+        if not all_company_displays:
+            messagebox.showwarning("No Companies", "No companies available. Please refresh the company list.")
+            return
+        
+        # Limit to available companies
+        actual_count = min(count, len(all_company_displays))
+        top_companies = all_company_displays[:actual_count]
+        
+        # Confirm the download
+        if not messagebox.askyesno("Confirm Trending Download", 
+                                   f"You are about to download questions for the top {actual_count} trending companies.\n\n"
+                                   f"This may take a significant amount of time.\n\n"
+                                   f"Continue?"):
+            return
+        
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info(f"Starting trending companies download: top {actual_count} companies")
+                self.status_var.set(f"Downloading top {actual_count} trending companies...")
+                
+                success_count = 0
+                error_count = 0
+                
+                for i, company_display in enumerate(top_companies, 1):
+                    # Extract slug from display format
+                    if company_display in self.company_display_to_slug:
+                        company_slug = self.company_display_to_slug[company_display]
+                        company_name = company_display.split(' (')[0] if ' (' in company_display else company_slug
+                        
+                        self.logger.info(f"[{i}/{actual_count}] Downloading: {company_name}")
+                        self.status_var.set(f"Downloading company {i}/{actual_count}: {company_name}")
+                        
+                        try:
+                            self.company.download_selected_company_questions(company_slug)
+                            success_count += 1
+                        except Exception as e:
+                            self.logger.error(f"Error downloading {company_name}: {e}")
+                            error_count += 1
+                    else:
+                        self.logger.warning(f"Could not find slug for: {company_display}")
+                        error_count += 1
+                
+                # Summary
+                self.logger.info(f"Trending companies download complete: {success_count} successful, {error_count} errors")
+                self.status_var.set(f"Completed: {success_count} companies downloaded, {error_count} errors")
+                
+                messagebox.showinfo("Download Complete", 
+                                  f"Trending Companies Download Complete!\n\n"
+                                  f"✓ Successfully downloaded: {success_count}\n"
+                                  f"✗ Errors: {error_count}\n\n"
+                                  f"Check the log for details.")
+                
+            except Exception as e:
+                self.logger.error(f"Error in trending companies download: {e}")
+                messagebox.showerror("Error", f"Failed to download trending companies: {e}")
+        
+        self.run_in_thread(task)
+        
+    def load_company_favorites(self):
+        company_input = self.company_slug_var.get().strip()
+        if not company_input:
+            # Silently return if no company selected yet
+            return
+        
+        # Extract company slug from input using reverse mapping
+        if hasattr(self, 'company_display_to_slug') and company_input in self.company_display_to_slug:
+            company_slug = self.company_display_to_slug[company_input]
+        elif '(' in company_input and ')' in company_input:
+            # Fallback: don't try to parse, just return
+            return
         else:
+            # Direct slug input (manual typing)
             company_slug = company_input
             
         def task():
-            self.initialize_components()
-            favorite_details = self.company.get_company_favorite_slugs(company_slug)
-            if favorite_details:
+            try:
+                self.initialize_components()
+                
+                self.logger.debug(f"Loading favorites for company: {company_slug}")
+                self.status_var.set(f"Loading favorites for {company_slug}...")
+                
+                favorite_details = self.company.get_company_favorite_slugs(company_slug)
+                
+                if favorite_details:
+                    # Store the favorite data for later use
+                    self.favorite_data = favorite_details
+                    
+                    # Clear and populate the listbox
+                    self.favorites_listbox.delete(0, tk.END)
+                    for slug, name in favorite_details:
+                        self.favorites_listbox.insert(tk.END, f"{name}")
+                    
+                    self.logger.info(f"Loaded {len(favorite_details)} favorite categories for {company_slug}")
+                    self.status_var.set(f"Loaded {len(favorite_details)} favorites for {company_slug}")
+                else:
+                    # Clear the listbox if no favorites
+                    self.favorites_listbox.delete(0, tk.END)
+                    self.favorite_data = []
+                    self.logger.info(f"No favorites found for {company_slug}")
+                    self.status_var.set(f"No favorites found for {company_slug}")
+                    
+            except Exception as e:
+                self.logger.error(f"Error loading favorites for {company_slug}: {e}")
+                self.status_var.set(f"Error loading favorites")
+                # Clear listbox on error
                 self.favorites_listbox.delete(0, tk.END)
-                self.favorite_data = favorite_details
-                for idx, (slug, name) in enumerate(favorite_details, start=1):
-                    self.favorites_listbox.insert(tk.END, f"{idx}. {name}")
+                self.favorite_data = []
+                
         self.run_in_thread(task)
         
     def download_favorite_questions(self):
-        selection = self.favorites_listbox.curselection()
-        if not selection:
-            messagebox.showwarning("Selection Required", "Please select a favorite from the list")
-            return
-        company_input = self.fav_company_slug_var.get().strip()
-        if not company_input:
-            messagebox.showwarning("Input Required", "Please enter or select a company slug")
+        selections = self.favorites_listbox.curselection()
+        if not selections:
+            messagebox.showwarning("Selection Required", "Please select one or more question groups from the list")
             return
         
-        # Extract company slug
-        if '(' in company_input and ')' in company_input:
-            company_slug = company_input.split('(')[-1].split(')')[0].strip()
+        company_input = self.company_slug_var.get().strip()
+        if not company_input:
+            messagebox.showwarning("Input Required", "Please select a company first")
+            return
+        
+        # Extract company slug using reverse mapping
+        if hasattr(self, 'company_display_to_slug') and company_input in self.company_display_to_slug:
+            company_slug = self.company_display_to_slug[company_input]
+        elif '(' in company_input and ')' in company_input:
+            # Fallback: user typed manually in old format
+            messagebox.showwarning("Invalid Input", "Please select a company from the dropdown list")
+            return
         else:
+            # Direct slug input (manual typing)
             company_slug = company_input
         
-        idx = selection[0]
-        comp_fav_slug, name = self.favorite_data[idx]
+        # Validate selections
+        if not hasattr(self, 'favorite_data') or not self.favorite_data:
+            messagebox.showerror("Error", "No favorites data available. Please reload the favorites list.")
+            return
+        
+        # Get all selected favorites
+        selected_favorites = []
+        for idx in selections:
+            if idx >= len(self.favorite_data):
+                messagebox.showerror("Error", f"Invalid selection at index {idx}. Please reload the favorites list.")
+                return
+            selected_favorites.append(self.favorite_data[idx])
+        
+        # Confirm if multiple selections
+        if len(selected_favorites) > 1:
+            group_names = '\n'.join([f"  • {name}" for _, name in selected_favorites])
+            if not messagebox.askyesno("Confirm Multiple Downloads", 
+                                       f"You are about to download {len(selected_favorites)} question groups:\n\n{group_names}\n\nContinue?"):
+                return
         
         def task():
             self.initialize_components()
-            self.company.download_favorite_company_questions(company_slug, comp_fav_slug)
+            
+            total_groups = len(selected_favorites)
+            for i, (comp_fav_slug, name) in enumerate(selected_favorites, 1):
+                self.logger.info(f"Downloading group {i}/{total_groups}: {name}")
+                self.status_var.set(f"Downloading group {i}/{total_groups}: {name}")
+                
+                try:
+                    self.company.download_favorite_company_questions(company_slug, comp_fav_slug)
+                except Exception as e:
+                    self.logger.error(f"Error downloading group '{name}': {e}")
+            
+            self.status_var.set(f"Completed downloading {total_groups} question group(s)")
+            self.logger.info(f"Completed downloading {total_groups} question group(s)")
+            
         self.run_in_thread(task)
         
     def download_all_submissions(self):
@@ -2687,9 +2858,9 @@ class LeetcodeScraperGUI:
                 missing = []
                 
                 for sub in submissions:
-                    q_id = sub.get('frontendId', '')
-                    title = sub.get('title', '')
-                    status = sub.get('questionStatus', '')
+                    q_id = sub.frontend_id
+                    title = sub.title
+                    status = sub.question_status
                     
                     # Check if submission directory exists with files
                     submission_dir = os.path.join(self.config.submissions_directory, Util.qstr(q_id))

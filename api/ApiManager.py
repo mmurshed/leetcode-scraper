@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from logging import Logger
 
 from models.Question import Question
+from models.SubmissionProgress import SubmissionProgress
 from utils.Config import Config
 from utils.Constants import Constants
 
@@ -350,7 +351,7 @@ class ApiManager:
         
         return data
 
-    def get_all_submissions(self):
+    def get_all_submissions(self) -> List[SubmissionProgress]:
         """Get all questions that the user has submitted solutions for.
         
         Returns a list of all questions with submission details including:
@@ -359,7 +360,7 @@ class ApiManager:
         - lastSubmittedAt, numSubmitted
         - topicTags
         """
-        self.logger.debug("Fetching all user submissions...")
+        self.logger.info("Fetching all user submissions...")
         
         # Get first batch to determine total count
         first_batch = self.get_user_submission_progress(limit=50, skip=0)
@@ -371,13 +372,13 @@ class ApiManager:
         total_num = first_batch['totalNum']
         all_questions = first_batch.get('questions', [])
         
-        self.logger.debug(f"Total questions with submissions: {total_num}")
+        self.logger.info(f"Total questions with submissions: {total_num}")
         
         # Fetch remaining batches if needed
         if total_num > 50:
             skip = 50
             while skip < total_num:
-                self.logger.debug(f"Fetching submissions {skip} to {skip + 50}...")
+                self.logger.info(f"Fetching submissions {skip} to {skip + 50}...")
                 batch = self.get_user_submission_progress(limit=50, skip=skip)
                 
                 if batch and 'questions' in batch:
@@ -386,7 +387,11 @@ class ApiManager:
                 skip += 50
         
         self.logger.debug(f"Retrieved {len(all_questions)} questions with submissions")
-        return all_questions
+        
+        # Convert to SubmissionProgress objects
+        submissions = [SubmissionProgress.from_json(q) for q in all_questions]
+        
+        return submissions
 
     #endregion user progress api
 

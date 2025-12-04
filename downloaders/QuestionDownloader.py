@@ -250,7 +250,7 @@ class QuestionDownloader:
 
         submission_html = ""
         if self.config.include_submissions_count > 0:
-            submissions = self.submissiondownloader.get_submission_data(question.id, question.slug, False, self.config.include_submissions_count)
+            submissions = self.submissiondownloader.get_submission_data(question_id=question.id, question_slug=question.slug, save_submission_as_file=False, limit=self.config.include_submissions_count, accepted_only=True)
             if submissions and len(submissions) > 0:
                 for timestamp, code in submissions.items():
                     submission_time = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H.%M.%S")
