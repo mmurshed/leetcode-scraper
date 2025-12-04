@@ -20,7 +20,7 @@ class Config:
         self.include_community_solution_count: int = 1
         self.include_default_code: bool = False
         self.extract_gif_frames: bool = False
-        self.recompress_image_formats: list = ["webp"]  # Options: "all", "png", "jpg", "webp"
+        self.recompress_image_formats: list = ["webp"]  # Options: "png", "jpg", "webp"
         self.base64_encode_image: bool = False
         self.download_images: str = "new"  # Options: "none", "always", "new"
         self.download_videos: str = "new"  # Options: "none", "always", "new"

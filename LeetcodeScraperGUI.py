@@ -264,8 +264,8 @@ class LeetcodeScraperGUI:
         # Import language list from Constants
         from utils.Constants import Constants
         available_languages = ["all"] + sorted([lang for lang in Constants.LANG_NAMES.keys() if lang != "all"])
-        self.add_multiselect_field(content_frame, "preferred_language_order", 
-                                   "Preferred Languages:", available_languages)
+        self.add_ordered_list_field(content_frame, "preferred_language_order", 
+                                    "Preferred Languages (in order):", available_languages)
         
         self.add_number_field(content_frame, "include_submissions_count", "Number of your code submissions to include:")
         self.add_number_field(content_frame, "include_community_solution_count", "Number of community solutions to include:")
@@ -277,7 +277,7 @@ class LeetcodeScraperGUI:
         image_frame.pack(fill='x', padx=10, pady=5)
                  
         # Recompress image - multi-select
-        recompress_options = ["all", "png", "jpg", "webp"]
+        recompress_options = ["png", "jpg", "webp"]
         self.add_multiselect_field(image_frame, "recompress_image_formats", 
                                    "Recompress image formats (for compatibility):", recompress_options)
         
@@ -468,6 +468,134 @@ class LeetcodeScraperGUI:
         
         # Store reference to listbox (not a var)
         self.config_vars[key] = listbox
+    
+    def add_ordered_list_field(self, parent, key, label, available_options):
+        """Add an ordered list field with controls to add, remove, and reorder items."""
+        frame = ttk.Frame(parent)
+        frame.pack(fill='x', pady=2)
+        
+        # Label and info frame
+        label_frame = ttk.Frame(frame)
+        label_frame.pack(fill='x')
+        ttk.Label(label_frame, text=label, width=30, anchor='w').pack(side='left', padx=5)
+        ttk.Label(label_frame, text="(Order matters - top to bottom)", 
+                 font=('Arial', 8), foreground='gray').pack(side='left', padx=5)
+        
+        # Main container with two columns
+        main_container = ttk.Frame(frame)
+        main_container.pack(fill='x', padx=35, pady=2)
+        
+        # Left side: Available languages dropdown + Add button
+        left_frame = ttk.Frame(main_container)
+        left_frame.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        
+        add_frame = ttk.Frame(left_frame)
+        add_frame.pack(fill='x', pady=(0, 5))
+        ttk.Label(add_frame, text="Add language:").pack(side='left', padx=(0, 5))
+        
+        # Dropdown for available languages
+        add_var = tk.StringVar()
+        add_combo = ttk.Combobox(add_frame, textvariable=add_var, values=available_options, 
+                                state='readonly', width=15)
+        add_combo.pack(side='left', padx=5)
+        add_combo.set(available_options[0] if available_options else "")
+        
+        # Store reference for later use
+        if not hasattr(self, '_ordered_list_add_combos'):
+            self._ordered_list_add_combos = {}
+        self._ordered_list_add_combos[key] = (add_var, available_options)
+        
+        # Right side: Ordered list with scrollbar and controls
+        right_frame = ttk.Frame(main_container)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        # Listbox with scrollbar for ordered items
+        list_container = ttk.Frame(right_frame)
+        list_container.pack(side='left', fill='both', expand=True)
+        
+        scrollbar = ttk.Scrollbar(list_container)
+        scrollbar.pack(side='right', fill='y')
+        
+        listbox = tk.Listbox(list_container, height=6, 
+                            yscrollcommand=scrollbar.set, exportselection=False)
+        listbox.pack(side='left', fill='both', expand=True)
+        scrollbar.config(command=listbox.yview)
+        
+        # Control buttons (Add, Remove, Move Up, Move Down)
+        buttons_frame = ttk.Frame(right_frame)
+        buttons_frame.pack(side='left', fill='y', padx=(5, 0))
+        
+        ttk.Button(buttons_frame, text="Add →", width=10,
+                  command=lambda: self.ordered_list_add(key, add_var, listbox)).pack(pady=2)
+        ttk.Button(buttons_frame, text="Remove", width=10,
+                  command=lambda: self.ordered_list_remove(listbox)).pack(pady=2)
+        ttk.Button(buttons_frame, text="↑ Move Up", width=10,
+                  command=lambda: self.ordered_list_move_up(listbox)).pack(pady=2)
+        ttk.Button(buttons_frame, text="↓ Move Down", width=10,
+                  command=lambda: self.ordered_list_move_down(listbox)).pack(pady=2)
+        
+        # Store reference to listbox
+        self.config_vars[key] = listbox
+        
+    def ordered_list_add(self, key, add_var, listbox):
+        """Add a language to the ordered list."""
+        selected = add_var.get()
+        if not selected:
+            return
+        
+        # Check if already in list
+        current_items = listbox.get(0, tk.END)
+        if selected in current_items:
+            messagebox.showinfo("Already Added", f"'{selected}' is already in the list")
+            return
+        
+        # Add to listbox
+        listbox.insert(tk.END, selected)
+    
+    def ordered_list_remove(self, listbox):
+        """Remove selected item from the ordered list."""
+        selection = listbox.curselection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select an item to remove")
+            return
+        
+        # Remove selected items (in reverse order to maintain indices)
+        for index in reversed(selection):
+            listbox.delete(index)
+    
+    def ordered_list_move_up(self, listbox):
+        """Move selected item up in the ordered list."""
+        selection = listbox.curselection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select an item to move")
+            return
+        
+        index = selection[0]
+        if index == 0:
+            return  # Already at top
+        
+        # Swap with previous item
+        item = listbox.get(index)
+        listbox.delete(index)
+        listbox.insert(index - 1, item)
+        listbox.selection_set(index - 1)
+    
+    def ordered_list_move_down(self, listbox):
+        """Move selected item down in the ordered list."""
+        selection = listbox.curselection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select an item to move")
+            return
+        
+        index = selection[0]
+        if index >= listbox.size() - 1:
+            return  # Already at bottom
+        
+        # Swap with next item
+        item = listbox.get(index)
+        listbox.delete(index)
+        listbox.insert(index + 1, item)
+        listbox.selection_set(index + 1)
         
     def browse_directory(self, var):
         """Browse for a directory."""
@@ -504,13 +632,23 @@ class LeetcodeScraperGUI:
                     elif isinstance(var, tk.IntVar):
                         var.set(int(value))
                     elif isinstance(var, tk.Listbox):
-                        # Handle multi-select listbox (for preferred_language_order)
-                        var.selection_clear(0, tk.END)
-                        if isinstance(value, list):
-                            for i in range(var.size()):
-                                item = var.get(i)
-                                if item in value:
-                                    var.selection_set(i)
+                        # Handle listbox fields
+                        # Check if it's an ordered list (like preferred_language_order)
+                        # or a multi-select list (like recompress_image_formats)
+                        if key == "preferred_language_order":
+                            # Ordered list - clear and populate in order from config
+                            var.delete(0, tk.END)
+                            if isinstance(value, list):
+                                for item in value:
+                                    var.insert(tk.END, item)
+                        else:
+                            # Multi-select list - select matching items
+                            var.selection_clear(0, tk.END)
+                            if isinstance(value, list):
+                                for i in range(var.size()):
+                                    item = var.get(i)
+                                    if item in value:
+                                        var.selection_set(i)
                     elif isinstance(var, tk.StringVar):
                         # Check if this is a labeled dropdown field
                         if hasattr(self, '_dropdown_reverse_mappings') and key in self._dropdown_reverse_mappings:
@@ -561,17 +699,21 @@ class LeetcodeScraperGUI:
                 elif isinstance(var, tk.IntVar):
                     setattr(config, key, int(var.get()))
                 elif isinstance(var, tk.Listbox):
-                    # Handle multi-select listbox (for preferred_language_order and recompress_image_formats)
-                    selected_indices = var.curselection()
-                    selected_items = [var.get(i) for i in selected_indices]
-                    
-                    # Set appropriate defaults based on field
+                    # Handle listbox fields
                     if key == "preferred_language_order":
-                        setattr(config, key, selected_items if selected_items else ["all"])
-                    elif key == "recompress_image_formats":
-                        setattr(config, key, selected_items if selected_items else ["webp"])
+                        # Ordered list - save all items in order (not just selected)
+                        all_items = [var.get(i) for i in range(var.size())]
+                        setattr(config, key, all_items if all_items else ["all"])
                     else:
-                        setattr(config, key, selected_items)
+                        # Multi-select list - save only selected items
+                        selected_indices = var.curselection()
+                        selected_items = [var.get(i) for i in selected_indices]
+                        
+                        # Set appropriate defaults based on field
+                        if key == "recompress_image_formats":
+                            setattr(config, key, selected_items if selected_items else ["webp"])
+                        else:
+                            setattr(config, key, selected_items)
                 elif isinstance(var, tk.StringVar):
                     value = var.get()
                     # Check if this is a labeled dropdown field
