@@ -71,13 +71,15 @@ class LeetcodeScraperGUI:
         
         # Tab 2: Cards
         cards_frame = ttk.Frame(notebook)
+        cards_scrollable = self.create_scrollable_frame(cards_frame)
         notebook.add(cards_frame, text="Cards")
-        self.setup_cards_tab(cards_frame)
+        self.setup_cards_tab(cards_scrollable)
         
         # Tab 3: Companies
         companies_frame = ttk.Frame(notebook)
+        companies_scrollable = self.create_scrollable_frame(companies_frame)
         notebook.add(companies_frame, text="Companies")
-        self.setup_companies_tab(companies_frame)
+        self.setup_companies_tab(companies_scrollable)
         
         # Tab 4: Submissions
         submissions_frame = ttk.Frame(notebook)
@@ -1068,32 +1070,51 @@ class LeetcodeScraperGUI:
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Card slug input with dropdown
-        card_input_frame = ttk.Frame(parent)
-        card_input_frame.pack(pady=10)
-        ttk.Label(card_input_frame, text="Card Name:").pack(side='left', padx=5)
+        # Card selection section
+        card_label = ttk.Label(parent, text="Select Cards to Download", font=('Arial', 10, 'bold'))
+        card_label.pack(pady=(5, 5))
         
-        # Use Combobox for both typing and dropdown
-        self.card_slug_var = tk.StringVar()
-        self.card_slug_combo = ttk.Combobox(card_input_frame, textvariable=self.card_slug_var, width=30)
-        self.card_slug_combo.pack(side='left', padx=5)
-        self.card_slug_combo['values'] = ()  # Empty initially
+        ttk.Label(parent, text="Card list loads automatically when you open this tab. Select one or more cards to download.", 
+                 font=('Arial', 9, 'italic'), foreground='gray').pack(pady=2)
         
-        # Add filtering
-        self.card_slug_var.trace_add('write', lambda *args: self.filter_cards())
+        # Container for listbox and buttons side by side
+        card_content_frame = ttk.Frame(parent)
+        card_content_frame.pack(fill='both', expand=True, padx=10, pady=5)
         
-        ttk.Button(card_input_frame, text="Download", command=self.download_card).pack(side='left')
-        ttk.Button(card_input_frame, text="Find Missing", command=self.check_missing_card).pack(side='left', padx=5)
+        # Left side: Listbox with scrollbar
+        card_listbox_frame = ttk.Frame(card_content_frame)
+        card_listbox_frame.pack(side='left', fill='both', expand=True)
+        
+        card_scrollbar = ttk.Scrollbar(card_listbox_frame)
+        card_scrollbar.pack(side='right', fill='y')
+        
+        self.cards_listbox = tk.Listbox(card_listbox_frame, height=12, selectmode='extended', 
+                                        yscrollcommand=card_scrollbar.set, exportselection=False)
+        self.cards_listbox.pack(side='left', fill='both', expand=True)
+        card_scrollbar.config(command=self.cards_listbox.yview)
+        
+        # Right side: Buttons
+        card_button_frame = ttk.Frame(card_content_frame)
+        card_button_frame.pack(side='left', fill='y', padx=(10, 0))
+        
+        ttk.Button(card_button_frame, text="Download Selected Card(s)", 
+                  command=self.download_card, width=25).pack(pady=4)
+        
+        ttk.Button(card_button_frame, text="Find Missing in Selected", 
+                  command=self.check_missing_card, width=25).pack(pady=4)
+        
+        ttk.Label(card_button_frame, text="(Hold Ctrl/Cmd to select multiple)", 
+                 font=('Arial', 8), foreground='gray', justify='center').pack(pady=2)
         
         # Info text
         info_frame = ttk.Frame(parent)
         info_frame.pack(fill='x', padx=10, pady=10)
-        info_text = ttk.Label(info_frame, text="Download LeetCode Explore Cards by slug name.\nCards contain curated problem sets and learning materials.\n\nCard list loads automatically when you open this tab.",
+        info_text = ttk.Label(info_frame, text="Download LeetCode Explore Cards.\nCards contain curated problem sets and learning materials.",
                              wraplength=500, justify='left', foreground='gray', font=('Arial', 9, 'italic'))
         info_text.pack()
     
     def load_card_list(self, show_message=True):
-        """Load all cards from LeetCode API and populate the dropdown.
+        """Load all cards from LeetCode API and populate the listbox.
         
         Args:
             show_message: If True, show success/error messages. Default True.
@@ -1117,20 +1138,22 @@ class LeetcodeScraperGUI:
                                 if 'slug' in card:
                                     card_list.append(card['slug'])
                     
-                    # Sort and remove duplicates
+                    # Remove duplicates and sort
                     card_list = sorted(set(card_list))
                     
-                    # Store all cards for filtering
+                    # Store all cards
                     self.all_cards = card_list
                     
-                    # Update combobox values
-                    self.card_slug_combo['values'] = card_list
+                    # Clear and populate listbox
+                    self.cards_listbox.delete(0, tk.END)
+                    for card_slug in card_list:
+                        self.cards_listbox.insert(tk.END, card_slug)
                     
                     self.cards_loaded = True
                     self.logger.info(f"Loaded {len(card_list)} cards")
                     self.status_var.set(f"Loaded {len(card_list)} cards")
                     if show_message:
-                        messagebox.showinfo("Success", f"Loaded {len(card_list)} cards into dropdown")
+                        messagebox.showinfo("Success", f"Loaded {len(card_list)} cards into list")
                 else:
                     self.logger.error("No cards found")
                     if show_message:
@@ -1186,9 +1209,11 @@ class LeetcodeScraperGUI:
                 # Sort and remove duplicates
                 card_list = sorted(set(card_list))
                 
-                # Update the dropdown list
+                # Update the listbox
                 self.all_cards = card_list
-                self.card_slug_combo['values'] = card_list
+                self.cards_listbox.delete(0, tk.END)
+                for card_slug in card_list:
+                    self.cards_listbox.insert(tk.END, card_slug)
                 
                 self.logger.info(f"Refreshed cards list: {len(card_list)} cards")
                 self.status_var.set("Cards list refreshed")
@@ -1196,7 +1221,7 @@ class LeetcodeScraperGUI:
                     f"Cards list refreshed successfully!\n\n"
                     f"Total cards: {len(card_list)}\n"
                     f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
-                    f"The dropdown list has been updated with the latest data.")
+                    f"The list has been updated with the latest data.")
                 
             except Exception as e:
                 self.logger.error(f"Error refreshing cards list: {e}")
@@ -1220,26 +1245,42 @@ class LeetcodeScraperGUI:
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Company slug input with dropdown
-        company_input_frame = ttk.Frame(parent)
-        company_input_frame.pack(pady=10)
-        ttk.Label(company_input_frame, text="Company Name:").pack(side='left', padx=5)
+        # Company selection section
+        company_label = ttk.Label(parent, text="Select Companies to Download", font=('Arial', 10, 'bold'))
+        company_label.pack(pady=(5, 5))
         
-        # Use Combobox for both typing and dropdown
-        self.company_slug_var = tk.StringVar()
-        self.company_slug_combo = ttk.Combobox(company_input_frame, textvariable=self.company_slug_var, width=20)
-        self.company_slug_combo.pack(side='left', padx=5)
-        self.company_slug_combo['values'] = ()  # Empty initially
+        ttk.Label(parent, text="Company list loads automatically when you open this tab. Select one or more companies to download.", 
+                 font=('Arial', 9, 'italic'), foreground='gray').pack(pady=2)
         
-        # Add filtering
-        self.company_slug_var.trace_add('write', lambda *args: self.filter_companies('company'))
+        # Container for listbox and buttons side by side
+        company_content_frame = ttk.Frame(parent)
+        company_content_frame.pack(fill='both', expand=True, padx=10, pady=5)
         
-        ttk.Button(company_input_frame, text="Download Selected Company Questions", command=self.download_company_questions).pack(side='left', padx=5)
-        ttk.Button(company_input_frame, text="Find Missing", command=self.check_missing_company_questions).pack(side='left', padx=5)
+        # Left side: Listbox with scrollbar
+        company_listbox_frame = ttk.Frame(company_content_frame)
+        company_listbox_frame.pack(side='left', fill='both', expand=True)
         
-        # Bind company selection to load favorites
-        self.company_slug_combo.bind('<<ComboboxSelected>>', lambda e: self.load_company_favorites())
+        company_scrollbar = ttk.Scrollbar(company_listbox_frame)
+        company_scrollbar.pack(side='right', fill='y')
         
+        self.companies_listbox = tk.Listbox(company_listbox_frame, height=10, selectmode='extended', 
+                                            yscrollcommand=company_scrollbar.set, exportselection=False)
+        self.companies_listbox.pack(side='left', fill='both', expand=True)
+        company_scrollbar.config(command=self.companies_listbox.yview)
+        
+        # Right side: Buttons
+        company_button_frame = ttk.Frame(company_content_frame)
+        company_button_frame.pack(side='left', fill='y', padx=(10, 0))
+        
+        ttk.Button(company_button_frame, text="Download Selected Company Questions", 
+                  command=self.download_company_questions, width=30).pack(pady=4)
+        
+        ttk.Button(company_button_frame, text="Find Missing in Selected", 
+                  command=self.check_missing_company_questions, width=30).pack(pady=4)
+        
+        ttk.Label(company_button_frame, text="(Hold Ctrl/Cmd to select multiple)", 
+                 font=('Arial', 8), foreground='gray', justify='center').pack(pady=2)
+                
         
         # Trending companies download        
         trending_input_frame = ttk.Frame(parent)
@@ -1258,6 +1299,23 @@ class LeetcodeScraperGUI:
         fav_frame = ttk.Frame(parent)
         fav_frame.pack(fill='x', padx=10, pady=5)
         
+        # Company slug input with dropdown
+        company_input_frame = ttk.Frame(fav_frame)
+        company_input_frame.pack(pady=10)
+        ttk.Label(company_input_frame, text="Company Name:").pack(side='left', padx=5)
+        
+        # Use Combobox for both typing and dropdown
+        self.company_slug_var = tk.StringVar()
+        self.company_slug_combo = ttk.Combobox(company_input_frame, textvariable=self.company_slug_var, width=20)
+        self.company_slug_combo.pack(side='left', padx=5)
+        self.company_slug_combo['values'] = ()  # Empty initially
+
+        # Bind company selection to load favorites
+        self.company_slug_combo.bind('<<ComboboxSelected>>', lambda e: self.load_company_favorites())
+        
+        # Add filtering
+        self.company_slug_var.trace_add('write', lambda *args: self.filter_companies('company'))
+
         ttk.Label(fav_frame, text="Select a company above to load its question groups:", 
                  font=('Arial', 9, 'italic'), foreground='gray').pack(anchor='w', pady=2)
         
@@ -1315,10 +1373,15 @@ class LeetcodeScraperGUI:
                     # Format as "name (question_count)" for display
                     company_list = [f"{c.name} ({c.question_count})" for c in companies]
                     
-                    # Store all companies for filtering
+                    # Store all companies
                     self.all_companies = company_list
                     
-                    # Update both comboboxes
+                    # Update main listbox
+                    self.companies_listbox.delete(0, tk.END)
+                    for company_display in company_list:
+                        self.companies_listbox.insert(tk.END, company_display)
+                    
+                    # Update favorites combobox (the second one)
                     self.company_slug_combo['values'] = company_list
                     
                     # Store slug mapping for easy lookup (slug -> display format)
@@ -1330,7 +1393,7 @@ class LeetcodeScraperGUI:
                     self.logger.info(f"Loaded {len(companies)} companies")
                     self.status_var.set(f"Loaded {len(companies)} companies")
                     if show_message:
-                        messagebox.showinfo("Success", f"Loaded {len(companies)} companies into dropdown")
+                        messagebox.showinfo("Success", f"Loaded {len(companies)} companies into list")
                 else:
                     self.logger.error("No companies found")
                     if show_message:
@@ -1378,8 +1441,15 @@ class LeetcodeScraperGUI:
                 # Format as "name (question_count)" for display
                 company_list = [f"{c.name} ({c.question_count})" for c in companies]
                 
-                # Update the dropdown lists
+                # Update the listbox and combobox
                 self.all_companies = company_list
+                
+                # Update main listbox
+                self.companies_listbox.delete(0, tk.END)
+                for company_display in company_list:
+                    self.companies_listbox.insert(tk.END, company_display)
+                
+                # Update favorites combobox
                 self.company_slug_combo['values'] = company_list
                 
                 # Store slug mapping for easy lookup (slug -> display format)
@@ -1393,7 +1463,7 @@ class LeetcodeScraperGUI:
                     f"Company list refreshed successfully!\n\n"
                     f"Total companies: {len(companies)}\n"
                     f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
-                    f"The dropdown lists have been updated with the latest data.")
+                    f"The list has been updated with the latest data.")
                 
             except Exception as e:
                 self.logger.error(f"Error refreshing company list: {e}")
@@ -1603,18 +1673,6 @@ class LeetcodeScraperGUI:
             # Filter questions that contain the typed text
             filtered = [q for q in self.all_questions if typed in q.lower()]
             combo['values'] = filtered
-    
-    def filter_cards(self):
-        """Filter cards based on user input."""
-        typed = self.card_slug_var.get().lower()
-        
-        if not typed:
-            # If nothing typed, show all cards
-            self.card_slug_combo['values'] = self.all_cards
-        else:
-            # Filter cards that contain the typed text
-            filtered = [card for card in self.all_cards if typed in card.lower()]
-            self.card_slug_combo['values'] = filtered
     
     def filter_companies(self, field):
         """Filter companies based on user input in the specified field.
@@ -1868,105 +1926,163 @@ class LeetcodeScraperGUI:
         self.run_in_thread(task)
         
     def download_card(self):
-        card_slug = self.card_slug_var.get().strip()
-        if not card_slug:
-            messagebox.showwarning("Input Required", "Please enter or select a card name")
+        """Download one or more selected cards."""
+        selections = self.cards_listbox.curselection()
+        if not selections:
+            messagebox.showwarning("Selection Required", "Please select one or more cards from the list")
             return
+        
+        # Get selected card slugs
+        selected_cards = [self.cards_listbox.get(i) for i in selections]
+        
+        # Confirm if multiple selections
+        if len(selected_cards) > 1:
+            card_list_str = '\n'.join([f"  • {card}" for card in selected_cards])
+            if not messagebox.askyesno("Confirm Multiple Downloads", 
+                                       f"You are about to download {len(selected_cards)} cards:\n\n{card_list_str}\n\nContinue?"):
+                return
+        
         def task():
             self.initialize_components()
-            self.cards.download_selected_card(card_slug)
+            
+            total_cards = len(selected_cards)
+            success_count = 0
+            error_count = 0
+            
+            for i, card_slug in enumerate(selected_cards, 1):
+                self.logger.info(f"Downloading card {i}/{total_cards}: {card_slug}")
+                self.status_var.set(f"Downloading card {i}/{total_cards}: {card_slug}")
+                
+                try:
+                    self.cards.download_selected_card(card_slug)
+                    success_count += 1
+                except Exception as e:
+                    self.logger.error(f"Error downloading card '{card_slug}': {e}")
+                    error_count += 1
+            
+            self.status_var.set(f"Completed: {success_count} cards downloaded, {error_count} errors")
+            self.logger.info(f"Card download complete: {success_count} successful, {error_count} errors")
+            
+            if total_cards > 1:
+                messagebox.showinfo("Download Complete", 
+                                  f"Card Download Complete!\n\n"
+                                  f"✓ Successfully downloaded: {success_count}\n"
+                                  f"✗ Errors: {error_count}\n\n"
+                                  f"Check the log for details.")
+        
         self.run_in_thread(task)
     
     def check_missing_card(self):
-        """Check for missing items in a specific card."""
-        card_slug = self.card_slug_var.get().strip()
-        if not card_slug:
-            messagebox.showwarning("Input Required", "Please enter or select a card name")
+        """Check for missing items in selected card(s)."""
+        selections = self.cards_listbox.curselection()
+        if not selections:
+            messagebox.showwarning("Selection Required", "Please select one or more cards from the list")
             return
+        
+        # Get selected card slugs
+        selected_cards = [self.cards_listbox.get(i) for i in selections]
         
         def task():
             try:
                 self.initialize_components()
                 
-                self.logger.debug(f"Checking missing items for card: {card_slug}")
-                self.status_var.set(f"Checking card {card_slug}...")
-                
-                # Validate card exists
+                # Validate cards exist
                 cards = self.cards.get_cards()
                 card_slugs = {card.slug for card in cards}
                 
-                if not cards or card_slug not in card_slugs:
-                    self.logger.error(f"Card not found: {card_slug}")
-                    messagebox.showerror("Invalid Card", f"Card '{card_slug}' not found")
-                    return
+                overall_stats = {
+                    'total_cards': len(selected_cards),
+                    'total_items': 0,
+                    'downloaded_items': 0,
+                    'missing_items': 0
+                }
                 
-                # Get chapters with items for this card
-                chapters = self.cards.lc.get_chapters_with_items(card_slug)
-                
-                if not chapters:
-                    self.logger.error(f"Could not retrieve chapters for card: {card_slug}")
-                    messagebox.showerror("Error", f"Could not retrieve chapters for {card_slug}")
-                    return
-                
-                # Check which items are downloaded
-                total_items = 0
-                downloaded_items = 0
-                missing_items = []
-                
-                cards_chapter_dir = os.path.join(self.config.cards_directory, card_slug)
-                
-                for chapter in chapters:
-                    chapter_title = chapter.get('title', 'Unknown Chapter')
+                for i, card_slug in enumerate(selected_cards, 1):
+                    self.logger.debug(f"Checking card {i}/{len(selected_cards)}: {card_slug}")
+                    self.status_var.set(f"Checking card {i}/{len(selected_cards)}: {card_slug}")
                     
-                    for item in chapter['items']:
-                        item_id = item['id']
-                        item_title = Util.sanitize_title(item['title'])
-                        total_items += 1
+                    if card_slug not in card_slugs:
+                        self.logger.error(f"Card not found: {card_slug}")
+                        continue
+                    
+                    # Get chapters with items for this card
+                    chapters = self.cards.lc.get_chapters_with_items(card_slug)
+                    
+                    if not chapters:
+                        self.logger.error(f"Could not retrieve chapters for card: {card_slug}")
+                        continue
+                    
+                    # Check which items are downloaded
+                    total_items = 0
+                    downloaded_items = 0
+                    missing_items = []
+                    
+                    cards_chapter_dir = os.path.join(self.config.cards_directory, card_slug)
+                    
+                    for chapter in chapters:
+                        chapter_title = chapter.get('title', 'Unknown Chapter')
                         
-                        # Check if item file exists
-                        item_file = os.path.join(cards_chapter_dir, Util.qhtml(item_id, item_title))
-                        
-                        if os.path.exists(item_file):
-                            downloaded_items += 1
-                        else:
-                            missing_items.append((item_id, item_title, chapter_title))
+                        for item in chapter['items']:
+                            item_id = item['id']
+                            item_title = Util.sanitize_title(item['title'])
+                            total_items += 1
+                            
+                            # Check if item file exists
+                            item_file = os.path.join(cards_chapter_dir, Util.qhtml(item_id, item_title))
+                            
+                            if os.path.exists(item_file):
+                                downloaded_items += 1
+                            else:
+                                missing_items.append((item_id, item_title, chapter_title))
+                    
+                    missing_count = len(missing_items)
+                    
+                    # Update overall stats
+                    overall_stats['total_items'] += total_items
+                    overall_stats['downloaded_items'] += downloaded_items
+                    overall_stats['missing_items'] += missing_count
+                    
+                    # Log summary for this card
+                    self.logger.info(f"Card '{card_slug}' check complete:")
+                    self.logger.info(f"  Total items: {total_items}")
+                    self.logger.info(f"  Downloaded: {downloaded_items}")
+                    self.logger.info(f"  Missing: {missing_count}")
+                    
+                    if missing_count > 0:
+                        self.logger.info("Missing items:")
+                        for item_id, title, chapter in missing_items[:10]:  # Log first 10 per card
+                            self.logger.info(f"  {item_id} - {title} (Chapter: {chapter})")
+                        if missing_count > 10:
+                            self.logger.info(f"  ... and {missing_count - 10} more")
                 
-                missing_count = len(missing_items)
-                
-                # Log summary
-                self.logger.info(f"Card '{card_slug}' check complete:")
-                self.logger.info(f"  Total items: {total_items}")
-                self.logger.info(f"  Downloaded: {downloaded_items}")
-                self.logger.info(f"  Missing: {missing_count}")
-                
-                if missing_count > 0:
-                    self.logger.info("Missing items:")
-                    for item_id, title, chapter in missing_items[:30]:  # Log first 30
-                        self.logger.info(f"  {item_id} - {title} (Chapter: {chapter})")
-                    if missing_count > 30:
-                        self.logger.info(f"  ... and {missing_count - 30} more")
-                
-                # Create message
-                if missing_count == 0:
-                    self.status_var.set(f"All items for card {card_slug} downloaded!")
-                    message = (f"Card Check Complete!\n\n"
-                             f"Card: {card_slug}\n"
-                             f"Total items: {total_items}\n"
-                             f"✓ All items are downloaded!")
+                # Show overall summary
+                if len(selected_cards) == 1:
+                    # Single card - show detailed message
+                    card_slug = selected_cards[0]
+                    missing_count = overall_stats['missing_items']
+                    
+                    if missing_count == 0:
+                        self.status_var.set(f"All items for card {card_slug} downloaded!")
+                        message = (f"Card Check Complete!\n\n"
+                                 f"Card: {card_slug}\n"
+                                 f"Total items: {overall_stats['total_items']}\n"
+                                 f"✓ All items are downloaded!")
+                    else:
+                        self.status_var.set(f"Found {missing_count} missing items for {card_slug}")
+                        message = (f"Card Check: {card_slug}\n\n"
+                                 f"Total items: {overall_stats['total_items']}\n"
+                                 f"✓ Downloaded: {overall_stats['downloaded_items']}\n"
+                                 f"✗ Missing: {missing_count}\n\n"
+                                 f"Check the log for the complete list.")
                 else:
-                    self.status_var.set(f"Found {missing_count} missing items for {card_slug}")
-                    
-                    # Show first 10 missing items
-                    display_items = missing_items[:10]
-                    display_list = '\n'.join([f"{item_id} - {title}\n  (Chapter: {chap})" for item_id, title, chap in display_items])
-                    more_text = f"\n... and {missing_count - 10} more" if missing_count > 10 else ""
-                    
-                    message = (f"Card Check: {card_slug}\n\n"
-                             f"Total items: {total_items}\n"
-                             f"✓ Downloaded: {downloaded_items}\n"
-                             f"✗ Missing: {missing_count}\n\n"
-                             f"Missing items:\n{display_list}{more_text}\n\n"
-                             f"Check the log for the complete list.")
+                    # Multiple cards - show aggregated summary
+                    self.status_var.set(f"Check complete: {overall_stats['missing_items']} missing items across {len(selected_cards)} cards")
+                    message = (f"Multiple Cards Check Complete!\n\n"
+                             f"Cards checked: {len(selected_cards)}\n"
+                             f"Total items: {overall_stats['total_items']}\n"
+                             f"✓ Downloaded: {overall_stats['downloaded_items']}\n"
+                             f"✗ Missing: {overall_stats['missing_items']}\n\n"
+                             f"Check the log for details on each card.")
                 
                 messagebox.showinfo("Card Check Complete", message)
                 
@@ -2508,131 +2624,180 @@ class LeetcodeScraperGUI:
         self.run_in_thread(task)
         
     def download_company_questions(self):
-        company_input = self.company_slug_var.get().strip()
-        if not company_input:
-            messagebox.showwarning("Input Required", "Please enter or select a company")
+        """Download questions for one or more selected companies."""
+        selections = self.companies_listbox.curselection()
+        if not selections:
+            messagebox.showwarning("Selection Required", "Please select one or more companies from the list")
             return
         
-        # Extract company slug from input
-        # Use reverse mapping if available, otherwise try to parse or use directly
-        if hasattr(self, 'company_display_to_slug') and company_input in self.company_display_to_slug:
-            company_slug = self.company_display_to_slug[company_input]
-        elif '(' in company_input and ')' in company_input:
-            # Fallback: Extract from "Company Name (question_count)" format - this won't work reliably anymore
-            # But keep for backward compatibility if user types manually
-            messagebox.showwarning("Invalid Input", "Please select a company from the dropdown list")
-            return
-        else:
-            # Direct slug input (manual typing)
-            company_slug = company_input
-            
+        # Get selected company displays
+        selected_companies = [self.companies_listbox.get(i) for i in selections]
+        
+        # Confirm if multiple selections
+        if len(selected_companies) > 1:
+            company_list_str = '\n'.join([f"  • {company}" for company in selected_companies])
+            if not messagebox.askyesno("Confirm Multiple Downloads", 
+                                       f"You are about to download questions for {len(selected_companies)} companies:\n\n{company_list_str}\n\nContinue?"):
+                return
+        
         def task():
             self.initialize_components()
-            self.company.download_selected_company_questions(company_slug)
+            
+            total_companies = len(selected_companies)
+            success_count = 0
+            error_count = 0
+            
+            for i, company_display in enumerate(selected_companies, 1):
+                # Extract slug from display format
+                if company_display in self.company_display_to_slug:
+                    company_slug = self.company_display_to_slug[company_display]
+                    company_name = company_display.split(' (')[0] if ' (' in company_display else company_slug
+                    
+                    self.logger.info(f"Downloading company {i}/{total_companies}: {company_name}")
+                    self.status_var.set(f"Downloading company {i}/{total_companies}: {company_name}")
+                    
+                    try:
+                        self.company.download_selected_company_questions(company_slug)
+                        success_count += 1
+                    except Exception as e:
+                        self.logger.error(f"Error downloading {company_name}: {e}")
+                        error_count += 1
+                else:
+                    self.logger.warning(f"Could not find slug for: {company_display}")
+                    error_count += 1
+            
+            self.status_var.set(f"Completed: {success_count} companies downloaded, {error_count} errors")
+            self.logger.info(f"Company download complete: {success_count} successful, {error_count} errors")
+            
+            if total_companies > 1:
+                messagebox.showinfo("Download Complete", 
+                                  f"Company Download Complete!\n\n"
+                                  f"✓ Successfully downloaded: {success_count}\n"
+                                  f"✗ Errors: {error_count}\n\n"
+                                  f"Check the log for details.")
+        
         self.run_in_thread(task)
     
     def check_missing_company_questions(self):
-        """Check for missing downloads for a specific company."""
-        company_input = self.company_slug_var.get().strip()
-        if not company_input:
-            messagebox.showwarning("Input Required", "Please enter or select a company")
+        """Check for missing downloads for selected company/companies."""
+        selections = self.companies_listbox.curselection()
+        if not selections:
+            messagebox.showwarning("Selection Required", "Please select one or more companies from the list")
             return
         
-        # Extract company slug and name from input
-        # Use reverse mapping if available, otherwise try to parse or use directly
-        if hasattr(self, 'company_display_to_slug') and company_input in self.company_display_to_slug:
-            company_slug = self.company_display_to_slug[company_input]
-            company_name = company_input.split(' (')[0] if ' (' in company_input else company_slug
-        elif '(' in company_input and ')' in company_input:
-            # Fallback: user typed manually in old format
-            messagebox.showwarning("Invalid Input", "Please select a company from the dropdown list")
-            return
-        else:
-            # Direct slug input (manual typing)
-            company_slug = company_input
-            company_name = company_slug
+        # Get selected company displays
+        selected_companies = [self.companies_listbox.get(i) for i in selections]
         
         def task():
             try:
                 self.initialize_components()
                 
-                self.logger.debug(f"Checking missing questions for company: {company_slug}")
-                self.status_var.set(f"Checking {company_slug}...")
-                
-                # Validate company exists
+                # Validate companies exist
                 companies = self.company.get_company_slugs()
                 company_slugs = {company.slug for company in companies}
                 
-                if not companies or company_slug not in company_slugs:
-                    self.logger.error(f"Company not valid: {company_slug}")
-                    messagebox.showerror("Invalid Company", f"Company '{company_slug}' not found")
-                    return
+                overall_stats = {
+                    'total_companies': len(selected_companies),
+                    'total_questions': 0,
+                    'downloaded_questions': 0,
+                    'missing_questions': 0
+                }
                 
-                # Get company question data
-                favorite_details = self.company.get_company_question_data(company_slug)
-                
-                if not favorite_details:
-                    self.logger.error(f"Could not retrieve questions for company: {company_slug}")
-                    messagebox.showerror("Error", f"Could not retrieve questions for {company_slug}")
-                    return
-                
-                # Check which questions are downloaded
-                total_questions = 0
-                downloaded_questions = 0
-                missing_questions = []
-                
-                company_dir = os.path.join(self.config.companies_directory, company_slug)
-                
-                for favorite_slug, (display_name, questions) in favorite_details.items():
-                    fav_dir = os.path.join(company_dir, favorite_slug)
+                for i, company_display in enumerate(selected_companies, 1):
+                    # Extract slug from display format
+                    if company_display in self.company_display_to_slug:
+                        company_slug = self.company_display_to_slug[company_display]
+                        company_name = company_display.split(' (')[0] if ' (' in company_display else company_slug
+                    else:
+                        self.logger.error(f"Could not find slug for: {company_display}")
+                        continue
                     
-                    for question in questions:
-                        total_questions += 1
+                    self.logger.debug(f"Checking company {i}/{len(selected_companies)}: {company_slug}")
+                    self.status_var.set(f"Checking company {i}/{len(selected_companies)}: {company_name}")
+                    
+                    if company_slug not in company_slugs:
+                        self.logger.error(f"Company not valid: {company_slug}")
+                        continue
+                    
+                    # Get company question data
+                    favorite_details = self.company.get_company_question_data(company_slug)
+                    
+                    if not favorite_details:
+                        self.logger.error(f"Could not retrieve questions for company: {company_slug}")
+                        continue
+                    
+                    # Check which questions are downloaded
+                    total_questions = 0
+                    downloaded_questions = 0
+                    missing_questions = []
+                    
+                    company_dir = os.path.join(self.config.companies_directory, company_slug)
+                    
+                    for favorite_slug, (display_name, questions) in favorite_details.items():
+                        fav_dir = os.path.join(company_dir, favorite_slug)
                         
-                        # Check if question file exists
-                        question_file = os.path.join(fav_dir, Util.qhtml(question.id, question.title))
-                        
-                        if os.path.exists(question_file):
-                            downloaded_questions += 1
-                        else:
-                            missing_questions.append((question.id, question.title, display_name))
+                        for question in questions:
+                            total_questions += 1
+                            
+                            # Check if question file exists
+                            question_file = os.path.join(fav_dir, Util.qhtml(question.id, question.title))
+                            
+                            if os.path.exists(question_file):
+                                downloaded_questions += 1
+                            else:
+                                missing_questions.append((question.id, question.title, display_name))
+                    
+                    missing_count = len(missing_questions)
+                    
+                    # Update overall stats
+                    overall_stats['total_questions'] += total_questions
+                    overall_stats['downloaded_questions'] += downloaded_questions
+                    overall_stats['missing_questions'] += missing_count
+                    
+                    # Log summary for this company
+                    self.logger.info(f"Company '{company_slug}' check complete:")
+                    self.logger.info(f"  Total questions: {total_questions}")
+                    self.logger.info(f"  Downloaded: {downloaded_questions}")
+                    self.logger.info(f"  Missing: {missing_count}")
+                    
+                    if missing_count > 0:
+                        self.logger.info("Missing questions:")
+                        for qid, title, category in missing_questions[:10]:  # Log first 10 per company
+                            self.logger.info(f"  {qid} - {title} (Category: {category})")
+                        if missing_count > 10:
+                            self.logger.info(f"  ... and {missing_count - 10} more")
                 
-                missing_count = len(missing_questions)
-                
-                # Log summary
-                self.logger.info(f"Company '{company_slug}' check complete:")
-                self.logger.info(f"  Total questions: {total_questions}")
-                self.logger.info(f"  Downloaded: {downloaded_questions}")
-                self.logger.info(f"  Missing: {missing_count}")
-                
-                if missing_count > 0:
-                    self.logger.info("Missing questions:")
-                    for qid, title, category in missing_questions[:50]:  # Log first 50
-                        self.logger.info(f"  {qid} - {title} (Category: {category})")
-                    if missing_count > 50:
-                        self.logger.info(f"  ... and {missing_count - 50} more")
-                
-                # Create message
-                if missing_count == 0:
-                    self.status_var.set(f"All questions for {company_slug} downloaded!")
-                    message = (f"Company Check Complete!\n\n"
-                             f"Company: {company_name}\n"
-                             f"Total questions: {total_questions}\n"
-                             f"✓ All questions are downloaded!")
+                # Show overall summary
+                if len(selected_companies) == 1:
+                    # Single company - show detailed message
+                    company_display = selected_companies[0]
+                    company_name = company_display.split(' (')[0] if ' (' in company_display else company_display
+                    missing_count = overall_stats['missing_questions']
+                    
+                    if missing_count == 0:
+                        self.status_var.set(f"All questions for {company_name} downloaded!")
+                        message = (f"Company Check Complete!\n\n"
+                                 f"Company: {company_name}\n"
+                                 f"Total questions: {overall_stats['total_questions']}\n"
+                                 f"✓ All questions are downloaded!")
+                    else:
+                        self.status_var.set(f"Found {missing_count} missing questions for {company_name}")
+                        message = (f"Company Check: {company_name}\n\n"
+                                 f"Total questions: {overall_stats['total_questions']}\n"
+                                 f"✓ Downloaded: {overall_stats['downloaded_questions']}\n"
+                                 f"✗ Missing: {missing_count}\n\n"
+                                 f"Check the log for the complete list.")
                 else:
-                    self.status_var.set(f"Found {missing_count} missing questions for {company_slug}")
-                    
-                    # Show first 15 missing questions
-                    display_questions = missing_questions[:15]
-                    display_list = '\n'.join([f"{qid} - {title} ({cat})" for qid, title, cat in display_questions])
-                    more_text = f"\n... and {missing_count - 15} more" if missing_count > 15 else ""
-                    
-                    message = (f"Company Check: {company_name}\n\n"
-                             f"Total questions: {total_questions}\n"
-                             f"✓ Downloaded: {downloaded_questions}\n"
-                             f"✗ Missing: {missing_count}\n\n"
-                             f"Missing questions:\n{display_list}{more_text}\n\n"
-                             f"Check the log for the complete list.")
+                    # Multiple companies - show aggregated summary
+                    self.status_var.set(f"Check complete: {overall_stats['missing_questions']} missing questions across {len(selected_companies)} companies")
+                    message = (f"Multiple Companies Check Complete!\n\n"
+                             f"Companies checked: {len(selected_companies)}\n"
+                             f"Total questions: {overall_stats['total_questions']}\n"
+                             f"✓ Downloaded: {overall_stats['downloaded_questions']}\n"
+                             f"✗ Missing: {overall_stats['missing_questions']}\n\n"
+                             f"Check the log for details on each company.")
+                
+                messagebox.showinfo("Company Check Complete", message)
                 
                 messagebox.showinfo("Company Check Complete", message)
                 
