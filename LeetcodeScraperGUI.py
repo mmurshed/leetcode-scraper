@@ -1299,6 +1299,9 @@ class LeetcodeScraperGUI:
         fav_frame = ttk.Frame(parent)
         fav_frame.pack(fill='x', padx=10, pady=5)
         
+        company_label = ttk.Label(fav_frame, text="Select a Company and Question Group to Download", font=('Arial', 10, 'bold'))
+        company_label.pack(pady=(5, 5))
+
         # Company slug input with dropdown
         company_input_frame = ttk.Frame(fav_frame)
         company_input_frame.pack(pady=10)
@@ -1487,31 +1490,48 @@ class LeetcodeScraperGUI:
         
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Question ID input with dropdown
-        submission_input_frame = ttk.Frame(parent)
-        submission_input_frame.pack(pady=10)
-        ttk.Label(submission_input_frame, text="Submitted Question ID:").pack(side='left', padx=5)
+        # Submission selection section
+        submission_label = ttk.Label(parent, text="Select Questions to Download Submissions", font=('Arial', 10, 'bold'))
+        submission_label.pack(pady=(5, 5))
         
-        # Use Combobox for both typing and dropdown
-        self.submission_question_id_var = tk.StringVar()
-        self.submission_question_id_combo = ttk.Combobox(submission_input_frame, textvariable=self.submission_question_id_var, width=30)
-        self.submission_question_id_combo.pack(side='left', padx=5)
-        self.submission_question_id_combo['values'] = ()  # Empty initially
+        ttk.Label(parent, text="Submission list loads automatically when you open this tab. Select one or more questions.", 
+                 font=('Arial', 9, 'italic'), foreground='gray').pack(pady=2)
         
-        # Add filtering
-        self.submission_question_id_var.trace_add('write', lambda *args: self.filter_submission_questions())
+        # Container for listbox and button side by side
+        submission_content_frame = ttk.Frame(parent)
+        submission_content_frame.pack(fill='both', expand=True, padx=10, pady=5)
         
-        ttk.Button(submission_input_frame, text="Download", command=self.download_question_submissions).pack(side='left')
+        # Left side: Listbox with scrollbar
+        submission_listbox_frame = ttk.Frame(submission_content_frame)
+        submission_listbox_frame.pack(side='left', fill='both', expand=True)
+        
+        submission_scrollbar = ttk.Scrollbar(submission_listbox_frame)
+        submission_scrollbar.pack(side='right', fill='y')
+        
+        self.submissions_listbox = tk.Listbox(submission_listbox_frame, height=12, selectmode='extended', 
+                                              yscrollcommand=submission_scrollbar.set, exportselection=False)
+        self.submissions_listbox.pack(side='left', fill='both', expand=True)
+        submission_scrollbar.config(command=self.submissions_listbox.yview)
+        
+        # Right side: Button
+        submission_button_frame = ttk.Frame(submission_content_frame)
+        submission_button_frame.pack(side='left', fill='y', padx=(10, 0))
+        
+        ttk.Button(submission_button_frame, text="Download Selected Submissions", 
+                  command=self.download_question_submissions, width=25).pack(pady=4)
+        
+        ttk.Label(submission_button_frame, text="(Hold Ctrl/Cmd to select multiple)", 
+                 font=('Arial', 8), foreground='gray', justify='center').pack(pady=2)
         
         # Info text
         info_frame = ttk.Frame(parent)
         info_frame.pack(fill='x', padx=10, pady=10)
-        info_text = ttk.Label(info_frame, text="Download your submission history for specific questions or all questions.\nThe dropdown shows only questions you've attempted or solved.\n✓ = Solved, ○ = Attempted\n\nSubmission list loads automatically when you open this tab.",
+        info_text = ttk.Label(info_frame, text="Download your submission history for specific questions or all questions.\nThe list shows only questions you've attempted or solved. ✓ = Solved, ○ = Attempted",
                              wraplength=500, justify='left', foreground='gray', font=('Arial', 9, 'italic'))
         info_text.pack()
     
     def load_submission_question_list(self, show_message=True):
-        """Load questions with submissions from LeetCode API and populate the dropdown.
+        """Load questions with submissions from LeetCode API and populate the listbox.
         
         Args:
             show_message: If True, show success/error messages. Default True.
@@ -1550,11 +1570,13 @@ class LeetcodeScraperGUI:
                     # Sort by question ID
                     question_list.sort(key=lambda x: int(x.split(' - ')[0]))
                     
-                    # Store all submission questions for filtering
+                    # Store all submission questions
                     self.all_submission_questions = question_list
                     
-                    # Update combobox values
-                    self.submission_question_id_combo['values'] = question_list
+                    # Clear and populate listbox
+                    self.submissions_listbox.delete(0, tk.END)
+                    for question_display in question_list:
+                        self.submissions_listbox.insert(tk.END, question_display)
                     
                     self.submissions_loaded = True
                     self.logger.info(f"Loaded {len(submissions)} questions with submissions")
@@ -1628,9 +1650,11 @@ class LeetcodeScraperGUI:
                 # Sort by question ID
                 question_list.sort(key=lambda x: int(x.split(' - ')[0]))
                 
-                # Update the dropdown list
+                # Update the listbox
                 self.all_submission_questions = question_list
-                self.submission_question_id_combo['values'] = question_list
+                self.submissions_listbox.delete(0, tk.END)
+                for question_display in question_list:
+                    self.submissions_listbox.insert(tk.END, question_display)
                 
                 self.logger.info(f"Refreshed submissions list: {len(submissions)} questions with submissions")
                 self.status_var.set("Submissions list refreshed")
@@ -1640,7 +1664,7 @@ class LeetcodeScraperGUI:
                     f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
                     f"✓ = Solved\n"
                     f"○ = Attempted\n\n"
-                    f"The dropdown list has been updated with the latest data.")
+                    f"The list has been updated with the latest data.")
                 
             except Exception as e:
                 self.logger.error(f"Error refreshing submissions list: {e}")
@@ -1697,18 +1721,6 @@ class LeetcodeScraperGUI:
             filtered = [company for company in self.all_companies if typed in company.lower()]
             combo['values'] = filtered
     
-    def filter_submission_questions(self):
-        """Filter submission questions based on user input."""
-        typed = self.submission_question_id_var.get().lower()
-        
-        if not typed:
-            # If nothing typed, show all questions
-            self.submission_question_id_combo['values'] = self.all_submission_questions
-        else:
-            # Filter questions that contain the typed text
-            filtered = [q for q in self.all_submission_questions if typed in q.lower()]
-            self.submission_question_id_combo['values'] = filtered
-        
     def setup_converter_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
@@ -3089,32 +3101,65 @@ class LeetcodeScraperGUI:
         self.run_in_thread(task)
         
     def download_question_submissions(self):
-        question_input = self.submission_question_id_var.get().strip()
-        if not question_input:
-            messagebox.showwarning("Input Required", "Please enter or select a question ID")
+        """Download submissions for one or more selected questions."""
+        selections = self.submissions_listbox.curselection()
+        if not selections:
+            messagebox.showwarning("Selection Required", "Please select one or more questions from the list")
             return
         
-        # Extract question ID from input
-        # Input can be either "123" or "123 - Question Title"
-        try:
-            if ' - ' in question_input:
-                # Extract ID from "ID - Title" format
-                question_id = int(question_input.split(' - ')[0].strip())
-            else:
-                # Direct ID input
-                question_id = int(question_input)
-        except ValueError:
-            messagebox.showerror("Invalid Input", "Question ID must be a number.\nFormat: 123 or select from dropdown")
+        # Get selected question displays and extract IDs
+        selected_questions = []
+        for i in selections:
+            question_display = self.submissions_listbox.get(i)
+            try:
+                # Extract ID from "ID - Title [Status]" format
+                question_id = int(question_display.split(' - ')[0].strip())
+                selected_questions.append((question_id, question_display))
+            except (ValueError, IndexError):
+                self.logger.error(f"Could not parse question ID from: {question_display}")
+                continue
+        
+        if not selected_questions:
+            messagebox.showerror("Invalid Selection", "Could not parse question IDs from selection")
             return
         
-        # Validate it's a positive integer
-        if question_id <= 0:
-            messagebox.showerror("Invalid Input", "Question ID must be a positive number")
-            return
-            
+        # Confirm if multiple selections
+        if len(selected_questions) > 1:
+            question_list_str = '\n'.join([f"  • {display}" for _, display in selected_questions])
+            if not messagebox.askyesno("Confirm Multiple Downloads", 
+                                       f"You are about to download submissions for {len(selected_questions)} questions:\n\n{question_list_str}\n\nContinue?"):
+                return
+        
         def task():
             self.initialize_components()
-            self.submission.get_selected_submissions(question_id=question_id)
+            
+            total_questions = len(selected_questions)
+            success_count = 0
+            error_count = 0
+            
+            for i, (question_id, question_display) in enumerate(selected_questions, 1):
+                question_title = question_display.split(' - ')[1].split(' [')[0] if ' - ' in question_display else str(question_id)
+                
+                self.logger.info(f"Downloading submissions {i}/{total_questions}: {question_id} - {question_title}")
+                self.status_var.set(f"Downloading submissions {i}/{total_questions}: {question_id} - {question_title}")
+                
+                try:
+                    self.submission.get_selected_submissions(question_id=question_id)
+                    success_count += 1
+                except Exception as e:
+                    self.logger.error(f"Error downloading submissions for question {question_id}: {e}")
+                    error_count += 1
+            
+            self.status_var.set(f"Completed: {success_count} submissions downloaded, {error_count} errors")
+            self.logger.info(f"Submission download complete: {success_count} successful, {error_count} errors")
+            
+            if total_questions > 1:
+                messagebox.showinfo("Download Complete", 
+                                  f"Submission Download Complete!\n\n"
+                                  f"✓ Successfully downloaded: {success_count}\n"
+                                  f"✗ Errors: {error_count}\n\n"
+                                  f"Check the log for details.")
+        
         self.run_in_thread(task)
         
     def browse_pdf_directory(self):
