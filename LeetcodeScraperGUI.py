@@ -7,7 +7,6 @@ import os
 
 from LeetcodeScraper import init
 from utils.Util import Util
-from utils.ConfigLoader import ConfigLoader
 
 
 class TextHandler(Handler):
@@ -30,7 +29,7 @@ class TextHandler(Handler):
 class LeetcodeScraperGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("LeetCode Scraper v3.0-beta")
+        self.root.title("LeetCode Scraper 3.0-beta")
         self.root.geometry("900x700")
         
         # Initialize logger
@@ -612,6 +611,11 @@ class LeetcodeScraperGUI:
     
     def on_openai_key_changed(self):
         """Callback when OpenAI API key is changed - fetch available models."""
+        # Only fetch models if OpenAI is selected as the AI generator
+        ai_generator_var = self.config_vars.get("ai_solution_generator")
+        if not ai_generator_var or ai_generator_var.get().strip().lower() != "openai":
+            return
+        
         api_key = self.config_vars.get("open_ai_api_key")
         if not api_key:
             return
@@ -675,6 +679,11 @@ class LeetcodeScraperGUI:
     
     def on_ollama_url_changed(self):
         """Callback when Ollama URL is changed - fetch available models."""
+        # Only fetch models if Ollama is selected as the AI generator
+        ai_generator_var = self.config_vars.get("ai_solution_generator")
+        if not ai_generator_var or ai_generator_var.get().strip().lower() != "ollama":
+            return
+        
         url_var = self.config_vars.get("ollama_url")
         if not url_var:
             return
@@ -703,8 +712,20 @@ class LeetcodeScraperGUI:
         # Show relevant frame based on selection
         if selected == "openai":
             self.openai_subframe.pack(fill='x', pady=5)
+            # If API key is already filled, fetch models
+            api_key_var = self.config_vars.get("open_ai_api_key")
+            if api_key_var:
+                key_value = api_key_var.get().strip()
+                if key_value and key_value.startswith("sk-") and len(key_value) > 20:
+                    self.fetch_openai_models(key_value)
         elif selected == "ollama":
             self.ollama_subframe.pack(fill='x', pady=5)
+            # If URL is already filled, fetch models
+            url_var = self.config_vars.get("ollama_url")
+            if url_var:
+                url_value = url_var.get().strip()
+                if url_value and url_value.startswith("http"):
+                    self.fetch_ollama_models(url_value)
         # If "none", both remain hidden
     
     def fetch_ollama_models(self, base_url):
@@ -762,24 +783,26 @@ class LeetcodeScraperGUI:
     def setup_questions_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
-        # Questions section
-        questions_frame = ttk.LabelFrame(parent, text="Questions", padding="10")
-        questions_frame.pack(fill='x', padx=10, pady=10)
-        
         # Buttons for all questions operations
-        all_questions_frame = ttk.Frame(questions_frame)
+        all_questions_frame = ttk.Frame(parent)
         all_questions_frame.pack(pady=5)
         ttk.Button(all_questions_frame, text="Download All Questions", command=self.download_all_questions, width=30).pack(side='left', padx=5)
         ttk.Button(all_questions_frame, text="Find Missing", command=self.check_missing_questions, width=30).pack(side='left', padx=5)
         
-        ttk.Separator(questions_frame, orient='horizontal').pack(fill='x', pady=10)
+        # Second row of buttons
+        all_questions_frame2 = ttk.Frame(parent)
+        all_questions_frame2.pack(pady=5)
+        ttk.Button(all_questions_frame2, text="Generate Index", command=self.generate_question_index, width=30).pack(side='left', padx=5)
+        ttk.Button(all_questions_frame2, text="Refresh Question List", command=self.refresh_question_list, width=30).pack(side='left', padx=5)
+        
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
         # Single Question Download
-        single_label = ttk.Label(questions_frame, text="Download Single Question", font=('Arial', 10, 'bold'))
+        single_label = ttk.Label(parent, text="Download Single Question", font=('Arial', 10, 'bold'))
         single_label.pack(pady=(5, 5))
         
         # Question ID input with dropdown
-        question_input_frame = ttk.Frame(questions_frame)
+        question_input_frame = ttk.Frame(parent)
         question_input_frame.pack(pady=5)
         ttk.Label(question_input_frame, text="Question ID:").pack(side='left', padx=5)
         
@@ -794,14 +817,14 @@ class LeetcodeScraperGUI:
         
         ttk.Button(question_input_frame, text="Download", command=self.download_question).pack(side='left')
         
-        ttk.Separator(questions_frame, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
         # Range Download
-        range_label = ttk.Label(questions_frame, text="Download Question Range", font=('Arial', 10, 'bold'))
+        range_label = ttk.Label(parent, text="Download Question Range", font=('Arial', 10, 'bold'))
         range_label.pack(pady=(5, 5))
         
         # Range input frame
-        range_input_frame = ttk.Frame(questions_frame)
+        range_input_frame = ttk.Frame(parent)
         range_input_frame.pack(pady=5)
         
         ttk.Label(range_input_frame, text="From ID:").pack(side='left', padx=5)
@@ -873,7 +896,7 @@ class LeetcodeScraperGUI:
                     self.question_to_id_combo['values'] = question_list
                     
                     self.questions_loaded = True
-                    self.logger.debug(f"Loaded {len(questions)} questions")
+                    self.logger.info(f"Loaded {len(questions)} questions")
                     self.status_var.set(f"Loaded {len(questions)} questions")
                     if show_message:
                         messagebox.showinfo("Success", f"Loaded {len(questions)} questions into dropdown")
@@ -893,20 +916,21 @@ class LeetcodeScraperGUI:
     def setup_cards_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
-        # Cards section
-        cards_frame = ttk.LabelFrame(parent, text="Cards", padding="10")
-        cards_frame.pack(fill='x', padx=10, pady=10)
-        
         # Buttons for all cards operations
-        all_cards_frame = ttk.Frame(cards_frame)
+        all_cards_frame = ttk.Frame(parent)
         all_cards_frame.pack(pady=5)
         ttk.Button(all_cards_frame, text="Download All Cards", command=self.download_all_cards, width=30).pack(side='left', padx=5)
         ttk.Button(all_cards_frame, text="Find Missing", command=self.check_missing_cards, width=30).pack(side='left', padx=5)
         
-        ttk.Separator(cards_frame, orient='horizontal').pack(fill='x', pady=10)
+        # Second row of buttons
+        all_cards_frame2 = ttk.Frame(parent)
+        all_cards_frame2.pack(pady=5)
+        ttk.Button(all_cards_frame2, text="Refresh Cards List", command=self.refresh_cards_list, width=30).pack(side='left', padx=5)
+        
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
         # Card slug input with dropdown
-        card_input_frame = ttk.Frame(cards_frame)
+        card_input_frame = ttk.Frame(parent)
         card_input_frame.pack(pady=10)
         ttk.Label(card_input_frame, text="Card Name:").pack(side='left', padx=5)
         
@@ -980,6 +1004,66 @@ class LeetcodeScraperGUI:
                     messagebox.showerror("Error", f"Failed to load cards: {e}")
         
         self.run_in_thread(task)
+    
+    def refresh_cards_list(self):
+        """Clear cards cache and fetch fresh data from LeetCode."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info("Refreshing cards list from LeetCode...")
+                self.status_var.set("Clearing cards cache...")
+                
+                # Clear card-related cache entries
+                # Cache keys follow pattern: "card-categories", "card-detail-{slug}", "card-{slug}-chapters"
+                cache_keys_to_delete = []
+                for key in self.cache.iterkeys():
+                    if key.startswith("card-"):
+                        cache_keys_to_delete.append(key)
+                
+                # Delete the cache entries
+                for key in cache_keys_to_delete:
+                    self.cache.delete(key)
+                
+                self.logger.info(f"Cleared {len(cache_keys_to_delete)} cache entries")
+                self.status_var.set("Fetching fresh cards data...")
+                
+                # Fetch fresh data (this will cache the new data)
+                categories = self.cards.lc.get_categories()
+                
+                if not categories:
+                    self.logger.warning("Could not retrieve cards list")
+                    messagebox.showwarning("Error", "Could not retrieve cards from LeetCode")
+                    return
+                
+                # Extract card slugs
+                card_list = []
+                for category in categories:
+                    if 'cards' in category:
+                        for card in category['cards']:
+                            if 'slug' in card:
+                                card_list.append(card['slug'])
+                
+                # Sort and remove duplicates
+                card_list = sorted(set(card_list))
+                
+                # Update the dropdown list
+                self.all_cards = card_list
+                self.card_slug_combo['values'] = card_list
+                
+                self.logger.info(f"Refreshed cards list: {len(card_list)} cards")
+                self.status_var.set("Cards list refreshed")
+                messagebox.showinfo("Success", 
+                    f"Cards list refreshed successfully!\n\n"
+                    f"Total cards: {len(card_list)}\n"
+                    f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
+                    f"The dropdown list has been updated with the latest data.")
+                
+            except Exception as e:
+                self.logger.error(f"Error refreshing cards list: {e}")
+                messagebox.showerror("Error", f"Failed to refresh cards list:\n\n{e}")
+        
+        self.run_in_thread(task)
         
     def setup_companies_tab(self, parent):
         parent.columnconfigure(0, weight=1)
@@ -990,14 +1074,15 @@ class LeetcodeScraperGUI:
         ttk.Button(all_companies_frame, text="Download All Company Questions", command=self.download_all_companies, width=35).pack(side='left', padx=5)
         ttk.Button(all_companies_frame, text="Find Missing", command=self.check_missing_companies, width=35).pack(side='left', padx=5)
         
+        # Second row of buttons
+        all_companies_frame2 = ttk.Frame(parent)
+        all_companies_frame2.pack(pady=5)
+        ttk.Button(all_companies_frame2, text="Refresh Company List", command=self.refresh_company_list, width=35).pack(side='left', padx=5)
+        
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Single company
-        company_frame = ttk.LabelFrame(parent, text="Single Company", padding="10")
-        company_frame.pack(fill='x', padx=10, pady=5)
-        
         # Company slug input with dropdown
-        company_input_frame = ttk.Frame(company_frame)
+        company_input_frame = ttk.Frame(parent)
         company_input_frame.pack(pady=10)
         ttk.Label(company_input_frame, text="Company Name:").pack(side='left', padx=5)
         
@@ -1079,7 +1164,7 @@ class LeetcodeScraperGUI:
                     self.company_slug_mapping = {f"{c.name} ({c.slug})": c.slug for c in companies}
                     
                     self.companies_loaded = True
-                    self.logger.debug(f"Loaded {len(companies)} companies")
+                    self.logger.info(f"Loaded {len(companies)} companies")
                     self.status_var.set(f"Loaded {len(companies)} companies")
                     if show_message:
                         messagebox.showinfo("Success", f"Loaded {len(companies)} companies into dropdown")
@@ -1095,6 +1180,62 @@ class LeetcodeScraperGUI:
                     messagebox.showerror("Error", f"Failed to load companies: {e}")
         
         self.run_in_thread(task)
+    
+    def refresh_company_list(self):
+        """Clear company cache and fetch fresh data from LeetCode."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info("Refreshing company list from LeetCode...")
+                self.status_var.set("Clearing company cache...")
+                
+                # Clear company-related cache entries
+                # Cache keys follow pattern: "company-tags", "company-{slug}-favorite", "company-favorite-{slug}"
+                cache_keys_to_delete = []
+                for key in self.cache.iterkeys():
+                    if key.startswith("company-"):
+                        cache_keys_to_delete.append(key)
+                
+                # Delete the cache entries
+                for key in cache_keys_to_delete:
+                    self.cache.delete(key)
+                
+                self.logger.info(f"Cleared {len(cache_keys_to_delete)} cache entries")
+                self.status_var.set("Fetching fresh company data...")
+                
+                # Fetch fresh data (this will cache the new data)
+                companies = self.company.get_company_slugs()
+                
+                if not companies:
+                    self.logger.warning("Could not retrieve companies list")
+                    messagebox.showwarning("Error", "Could not retrieve companies from LeetCode")
+                    return
+                
+                # Format as "name (slug)" for display
+                company_list = [f"{c.name} ({c.slug})" for c in sorted(companies, key=lambda x: x.name)]
+                
+                # Update the dropdown lists
+                self.all_companies = company_list
+                self.company_slug_combo['values'] = company_list
+                self.fav_company_slug_combo['values'] = company_list
+                
+                # Store slug mapping for easy lookup
+                self.company_slug_mapping = {f"{c.name} ({c.slug})": c.slug for c in companies}
+                
+                self.logger.info(f"Refreshed company list: {len(companies)} companies")
+                self.status_var.set("Company list refreshed")
+                messagebox.showinfo("Success", 
+                    f"Company list refreshed successfully!\n\n"
+                    f"Total companies: {len(companies)}\n"
+                    f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
+                    f"The dropdown lists have been updated with the latest data.")
+                
+            except Exception as e:
+                self.logger.error(f"Error refreshing company list: {e}")
+                messagebox.showerror("Error", f"Failed to refresh company list:\n\n{e}")
+        
+        self.run_in_thread(task)
         
     def setup_submissions_tab(self, parent):
         parent.columnconfigure(0, weight=1)
@@ -1105,14 +1246,15 @@ class LeetcodeScraperGUI:
         ttk.Button(all_submissions_frame, text="Download All Your Submissions", command=self.download_all_submissions, width=35).pack(side='left', padx=5)
         ttk.Button(all_submissions_frame, text="Find Missing", command=self.check_missing_submissions, width=20).pack(side='left', padx=5)
         
+        # Second row of buttons
+        all_submissions_frame2 = ttk.Frame(parent)
+        all_submissions_frame2.pack(pady=5)
+        ttk.Button(all_submissions_frame2, text="Refresh Submissions", command=self.refresh_submissions_list, width=35).pack(side='left', padx=5)
+        
         ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
-        # Single question submissions
-        submission_frame = ttk.LabelFrame(parent, text="Download Submissions by Question ID", padding="10")
-        submission_frame.pack(fill='x', padx=10, pady=5)
-        
         # Question ID input with dropdown
-        submission_input_frame = ttk.Frame(submission_frame)
+        submission_input_frame = ttk.Frame(parent)
         submission_input_frame.pack(pady=10)
         ttk.Label(submission_input_frame, text="Submitted Question ID:").pack(side='left', padx=5)
         
@@ -1181,7 +1323,7 @@ class LeetcodeScraperGUI:
                     self.submission_question_id_combo['values'] = question_list
                     
                     self.submissions_loaded = True
-                    self.logger.debug(f"Loaded {len(submissions)} questions with submissions")
+                    self.logger.info(f"Loaded {len(submissions)} questions with submissions")
                     self.status_var.set(f"Loaded {len(submissions)} questions with submissions")
                     if show_message:
                         messagebox.showinfo("Success", f"Loaded {len(submissions)} questions with submissions\n\n✓ = Solved\n○ = Attempted")
@@ -1196,6 +1338,79 @@ class LeetcodeScraperGUI:
                 self.status_var.set("Failed to load submissions")
                 if show_message:
                     messagebox.showerror("Error", f"Failed to load submissions: {e}")
+        
+        self.run_in_thread(task)
+    
+    def refresh_submissions_list(self):
+        """Clear submissions cache and fetch fresh data from LeetCode."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info("Refreshing submissions list from LeetCode...")
+                self.status_var.set("Clearing submissions cache...")
+                
+                # Clear submission-related cache entries
+                # Cache keys follow pattern: "user-progress-submissions-{skip}-{limit}"
+                cache_keys_to_delete = []
+                for key in self.cache.iterkeys():
+                    if "progress" in key and "submission" in key:
+                        cache_keys_to_delete.append(key)
+                
+                # Delete the cache entries
+                for key in cache_keys_to_delete:
+                    self.cache.delete(key)
+                
+                self.logger.info(f"Cleared {len(cache_keys_to_delete)} cache entries")
+                self.status_var.set("Fetching fresh submissions data...")
+                
+                # Fetch fresh data (this will cache the new data)
+                submissions = self.qued.lc.get_all_submissions()
+                
+                if not submissions:
+                    self.logger.warning("No submissions found")
+                    self.status_var.set("No submissions found")
+                    messagebox.showinfo("No Submissions", "No submissions found. Have you solved any questions?")
+                    return
+                
+                # Format as "ID - Title [Status]" for display
+                question_list = []
+                for sub in submissions:
+                    q_id = sub.get('frontendId', '')
+                    title = sub.get('title', '')
+                    status = sub.get('questionStatus', '')
+                    
+                    # Create display text with status indicator
+                    if status == 'SOLVED':
+                        status_icon = '✓'
+                    elif status == 'ATTEMPTED':
+                        status_icon = '○'
+                    else:
+                        status_icon = '?'
+                    
+                    display_text = f"{q_id} - {title} [{status_icon}]"
+                    question_list.append(display_text)
+                
+                # Sort by question ID
+                question_list.sort(key=lambda x: int(x.split(' - ')[0]))
+                
+                # Update the dropdown list
+                self.all_submission_questions = question_list
+                self.submission_question_id_combo['values'] = question_list
+                
+                self.logger.info(f"Refreshed submissions list: {len(submissions)} questions with submissions")
+                self.status_var.set("Submissions list refreshed")
+                messagebox.showinfo("Success", 
+                    f"Submissions list refreshed successfully!\n\n"
+                    f"Questions with submissions: {len(submissions)}\n"
+                    f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
+                    f"✓ = Solved\n"
+                    f"○ = Attempted\n\n"
+                    f"The dropdown list has been updated with the latest data.")
+                
+            except Exception as e:
+                self.logger.error(f"Error refreshing submissions list: {e}")
+                messagebox.showerror("Error", f"Failed to refresh submissions list:\n\n{e}")
         
         self.run_in_thread(task)
     
@@ -1275,12 +1490,8 @@ class LeetcodeScraperGUI:
     def setup_converter_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
-        # PDF Conversion
-        pdf_frame = ttk.LabelFrame(parent, text="PDF Conversion", padding="10")
-        pdf_frame.pack(fill='x', padx=10, pady=5)
-        
         # PDF conversion options (applicable to both directory and file)
-        options_frame = ttk.Frame(pdf_frame)
+        options_frame = ttk.Frame(parent)
         options_frame.pack(fill='x', pady=(5, 10))
         
         self.pdf_overwrite_var = tk.BooleanVar(value=False)
@@ -1291,14 +1502,14 @@ class LeetcodeScraperGUI:
         ttk.Checkbutton(options_frame, text="Keep Word document(s)", 
                        variable=self.pdf_keep_docx_var).pack(anchor='w', padx=5, pady=2)
         
-        ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=5)
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=5)
         
         # Directory conversion
-        dir_label = ttk.Label(pdf_frame, text="Convert Directory:", font=('Arial', 9, 'bold'))
+        dir_label = ttk.Label(parent, text="Convert Directory:", font=('Arial', 9, 'bold'))
         dir_label.pack(anchor='w', pady=(5, 2))
         
         self.pdf_dir_var = tk.StringVar()
-        pdf_dir_frame = ttk.Frame(pdf_frame)
+        pdf_dir_frame = ttk.Frame(parent)
         pdf_dir_frame.pack(pady=5, fill='x')
         ttk.Label(pdf_dir_frame, text="Directory:").pack(side='left', padx=5)
         ttk.Entry(pdf_dir_frame, textvariable=self.pdf_dir_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
@@ -1306,28 +1517,28 @@ class LeetcodeScraperGUI:
         ttk.Button(pdf_dir_frame, text="Convert", command=self.convert_directory_to_pdf).pack(side='left', padx=5)
         ttk.Button(pdf_dir_frame, text="Find Missing", command=self.check_missing_pdfs).pack(side='left', padx=5)
         
-        ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
         # Single file conversion (HTML to PDF)
-        file_label = ttk.Label(pdf_frame, text="Convert HTML File:", font=('Arial', 9, 'bold'))
+        file_label = ttk.Label(parent, text="Convert HTML File:", font=('Arial', 9, 'bold'))
         file_label.pack(anchor='w', pady=(5, 2))
         
         self.pdf_file_var = tk.StringVar()
-        pdf_file_frame = ttk.Frame(pdf_frame)
+        pdf_file_frame = ttk.Frame(parent)
         pdf_file_frame.pack(pady=5, fill='x')
         ttk.Label(pdf_file_frame, text="HTML File:").pack(side='left', padx=5)
         ttk.Entry(pdf_file_frame, textvariable=self.pdf_file_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
         ttk.Button(pdf_file_frame, text="Browse", command=self.browse_pdf_file).pack(side='left', padx=5)
         ttk.Button(pdf_file_frame, text="Convert", command=self.convert_file_to_pdf).pack(side='left', padx=5)
         
-        ttk.Separator(pdf_frame, orient='horizontal').pack(fill='x', pady=10)
+        ttk.Separator(parent, orient='horizontal').pack(fill='x', pady=10)
         
         # Single DOCX file conversion (DOCX to PDF)
-        docx_label = ttk.Label(pdf_frame, text="Convert DOCX File:", font=('Arial', 9, 'bold'))
+        docx_label = ttk.Label(parent, text="Convert DOCX File:", font=('Arial', 9, 'bold'))
         docx_label.pack(anchor='w', pady=(5, 2))
         
         self.pdf_docx_file_var = tk.StringVar()
-        pdf_docx_frame = ttk.Frame(pdf_frame)
+        pdf_docx_frame = ttk.Frame(parent)
         pdf_docx_frame.pack(pady=5, fill='x')
         ttk.Label(pdf_docx_frame, text="DOCX File:").pack(side='left', padx=5)
         ttk.Entry(pdf_docx_frame, textvariable=self.pdf_docx_file_var, width=40).pack(side='left', padx=5, fill='x', expand=True)
@@ -1337,11 +1548,7 @@ class LeetcodeScraperGUI:
     def setup_cache_tab(self, parent):
         parent.columnconfigure(0, weight=1)
         
-        # Cache Management
-        cache_frame = ttk.LabelFrame(parent, text="Cache Management", padding="10")
-        cache_frame.pack(fill='x', padx=10, pady=5)
-        
-        cache_input_frame = ttk.Frame(cache_frame)
+        cache_input_frame = ttk.Frame(parent)
         cache_input_frame.pack(pady=5, fill='x')
         ttk.Label(cache_input_frame, text="Cache Key:").pack(side='left', padx=5)
         self.cache_key_var = tk.StringVar()
@@ -1353,12 +1560,12 @@ class LeetcodeScraperGUI:
         self.cache_key_var.trace_add('write', lambda *args: self.filter_cache_keys())
         
         # Action buttons
-        cache_buttons_frame = ttk.Frame(cache_frame)
+        cache_buttons_frame = ttk.Frame(parent)
         cache_buttons_frame.pack(pady=5)
         ttk.Button(cache_buttons_frame, text="Get", command=self.get_cache).pack(side='left', padx=2)
         ttk.Button(cache_buttons_frame, text="Delete", command=self.delete_cache).pack(side='left', padx=2)
         
-        ttk.Button(cache_frame, text="Clear All Cache", command=self.clear_cache).pack(pady=5)
+        ttk.Button(parent, text="Clear All Cache", command=self.clear_cache).pack(pady=5)
         
         # Info text
         info_frame = ttk.Frame(parent)
@@ -1611,6 +1818,92 @@ class LeetcodeScraperGUI:
             self.qued.download_all_questions()
         self.run_in_thread(task)
     
+    def generate_question_index(self):
+        """Generate index.html files for questions (subdirectories and root)."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info("Generating question index files...")
+                self.status_var.set("Generating question indexes...")
+                
+                # Get all questions from LeetCode
+                all_questions = self.qued.lc.get_all_questions()
+                
+                if not all_questions:
+                    self.logger.warning("Could not retrieve questions list")
+                    messagebox.showwarning("Error", "Could not retrieve questions from LeetCode")
+                    return
+                
+                # Generate the index files
+                self.qued.create_question_index(all_questions)
+                
+                self.logger.info("Question index files generated successfully")
+                self.status_var.set("Index generation complete")
+                messagebox.showinfo("Success", 
+                    f"Generated index files for {len(all_questions)} questions\n\n"
+                    f"• Root index: questions/index.html\n"
+                    f"• Subdirectory indexes: questions/0100/index.html, etc.")
+                
+            except Exception as e:
+                self.logger.error(f"Error generating question indexes: {e}")
+                messagebox.showerror("Error", f"Failed to generate question indexes:\n\n{e}")
+        
+        self.run_in_thread(task)
+    
+    def refresh_question_list(self):
+        """Clear question cache and fetch fresh data from LeetCode."""
+        def task():
+            try:
+                self.initialize_components()
+                
+                self.logger.info("Refreshing question list from LeetCode...")
+                self.status_var.set("Clearing question cache...")
+                
+                # Clear question-related cache entries
+                # Cache keys follow pattern: "question-count", "question-list"
+                cache_keys_to_delete = []
+                for key in self.cache.iterkeys():
+                    if key.startswith("question-count") or key.startswith("question-list"):
+                        cache_keys_to_delete.append(key)
+                
+                # Delete the cache entries
+                for key in cache_keys_to_delete:
+                    self.cache.delete(key)
+                
+                self.logger.info(f"Cleared {len(cache_keys_to_delete)} cache entries")
+                self.status_var.set("Fetching fresh question data...")
+                
+                # Fetch fresh data (this will cache the new data)
+                count = self.qued.lc.get_questions_count()
+                all_questions = self.qued.lc.get_all_questions()
+                
+                if not all_questions:
+                    self.logger.warning("Could not retrieve questions list")
+                    messagebox.showwarning("Error", "Could not retrieve questions from LeetCode")
+                    return
+                
+                # Update the dropdown lists
+                question_list = [f"{q.id} - {q.title}" for q in sorted(all_questions, key=lambda x: int(x.id))]
+                self.all_questions = question_list
+                self.question_id_combo['values'] = question_list
+                self.question_from_id_combo['values'] = question_list
+                self.question_to_id_combo['values'] = question_list
+                
+                self.logger.info(f"Refreshed question list: {len(all_questions)} questions")
+                self.status_var.set("Question list refreshed")
+                messagebox.showinfo("Success", 
+                    f"Question list refreshed successfully!\n\n"
+                    f"Total questions: {len(all_questions)}\n"
+                    f"Cleared {len(cache_keys_to_delete)} cache entries\n\n"
+                    f"The dropdown lists have been updated with the latest data.")
+                
+            except Exception as e:
+                self.logger.error(f"Error refreshing question list: {e}")
+                messagebox.showerror("Error", f"Failed to refresh question list:\n\n{e}")
+        
+        self.run_in_thread(task)
+    
     def check_missing_questions(self):
         """Check for questions that haven't been downloaded yet."""
         def task():
@@ -1775,6 +2068,8 @@ class LeetcodeScraperGUI:
                 return
         
         def task():
+            import time
+            
             self.initialize_components()
             
             # Get all questions to validate IDs exist
@@ -1784,6 +2079,7 @@ class LeetcodeScraperGUI:
             # Download questions in the range
             downloaded_count = 0
             skipped_count = 0
+            start_time = time.time()
             
             for question_id in range(from_id, to_id + 1):
                 if question_id not in all_question_ids:
@@ -1792,13 +2088,49 @@ class LeetcodeScraperGUI:
                     continue
                 
                 try:
-                    self.logger.info(f"Downloading question {question_id} ({downloaded_count + 1}/{range_size - skipped_count})")
+                    question_start = time.time()
+                    
+                    # Calculate time estimate
+                    if downloaded_count > 0:
+                        elapsed = time.time() - start_time
+                        avg_time_per_question = elapsed / downloaded_count
+                        remaining_questions = (range_size - skipped_count) - downloaded_count
+                        estimated_remaining = avg_time_per_question * remaining_questions
+                        
+                        # Format time estimate
+                        if estimated_remaining < 60:
+                            time_str = f"{int(estimated_remaining)}s"
+                        elif estimated_remaining < 3600:
+                            time_str = f"{int(estimated_remaining / 60)}m {int(estimated_remaining % 60)}s"
+                        else:
+                            hours = int(estimated_remaining / 3600)
+                            minutes = int((estimated_remaining % 3600) / 60)
+                            time_str = f"{hours}h {minutes}m"
+                        
+                        progress_msg = f"Downloading question {question_id} ({downloaded_count + 1}/{range_size - skipped_count}) - Est. remaining: {time_str}"
+                    else:
+                        progress_msg = f"Downloading question {question_id} ({downloaded_count + 1}/{range_size - skipped_count}) - Calculating time..."
+                    
+                    self.logger.info(progress_msg)
+                    self.status_var.set(progress_msg)
+                    
                     self.qued.download_selected_question(question_id)
                     downloaded_count += 1
+                    
                 except Exception as e:
                     self.logger.error(f"Failed to download question {question_id}: {e}")
             
-            self.logger.info(f"Range download complete: {downloaded_count} downloaded, {skipped_count} skipped")
+            total_time = time.time() - start_time
+            if total_time < 60:
+                time_taken = f"{int(total_time)}s"
+            elif total_time < 3600:
+                time_taken = f"{int(total_time / 60)}m {int(total_time % 60)}s"
+            else:
+                hours = int(total_time / 3600)
+                minutes = int((total_time % 3600) / 60)
+                time_taken = f"{hours}h {minutes}m"
+            
+            self.logger.info(f"Range download complete: {downloaded_count} downloaded, {skipped_count} skipped in {time_taken}")
             
         self.run_in_thread(task)
     

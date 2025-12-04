@@ -66,9 +66,6 @@ class Config:
             file.write(self.to_json())
 
     def set_derivative_values(self):
-        self.cards_filepath = os.path.join(self.save_directory, "cards.csv")
-        self.questions_filepath = os.path.join(self.save_directory, "questions.csv")
-        self.company_filepath = os.path.join(self.save_directory, "company.csv")
         self.cache_directory = os.path.join(self.save_directory, "cache")
         self.cards_directory = os.path.join(self.save_directory, "cards")
         self.companies_directory = os.path.join(self.save_directory, "companies")

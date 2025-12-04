@@ -371,7 +371,7 @@ class ApiManager:
         total_num = first_batch['totalNum']
         all_questions = first_batch.get('questions', [])
         
-        self.logger.info(f"Total questions with submissions: {total_num}")
+        self.logger.debug(f"Total questions with submissions: {total_num}")
         
         # Fetch remaining batches if needed
         if total_num > 50:
@@ -385,7 +385,7 @@ class ApiManager:
                 
                 skip += 50
         
-        self.logger.info(f"Retrieved {len(all_questions)} questions with submissions")
+        self.logger.debug(f"Retrieved {len(all_questions)} questions with submissions")
         return all_questions
 
     #endregion user progress api

@@ -15,7 +15,7 @@ def main(logger: Logger):
     while True:
         try:
             print(
-"""Leetcode-Scraper v3.0-beta
+"""Leetcode-Scraper 3.0-beta
 1: Setup config
 
 2: Download a card by name

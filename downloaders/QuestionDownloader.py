@@ -49,25 +49,73 @@ class QuestionDownloader:
     
     def create_question_index(self, questions):
         os.makedirs(self.config.questions_directory, exist_ok=True)
-        filepath = os.path.join(self.config.questions_directory, "index.html")
-
-        count = 0
-        html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th></tr>"""
+        
+        # Group questions by subdirectory
+        questions_by_folder = {}
         for question in questions:
-            count += 1
-            filename = Util.qhtml(question.id, question.title)
             folder_name = self.get_question_folder(question.id)
-            relative_path = f"{folder_name}/{filename}"
-
-            html += f'''<tr>
-                        <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
-                        <td><a slug="{question.slug}" title="{question.title}" href="{relative_path}">{question.title}</a></td>
-                        <td>{question.difficulty}</td>
+            if folder_name not in questions_by_folder:
+                questions_by_folder[folder_name] = []
+            questions_by_folder[folder_name].append(question)
+        
+        # Create index.html in each subdirectory
+        subdirectory_info = []
+        for folder_name in sorted(questions_by_folder.keys()):
+            folder_questions = sorted(questions_by_folder[folder_name], key=lambda q: int(q.id))
+            folder_path = os.path.join(self.config.questions_directory, folder_name)
+            os.makedirs(folder_path, exist_ok=True)
+            
+            # Generate HTML for this folder's index
+            folder_html = f"""<tr><th>Id</th><th style="width:70%">Title</th><th>Difficulty</th></tr>"""
+            for question in folder_questions:
+                filename = Util.qhtml(question.id, question.title)
+                
+                folder_html += f'''<tr>
+                            <td><a target="_blank" href="{Constants.LEETCODE_URL}/problems/{question.slug}">{question.id}</a></td>
+                            <td><a slug="{question.slug}" title="{question.title}" href="{filename}">{question.title}</a></td>
+                            <td>{question.difficulty}</td>
+                            </tr>'''
+            
+            # Write subdirectory index.html
+            folder_index_path = os.path.join(folder_path, "index.html")
+            folder_html_full = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Questions {folder_name}</title></head>
+                                  <body><h1>Questions {folder_name}</h1>
+                                  <p><a href="../index.html">← Back to All Questions</a></p>
+                                  <p>Total questions: {len(folder_questions)}</p>
+                                  <table border="1" cellpadding="5" cellspacing="0">{folder_html}</table>
+                                  </body></html>"""
+            with open(folder_index_path, 'w') as f:
+                f.write(folder_html_full)
+            
+            # Track info for root index
+            subdirectory_info.append((folder_name, len(folder_questions)))
+        
+        # Create root index.html with links to subdirectories
+        root_index_path = os.path.join(self.config.questions_directory, "index.html")
+        
+        # Generate table with subdirectory links
+        subdirs_html = f"""<tr><th>Folder</th><th>Question Range</th><th>Count</th></tr>"""
+        total_count = 0
+        for folder_name, count in subdirectory_info:
+            total_count += count
+            # Extract range from folder name (e.g., "0100" -> "1-199")
+            folder_num = int(folder_name)
+            range_start = folder_num
+            range_end = folder_num + 99
+            subdirs_html += f'''<tr>
+                        <td><a href="{folder_name}/index.html">{folder_name}/</a></td>
+                        <td>{range_start}-{range_end}</td>
+                        <td>{count}</td>
                         </tr>'''
-
-        html = f"""<!DOCTYPE html><html lang="en"><head></head><body><h1>All Questions</h1><p>Total questions {count}</p><table>{html}</table></body></html>"""
-        with open(filepath, 'w') as ifile:
-            ifile.write(html)
+        
+        root_html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>All Questions</title></head>
+                       <body><h1>All Questions</h1>
+                       <p>Total questions: {total_count}</p>
+                       <h2>Browse by Range</h2>
+                       <table border="1" cellpadding="5" cellspacing="0">{subdirs_html}</table>
+                       </body></html>"""
+        with open(root_index_path, 'w') as f:
+            f.write(root_html)
 
     def download_selected_question(self, question_id: int):
         questions = self.lc.get_all_questions()
